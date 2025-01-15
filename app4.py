@@ -599,24 +599,23 @@ def add_custom_css():
             color: black !important; /* Define a cor do texto como preto */
         }
 
-            /* Estiliza o botão de incremento */
-    button[data-testid="stNumberInput-StepUp"] {
-        color: black !important; /* Define a cor do texto ou ícone como preto */
-        fill: black !important; /* Caso o ícone SVG precise ser estilizado */
-        background-color: white !important; /* Opcional: cor de fundo do botão */
-    }
+        input[data-testid="stNumberInputField"] {
+            color: black !important; /* Define a cor do texto como preto */
+            }
 
-    /* Estiliza o ícone dentro do botão de incremento */
-    button[data-testid="stNumberInput-StepUp"] svg {
-        fill: black !important; /* Garante que o ícone seja preto */
-    }
+        /* Estiliza os botões de incremento e decremento */
+        button[data-testid="stNumberInputStepDown"], 
+        button[data-testid="stNumberInputStepUp"] {
+            color: black !important; /* Define a cor do ícone ou texto como preto */
+            fill: black !important;  /* Caso o ícone SVG precise ser estilizado */
+        }
 
-            /* Estiliza o botão de decremento */
-    button[data-testid="stNumberInput-StepDown"] {
-        color: black !important; /* Define a cor do texto ou ícone como preto */
-        fill: black !important; /* Caso o ícone SVG precise ser estilizado */
-        background-color: white !important; /* Opcional: cor de fundo do botão */
-    }
+        /* Estiliza o ícone dentro dos botões */
+        button[data-testid="stNumberInputStepDown"] svg, 
+        button[data-testid="stNumberInputStepUp"] svg {
+            fill: black !important;  /* Garante que os ícones sejam pretos */
+        }
+        
 
     /* Estiliza o fundo do container do multiselect */
         div[class="st-ak st-al st-bd st-be st-bf st-as st-bg st-bh st-ar st-bi st-bj st-bk st-bl"] {
@@ -636,6 +635,10 @@ def add_custom_css():
     /* Estiliza o ícone dentro do botão de decremento */
     button[data-testid="stNumberInput-StepDown"] svg {
         fill: black !important; /* Garante que o ícone seja preto */
+        
+         div[data-testid="stNumberInput"] input {
+        color: black; /* Define o texto como preto */
+    }
         
         div[data-testid="stDateInput"] input {
             color: black; /* Define o texto laranja */

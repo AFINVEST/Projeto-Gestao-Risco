@@ -171,7 +171,8 @@ df.columns = [
     'TREASURY', 'S&P'
 ]
 
-df.drop(['WDO1', 'IBOV', 'S&P'], axis=1, inplace=True)
+# recoloquei dolar, conferir dps
+df.drop(['IBOV', 'S&P'], axis=1, inplace=True)
 
 default_assets = ['DI_29', 'DAP35', 'TREASURY']
 # Selecionar quais ativos analisar
@@ -236,6 +237,7 @@ if len(assets) > 0:
     # Em dinheiro
     st.sidebar.write("---")
     st.sidebar.write("## Limite do Var do Portifólio")
+    var_port_pl_dinheiro = var_port * soma_pl
     var_port_dinheiro = vp_soma * var_port
     var_bps = st.sidebar.slider(
         "VaR do Portfólio (bps)", min_value=1.0, max_value=20.0, value=1.0, step=0.5)
@@ -324,9 +326,10 @@ with col1:
             f"**VaR Limite**:(Peso de {var_limite:.1%}) : **R${soma_pl * var_bps * var_limite:,.0f}**")
         var_limite_comparativo = soma_pl * var_bps * var_limite
     st.write(
-        f"**VaR do Portifólio**: {var_port:.4%} : **R${var_port_dinheiro:,.0f}**")
+        f"**VaR do Portifólio**: {var_port:.4%} : **R${var_port_pl_dinheiro:,.0f}**")
+    st.write(f"**CVaR**: {abs(cvar):.4%} : **R${abs(cvar * soma_pl):,.0f}**")
     st.write(f"**Volatilidade**: {vol_port_analitica:.2%}")
-    st.write(f"**CVaR**: {abs(cvar):.4%} : **R${abs(cvar * vp_soma):,.0f}**")
+
     st.write("---")
     # Ver quantos % do limite a soma do covar usa
     st.write(
@@ -452,6 +455,13 @@ df_pl_processado_input = calculate_contracts_per_fund_input(
     df_pl_processado, df_precos_ajustados)
 
 df_pl_processado_print = df_pl_processado.copy()
+# Adicionar linha de total
+sum_row = df_pl_processado_input.select_dtypes(include='number').sum()
+sum_row['Fundos/Carteiras Adm'] = 'Total'
+sum_row['Adm'] = ''
+df_pl_processado_print = pd.concat(
+    [df_pl_processado_input, sum_row.to_frame().T], ignore_index=True)
+
 df_pl_processado_print.set_index('Fundos/Carteiras Adm', inplace=True)
 df_pl_processado_print = df_pl_processado_print.drop(
     ['PL', 'Adm'], axis=1)
@@ -548,6 +558,7 @@ if columns:
     st.write("OBS: Os contratos estão arrendodandos para inteiros.")
 else:
     st.write("Selecione ao menos uma coluna para exibir os dados.")
+
 
 for asset in assets:
     col_name = f'Contratos {asset}'

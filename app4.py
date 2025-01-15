@@ -17,10 +17,10 @@ assets = ['DI_29', 'DAP35', 'TREASURY']
 # ----------- FUNÇÕES AUXILIARES -----------
 
 
-def process_portfolio(df_pl, weights):
+def process_portfolio(df_pl, Weights):
     """
     df_pl: DataFrame já lido pelo Streamlit (em vez do caminho do arquivo).
-    weights: lista com os valores de pesos para cada fundo.
+    Weights: lista com os valores de pesos para cada fundo.
     """
     # Processando a coluna PL para converter texto em float
     df_pl['PL'] = (
@@ -33,9 +33,9 @@ def process_portfolio(df_pl, weights):
     )
     # Selecionando linhas de interesse (ajuste conforme a sua necessidade)
     df_pl = df_pl.iloc[[5, 9, 10, 11, 17, 18, 19, 20, 22]]
-    df_pl['weights'] = weights
-    df_pl['weights'] = df_pl['weights'].astype(float)
-    df_pl['PL_atualizado'] = df_pl['PL'] * df_pl['weights']
+    df_pl['Weights'] = Weights
+    df_pl['Weights'] = df_pl['Weights'].astype(float)
+    df_pl['PL_atualizado'] = df_pl['PL'] * df_pl['Weights']
     df_pl['Adm'] = ['SANTANDER', 'BTG', 'SANTANDER',
                     'SANTANDER', 'BTG', 'BTG', 'BTG', 'BTG', 'BTG']
     return df_pl, df_pl['PL_atualizado'].sum()
@@ -81,7 +81,7 @@ def adjust_prices_with_var(df_precos, var_ativos):
 
 def calculate_contracts_per_fund(df_pl, df_precos):
     for i in range(len(df_precos)):
-        df_pl[f'Contratos {df_precos.index[i]}'] = (
+        df_pl[f'Max Contratos {df_precos.index[i]}'] = (
             df_pl['PL_atualizado'] /
             df_pl['PL_atualizado'].sum()
         ) * df_precos.iloc[i]['Valor Total']
@@ -90,11 +90,11 @@ def calculate_contracts_per_fund(df_pl, df_precos):
 
 def calculate_contracts_per_fund_input(df_pl, df_precos):
     for i in range(len(df_precos)):
-        df_pl[f'Contratos Input {df_precos.index[i]}'] = (
+        df_pl[f'Contratos {df_precos.index[i]}'] = (
             df_pl['PL_atualizado'] /
             df_pl['PL_atualizado'].sum()
         ) * df_precos.iloc[i]['Quantidade']
-        df_pl[f'Contratos Input {df_precos.index[i]}'] = df_pl[f'Contratos Input {df_precos.index[i]}'].apply(
+        df_pl[f'Contratos {df_precos.index[i]}'] = df_pl[f'Contratos {df_precos.index[i]}'].apply(
             lambda x: round(x, 0))
 
     return df_pl
@@ -138,7 +138,7 @@ dict_pesos = {
     'MANACA INFRA FIRF': 2,
     'AF DEB INCENTIVADA': 3
 }
-weights = list(dict_pesos.values())
+Weights = list(dict_pesos.values())
 
 st.sidebar.write("## Pesos dos Fundos")
 st.sidebar.write("Caso queira, defina os pesos de cada fundo:")
@@ -151,8 +151,8 @@ if fundos:
         peso = st.sidebar.number_input(
             f"Peso para {fundo}:", min_value=0.0, value=1.0, step=0.1)
         dict_pesos[fundo] = peso
-weights = list(dict_pesos.values())
-df_pl_processado, soma_pl = process_portfolio(df_pl, weights)
+Weights = list(dict_pesos.values())
+df_pl_processado, soma_pl = process_portfolio(df_pl, Weights)
 st.sidebar.write("---")
 
 df = pd.read_excel(file_bbg, sheet_name='BZ RATES',
@@ -295,298 +295,286 @@ if len(assets) > 0:
 
     # st.write(f"**CoVaR Total**: R$ {covar.sum():,.2f}")
 
+    df_precos_ajustados = calculate_portfolio_values(
+        df_precos_ajustados, df_pl_processado, var_bps)
+    df_pl_processado = calculate_contracts_per_fund(
+        df_pl_processado, df_precos_ajustados)
+    # Definir tamanhos das colunas: col1 e col2 maiores, col3 menor
+    # Ajuste os valores para mudar os tamanhos relativos
+    col1, col2, col3 = st.columns([2.5, 3.5, 1])
+    with col3:
+        # Coloquei as checkboxes aqui e alterei o texto para maior clareza
+        st.write("Escolha as colunas a exibir:")
+        beta = st.checkbox("Exibir Beta", value=False)
+        mvar = st.checkbox("Exibir MVar (R$)", value=True)
+        covar_rs = st.checkbox("Exibir CoVaR (R$)", value=True)
+        covar_perce = st.checkbox("Exibir CoVaR (%)", value=True)
+        var_check = st.checkbox("Exibir VaR", value=False)
+        perc_ris_tot = st.checkbox("Exibir % do Risco Total", value=True)
 
-df_precos_ajustados = calculate_portfolio_values(
-    df_precos_ajustados, df_pl_processado, var_bps)
-df_pl_processado = calculate_contracts_per_fund(
-    df_pl_processado, df_precos_ajustados)
-# Definir tamanhos das colunas: col1 e col2 maiores, col3 menor
-# Ajuste os valores para mudar os tamanhos relativos
-col1, col2, col3 = st.columns([2.5, 3.5, 1])
-with col3:
-    # Coloquei as checkboxes aqui e alterei o texto para maior clareza
-    st.write("Escolha as colunas a exibir:")
-    beta = st.checkbox("Exibir Beta", value=False)
-    mvar = st.checkbox("Exibir MVar (R$)", value=True)
-    covar_rs = st.checkbox("Exibir CoVaR (R$)", value=True)
-    covar_perce = st.checkbox("Exibir CoVaR (%)", value=True)
-    var_check = st.checkbox("Exibir VaR", value=False)
-    perc_ris_tot = st.checkbox("Exibir % do Risco Total", value=True)
+    with col1:
+        st.write("## Dados do Portifólio")
+        st.write(f"**Soma do PL atualizado: R$ {soma_pl:,.0f}**")
 
-with col1:
-    st.write("## Dados do Portifólio")
-    st.write(f"**Soma do PL atualizado: R$ {soma_pl:,.0f}**")
-
-    if var_din:
+        if var_din:
+            st.write(
+                f"**VaR Limite**: **R${var_lim_din:,.0f}**")
+            var_limite_comparativo = var_lim_din
+        else:
+            st.write(
+                f"**VaR Limite**:(Peso de {var_limite:.1%}) : **R${soma_pl * var_bps * var_limite:,.0f}**")
+            var_limite_comparativo = soma_pl * var_bps * var_limite
         st.write(
-            f"**VaR Limite**: **R${var_lim_din:,.0f}**")
-        var_limite_comparativo = var_lim_din
-    else:
+            f"**VaR do Portifólio**: R${var_port_dinheiro:,.0f} : **{var_port_dinheiro/soma_pl * 10000:.2f}bps**")
         st.write(
-            f"**VaR Limite**:(Peso de {var_limite:.1%}) : **R${soma_pl * var_bps * var_limite:,.0f}**")
-        var_limite_comparativo = soma_pl * var_bps * var_limite
-    st.write(
-        f"**VaR do Portifólio**: R${var_port_dinheiro:,.0f} : **{var_port_dinheiro/soma_pl * 10000:.2f}bps**")
-    st.write(
-        f"**CVaR**: R${abs(cvar * vp_soma):,.0f} : **{abs(cvar * vp_soma)/soma_pl * 10000:.2f}bps**")
-    st.write(f"**Volatilidade**: {vol_port_analitica:.2%}")
+            f"**CVaR**: R${abs(cvar * vp_soma):,.0f} : **{abs(cvar * vp_soma)/soma_pl * 10000:.2f}bps**")
+        st.write(f"**Volatilidade**: {vol_port_analitica:.2%}")
+
+        st.write("---")
+        # Ver quantos % do limite a soma do covar usa
+        # st.write(
+        #    f"**R$ {(abs(covar.sum())):,.0f}**")
+        st.write(
+            f"### {abs(covar.sum()/ var_limite_comparativo):.2%} do risco total")
+
+    with col2:
+        # Create a table with covar, beta, mvar, and covar for each asset
+        df_dados = pd.DataFrame({
+            'Beta': df_beta,
+            'MVar(R$)': df_mvar_dinheiro,
+            'CoVaR(R$)': covar,
+            'CoVaR(%)': covar_perc,
+            'Var': var_ativos[assets],
+            '% do Risco Total': covar_perc * abs(covar.sum() / var_limite_comparativo)
+        })
+
+        # Filter columns based on selected checkboxes
+        colunas_selecionadas = []
+
+        if beta:
+            colunas_selecionadas.append('Beta')
+        if mvar:
+            colunas_selecionadas.append('MVar(R$)')
+        if covar_rs:
+            colunas_selecionadas.append('CoVaR(R$)')
+        if covar_perce:
+            colunas_selecionadas.append('CoVaR(%)')
+        if var_check:
+            colunas_selecionadas.append('Var')
+        if perc_ris_tot:
+            colunas_selecionadas.append('% do Risco Total')
+
+        st.write("## Risco")
+
+        # Se a coluna CoVaR(R$) foi selecionada, formatar
+        if 'CoVaR(R$)' in colunas_selecionadas:
+            df_dados['CoVaR(R$)'] = df_dados['CoVaR(R$)'].apply(
+                lambda x: f"R${x:,.0f}")
+
+        if 'MVar(R$)' in colunas_selecionadas:
+            df_dados['MVar(R$)'] = df_dados['MVar(R$)'].apply(
+                lambda x: f"R${x:,.0f}")
+
+        if 'CoVaR(%)' in colunas_selecionadas:
+            df_dados['CoVaR(%)'] = df_dados['CoVaR(%)'].apply(
+                lambda x: f"{x:.2%}")
+
+        if 'Beta' in colunas_selecionadas:
+            df_dados['Beta'] = df_dados['Beta'].apply(lambda x: f"{x:.4f}")
+
+        if 'Var' in colunas_selecionadas:
+            df_dados['Var'] = df_dados['Var'].apply(lambda x: f"{x:.4f}%")
+
+        if '% do Risco Total' in colunas_selecionadas:
+            df_dados['% do Risco Total'] = df_dados['% do Risco Total'].apply(
+                lambda x: f"{x:.2%}")
+
+        # Display the filtered table
+        if colunas_selecionadas:
+            st.write("Tabela de Dados Selecionados:")
+            tabela_filtrada = df_dados[colunas_selecionadas]
+
+            # Adicionar uma linha de soma
+            sum_row = tabela_filtrada.select_dtypes(include='number').sum()
+            sum_row['Beta'] = df_beta.sum()
+            sum_row['MVar(R$)'] = df_mvar_dinheiro.sum()
+            sum_row['CoVaR(R$)'] = covar.sum()
+            sum_row['CoVaR(%)'] = covar_perc.sum()
+            sum_row['Var'] = var_ativos[assets].sum()
+            sum_row['% do Risco Total'] = (
+                covar_perc * abs(covar.sum() / var_limite_comparativo)).sum()
+            sum_row = sum_row.to_frame().T
+            sum_row['Beta'] = sum_row['Beta'].apply(lambda x: f"{x:.4f}")
+            sum_row['MVar(R$)'] = sum_row['MVar(R$)'].apply(
+                lambda x: f"R${x:,.0f}")
+            sum_row['CoVaR(R$)'] = sum_row['CoVaR(R$)'].apply(
+                lambda x: f"R${x:,.0f}")
+            sum_row['CoVaR(%)'] = sum_row['CoVaR(%)'].apply(
+                lambda x: f"{x:.2%}")
+            sum_row['Var'] = sum_row['Var'].apply(lambda x: f"{x:.4f}")
+            sum_row['% do Risco Total'] = sum_row['% do Risco Total'].apply(
+                lambda x: f"{x:.2%}")
+
+            sum_row = sum_row[colunas_selecionadas]
+            # Adicionar índice 'Total'
+            sum_row.index = ['Total']
+            # Adicionar a linha de soma na tabela filtrada
+            tabela_filtrada_com_soma = pd.concat([tabela_filtrada, sum_row])
+            st.table(tabela_filtrada_com_soma)
+        else:
+            st.write("Nenhuma coluna selecionada.")
+
+    #########################
+    # 9) TABELA DF_PL (FILTROS)
+    #########################
 
     st.write("---")
-    # Ver quantos % do limite a soma do covar usa
-    # st.write(
-    #    f"**R$ {(abs(covar.sum())):,.0f}**")
-    st.write(
-        f"### {abs(covar.sum()/ var_limite_comparativo):.2%} do risco total")
+    st.write("## Quantidade de Contratos por Fundo")
 
-with col2:
-    # Create a table with covar, beta, mvar, and covar for each asset
-    df_dados = pd.DataFrame({
-        'Beta': df_beta,
-        'MVar(R$)': df_mvar_dinheiro,
-        'CoVaR(R$)': covar,
-        'CoVaR(%)': covar_perc,
-        'Var': var_ativos[assets],
-        '% do Risco Total': covar_perc * abs(covar.sum() / var_limite_comparativo)
-    })
-
-    # Filter columns based on selected checkboxes
-    colunas_selecionadas = []
-
-    if beta:
-        colunas_selecionadas.append('Beta')
-    if mvar:
-        colunas_selecionadas.append('MVar(R$)')
-    if covar_rs:
-        colunas_selecionadas.append('CoVaR(R$)')
-    if covar_perce:
-        colunas_selecionadas.append('CoVaR(%)')
-    if var_check:
-        colunas_selecionadas.append('Var')
-    if perc_ris_tot:
-        colunas_selecionadas.append('% do Risco Total')
-
-    st.write("## Risco")
-
-    # Se a coluna CoVaR(R$) foi selecionada, formatar
-    if 'CoVaR(R$)' in colunas_selecionadas:
-        df_dados['CoVaR(R$)'] = df_dados['CoVaR(R$)'].apply(
-            lambda x: f"R${x:,.0f}")
-
-    if 'MVar(R$)' in colunas_selecionadas:
-        df_dados['MVar(R$)'] = df_dados['MVar(R$)'].apply(
-            lambda x: f"R${x:,.0f}")
-
-    if 'CoVaR(%)' in colunas_selecionadas:
-        df_dados['CoVaR(%)'] = df_dados['CoVaR(%)'].apply(lambda x: f"{x:.2%}")
-
-    if 'Beta' in colunas_selecionadas:
-        df_dados['Beta'] = df_dados['Beta'].apply(lambda x: f"{x:.4f}")
-
-    if 'Var' in colunas_selecionadas:
-        df_dados['Var'] = df_dados['Var'].apply(lambda x: f"{x:.4f}%")
-
-    if '% do Risco Total' in colunas_selecionadas:
-        df_dados['% do Risco Total'] = df_dados['% do Risco Total'].apply(
-            lambda x: f"{x:.2%}")
-
-    # Display the filtered table
-    if colunas_selecionadas:
-        st.write("Tabela de Dados Selecionados:")
-        tabela_filtrada = df_dados[colunas_selecionadas]
-
-        # Adicionar uma linha de soma
-        sum_row = tabela_filtrada.select_dtypes(include='number').sum()
-        sum_row['Beta'] = df_beta.sum()
-        sum_row['MVar(R$)'] = df_mvar_dinheiro.sum()
-        sum_row['CoVaR(R$)'] = covar.sum()
-        sum_row['CoVaR(%)'] = covar_perc.sum()
-        sum_row['Var'] = var_ativos[assets].sum()
-        sum_row['% do Risco Total'] = (
-            covar_perc * abs(covar.sum() / var_limite_comparativo)).sum()
-        sum_row = sum_row.to_frame().T
-        sum_row['Beta'] = sum_row['Beta'].apply(lambda x: f"{x:.4f}")
-        sum_row['MVar(R$)'] = sum_row['MVar(R$)'].apply(
-            lambda x: f"R${x:,.0f}")
-        sum_row['CoVaR(R$)'] = sum_row['CoVaR(R$)'].apply(
-            lambda x: f"R${x:,.0f}")
-        sum_row['CoVaR(%)'] = sum_row['CoVaR(%)'].apply(lambda x: f"{x:.2%}")
-        sum_row['Var'] = sum_row['Var'].apply(lambda x: f"{x:.4f}")
-        sum_row['% do Risco Total'] = sum_row['% do Risco Total'].apply(
-            lambda x: f"{x:.2%}")
-
-        sum_row = sum_row[colunas_selecionadas]
-        # Adicionar índice 'Total'
-        sum_row.index = ['Total']
-        # Adicionar a linha de soma na tabela filtrada
-        tabela_filtrada_com_soma = pd.concat([tabela_filtrada, sum_row])
-        st.table(tabela_filtrada_com_soma)
-
-    else:
-        st.write("Nenhuma coluna selecionada.")
-
-
-#########################
-# 9) TABELA DF_PL (FILTROS)
-#########################
-
-
-st.write("---")
-st.write("## Quantidade de Contratos por Fundo")
-
-# Formatar a tabela
-df_precos_ajustados['Valor Fechamento'] = df_precos_ajustados['Valor Fechamento'].apply(
-    lambda x: f"R${x:,.0f}")
-df_precos_ajustados['Valor Fechamento Ajustado pelo Var'] = df_precos_ajustados['Valor Fechamento Ajustado pelo Var'].apply(
-    lambda x: f"R${x:,.0f}")
-df_precos_ajustados['Santander'] = df_precos_ajustados['Santander'].apply(
-    lambda x: f"{x:.0f}")
-df_precos_ajustados['BTG'] = df_precos_ajustados['BTG'].apply(
-    lambda x: f"{x:.0f}")
-df_precos_ajustados['Valor Total'] = df_precos_ajustados['Valor Total'].apply(
-    lambda x: f"{x:.0f}")
-
-
-default_columns = ['Adm', 'PL_atualizado']
-for asset in assets:
-    col_name = f'Contratos Input {asset}'
-    if col_name in df_pl_processado.columns:
-        default_columns.append(col_name)
-
-
-df_precos_ajustados['Quantidade'] = quantidade
-df_pl_processado_input = calculate_contracts_per_fund_input(
-    df_pl_processado, df_precos_ajustados)
-
-df_pl_processado_print = df_pl_processado.copy()
-# Adicionar linha de total
-sum_row = df_pl_processado_input.select_dtypes(include='number').sum()
-sum_row['Fundos/Carteiras Adm'] = 'Total'
-sum_row['Adm'] = ''
-df_pl_processado_print = pd.concat(
-    [df_pl_processado_input, sum_row.to_frame().T], ignore_index=True)
-
-df_pl_processado_print.set_index('Fundos/Carteiras Adm', inplace=True)
-df_pl_processado_print = df_pl_processado_print.drop(
-    ['PL', 'Adm'], axis=1)
-
-for asset in assets:
-    col_name = f'Contratos Input {asset}'
-    if col_name in df_pl_processado_print.columns:
-        df_pl_processado_print.drop(
-            col_name, axis=1, inplace=True)
-        default_columns.append(col_name)
-
-
-colunas_df_processado = []
-for asset in assets:
-    col_name = f'Contratos {asset}'
-    if col_name in df_pl_processado.columns:
-        colunas_df_processado.append(col_name)
-
-df_copy_processado = df_pl_processado.copy()
-df_copy_processado.drop(colunas_df_processado, axis=1, inplace=True)
-columns_sem_fundo = df_copy_processado.columns.tolist()
-columns_sem_fundo.remove('Fundos/Carteiras Adm')
-columns_sem_fundo.remove('PL')
-
-
-st.write("### Selecione as colunas")
-columns = []
-col1, col2, col3 = st.columns([4, 3, 3])
-# Contador para saber qual coluna estamos preenchendo
-for i, col in enumerate(columns_sem_fundo):
-    if i % 3 == 0:
-        # Primeira coluna (col1)
-        with col1:
-            if st.checkbox(col, value=col in default_columns, key=f"checkbox_{i}_{col}"):
-                columns.append(col)
-    elif i % 3 == 1:
-        # Segunda coluna (col2)
-        with col2:
-            if st.checkbox(col, value=col in default_columns, key=f"checkbox_{i}_{col}"):
-                columns.append(col)
-    else:
-        # Terceira coluna (col3)
-        with col3:
-            if st.checkbox(col, value=col in default_columns, key=f"checkbox_{i}_{col}"):
-                columns.append(col)
-
-coll1, coll2 = st.columns([7, 3])
-
-with coll2:
-    st.write("### Filtrar por Adm")
-    filtro_adm = []
-    for adm in df_pl_processado["Adm"].unique():
-        if st.checkbox(adm, key=f"checkbox_adm_{adm}"):
-            filtro_adm.append(adm)
-
-with coll1:
-    st.write("### Filtrar por Fundos/Carteiras")
-    filtro_fundo = st.multiselect(
-        'Filtrar por Fundos/Carteiras Adm',
-        df_pl_processado["Fundos/Carteiras Adm"].unique()
-    )
-
-
-filtered_df = df_pl_processado.copy()
-
-
-if filtro_fundo:
-    filtered_df = filtered_df[filtered_df["Fundos/Carteiras Adm"].isin(
-        filtro_fundo)]
-if filtro_adm:
-    filtered_df = filtered_df[filtered_df["Adm"].isin(filtro_adm)]
-
-
-# Soma
-sum_row = filtered_df.select_dtypes(include='number').sum()
-sum_row['Fundos/Carteiras Adm'] = 'Total'
-sum_row['Adm'] = ''
-filtered_df = pd.concat([filtered_df, sum_row.to_frame().T], ignore_index=True)
-
-filtered_df.index = filtered_df['Fundos/Carteiras Adm']
-if columns:
     # Formatar a tabela
-    for column in columns:
-        if column not in ['Adm', 'Fundos/Carteiras Adm']:
-            if column == 'PL_atualizado':
-                filtered_df[column] = filtered_df[column].apply(
-                    lambda x: f"R${x:,.0f}")
-            else:
-                filtered_df[column] = filtered_df[column].apply(
-                    lambda x: f"{x:.2f}")
+    df_precos_ajustados['Valor Fechamento'] = df_precos_ajustados['Valor Fechamento'].apply(
+        lambda x: f"R${x:,.0f}")
+    df_precos_ajustados['Valor Fechamento Ajustado pelo Var'] = df_precos_ajustados['Valor Fechamento Ajustado pelo Var'].apply(
+        lambda x: f"R${x:,.0f}")
+    df_precos_ajustados['Santander'] = df_precos_ajustados['Santander'].apply(
+        lambda x: f"{x:.0f}")
+    df_precos_ajustados['BTG'] = df_precos_ajustados['BTG'].apply(
+        lambda x: f"{x:.0f}")
+    df_precos_ajustados['Valor Total'] = df_precos_ajustados['Valor Total'].apply(
+        lambda x: f"{x:.0f}")
 
-    st.table(filtered_df[columns])
-    # Adicionar uma OBS
-    st.write("OBS: Os contratos estão arrendodandos para inteiros.")
-else:
-    st.write("Selecione ao menos uma coluna para exibir os dados.")
+    default_columns = ['Adm', 'PL_atualizado']
+    for asset in assets:
+        col_name = f'Contratos {asset}'
+        if col_name in df_pl_processado.columns:
+            default_columns.append(col_name)
 
+    df_precos_ajustados['Quantidade'] = quantidade
+    df_pl_processado_input = calculate_contracts_per_fund_input(
+        df_pl_processado, df_precos_ajustados)
 
-for asset in assets:
-    col_name = f'Contratos {asset}'
-    if col_name in df_pl_processado_print.columns:
-        df_pl_processado_print.rename(
-            columns={col_name: f'Max Contratos {asset}'}, inplace=True)
-for col in df_pl_processado_print.columns:
-    if col != 'PL_atualizado':
-        df_pl_processado_print[col] = df_pl_processado_print[col].apply(
-            lambda x: f"{x:.2f}")
+    df_pl_processado_print = df_pl_processado.copy()
+    # Adicionar linha de total
+    sum_row = df_pl_processado_input.select_dtypes(include='number').sum()
+    sum_row['Fundos/Carteiras Adm'] = 'Total'
+    sum_row['Adm'] = ''
+    df_pl_processado_print = pd.concat(
+        [df_pl_processado_input, sum_row.to_frame().T], ignore_index=True)
+
+    df_pl_processado_print.set_index('Fundos/Carteiras Adm', inplace=True)
+    df_pl_processado_print = df_pl_processado_print.drop(
+        ['PL', 'Adm'], axis=1)
+
+    for asset in assets:
+        col_name = f'Contratos {asset}'
+        if col_name in df_pl_processado_print.columns:
+            df_pl_processado_print.drop(
+                col_name, axis=1, inplace=True)
+            default_columns.append(col_name)
+
+    colunas_df_processado = []
+    for asset in assets:
+        col_name = f'Max Contratos {asset}'
+        if col_name in df_pl_processado.columns:
+            colunas_df_processado.append(col_name)
+
+    df_copy_processado = df_pl_processado.copy()
+    df_copy_processado.drop(colunas_df_processado, axis=1, inplace=True)
+    columns_sem_fundo = df_copy_processado.columns.tolist()
+    columns_sem_fundo.remove('Fundos/Carteiras Adm')
+    columns_sem_fundo.remove('PL')
+
+    st.write("### Selecione as colunas")
+    columns = []
+    col1, col2, col3 = st.columns([4, 3, 3])
+    # Contador para saber qual coluna estamos preenchendo
+    for i, col in enumerate(columns_sem_fundo):
+        if i % 3 == 0:
+            # Primeira coluna (col1)
+            with col1:
+                if st.checkbox(col, value=col in default_columns, key=f"checkbox_{i}_{col}"):
+                    columns.append(col)
+        elif i % 3 == 1:
+            # Segunda coluna (col2)
+            with col2:
+                if st.checkbox(col, value=col in default_columns, key=f"checkbox_{i}_{col}"):
+                    columns.append(col)
+        else:
+            # Terceira coluna (col3)
+            with col3:
+                if st.checkbox(col, value=col in default_columns, key=f"checkbox_{i}_{col}"):
+                    columns.append(col)
+
+    coll1, coll2 = st.columns([7, 3])
+
+    with coll2:
+        st.write("### Filtrar por Adm")
+        filtro_adm = []
+        for adm in df_pl_processado["Adm"].unique():
+            if st.checkbox(adm, key=f"checkbox_adm_{adm}"):
+                filtro_adm.append(adm)
+
+    with coll1:
+        st.write("### Filtrar por Fundos/Carteiras")
+        filtro_fundo = st.multiselect(
+            'Filtrar por Fundos/Carteiras Adm',
+            df_pl_processado["Fundos/Carteiras Adm"].unique()
+        )
+
+    filtered_df = df_pl_processado.copy()
+
+    if filtro_fundo:
+        filtered_df = filtered_df[filtered_df["Fundos/Carteiras Adm"].isin(
+            filtro_fundo)]
+    if filtro_adm:
+        filtered_df = filtered_df[filtered_df["Adm"].isin(filtro_adm)]
+
+    # Soma
+    sum_row = filtered_df.select_dtypes(include='number').sum()
+    sum_row['Fundos/Carteiras Adm'] = 'Total'
+    sum_row['Adm'] = ''
+    filtered_df = pd.concat(
+        [filtered_df, sum_row.to_frame().T], ignore_index=True)
+
+    filtered_df.index = filtered_df['Fundos/Carteiras Adm']
+    if columns:
+        # Formatar a tabela
+        for column in columns:
+            if column not in ['Adm', 'Fundos/Carteiras Adm']:
+                if column == 'PL_atualizado':
+                    filtered_df[column] = filtered_df[column].apply(
+                        lambda x: f"R${x:,.0f}")
+                else:
+                    filtered_df[column] = filtered_df[column].apply(
+                        lambda x: f"{x:.2f}")
+
+        st.table(filtered_df[columns])
+        # Adicionar uma OBS
+        st.write("OBS: Os contratos estão arrendodandos para inteiros.")
     else:
-        df_pl_processado_print[col] = df_pl_processado_print[col].apply(
-            lambda x: f"R${x:,.0f}")
+        st.write("Selecione ao menos uma coluna para exibir os dados.")
 
-st.write("---")
-st.write("### Quantidade Máxima de Contratos por Adm")
-# Ocultar coluna de Quantidade Valor Fechamento	Valor Fechamento Ajustado pelo Var
-df_precos_plot = df_precos_ajustados.drop(
-    ['Quantidade', 'Valor Fechamento', 'Valor Fechamento Ajustado pelo Var'], axis=1)
-st.table(df_precos_plot)
+    for col in df_pl_processado_print.columns:
+        if col != 'PL_atualizado':
+            df_pl_processado_print[col] = df_pl_processado_print[col].apply(
+                lambda x: f"{x:.2f}")
+        else:
+            df_pl_processado_print[col] = df_pl_processado_print[col].apply(
+                lambda x: f"R${x:,.0f}")
 
-st.write("### Quantidade Máxima de Contratos por Fundo")
-st.table(df_pl_processado_print)
+    st.write("---")
+    st.write("### Quantidade Máxima de Contratos por Adm")
+    # Ocultar coluna de Quantidade Valor Fechamento	Valor Fechamento Ajustado pelo Var
+    df_precos_plot = df_precos_ajustados.drop(
+        ['Quantidade', 'Valor Fechamento', 'Valor Fechamento Ajustado pelo Var'], axis=1)
+    st.table(df_precos_plot)
 
-st.write("---")
+    st.write("### Quantidade Máxima de Contratos por Fundo")
+    st.table(df_pl_processado_print)
+
+    st.write("---")
+else:
+    st.write("Nenhum Ativo selecionado.")
 
 
 def add_custom_css():

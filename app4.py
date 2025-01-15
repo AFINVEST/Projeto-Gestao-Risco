@@ -287,7 +287,8 @@ if len(assets) > 0:
     covar_perc = covar / covar.sum()
     # st.write("**CoVaR (contribuição de cada ativo)**")
     # st.write(covar_perc)
-    cvar = df_retorno[df_retorno['Portifolio'] < var_port]['Portifolio']
+    cvar = df_retorno[df_retorno['Portifolio'] < var_not_parametric(
+        df_returns_portifolio['Portifolio'])]['Portifolio']
     cvar = cvar.mean()
 
     # st.write(f"**CoVaR Total**: R$ {covar.sum():,.2f}")

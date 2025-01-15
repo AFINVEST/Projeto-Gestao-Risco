@@ -211,7 +211,7 @@ if len(assets) > 0:
     qtd_input = []
     for col in df_precos_ajustados.index:
         val = st.sidebar.number_input(
-            f"Quantidade para {col}:", min_value=-100, value=1, step=1)
+            f"Quantidade para {col}:", min_value=-10000, value=1, step=1)
         qtd_input.append(val)
     quantidade = np.array(qtd_input)
 

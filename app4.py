@@ -174,7 +174,7 @@ df.columns = [
 # recoloquei dolar, conferir dps
 df.drop(['IBOV', 'S&P'], axis=1, inplace=True)
 
-default_assets = ['DI_29', 'DAP35', 'TREASURY']
+default_assets = ['WDO1']
 # Selecionar quais ativos analisar
 st.sidebar.write("## Ativos do Portifólio")
 assets = st.sidebar.multiselect("Selecione os ativos:",
@@ -250,7 +250,7 @@ if len(assets) > 0:
        #     f"**VaR Limite (dinheiro)**: R$ {var_lim_din:,.2f}")
     else:
         var_limite = st.sidebar.slider(
-            "Limite para VaR gasto do Portfólio", min_value=0.1, max_value=1.0, value=0.5, step=0.01)
+            "Limite para VaR gasto do Portfólio", min_value=0.1, max_value=1.0, value=1.0, step=0.01)
 
      #   st.write(
      #       f"**VaR Limite (dinheiro)**: R$ {var_limite * var_port_dinheiro:,.2f}")
@@ -309,7 +309,7 @@ with col3:
     beta = st.checkbox("Exibir Beta", value=False)
     mvar = st.checkbox("Exibir MVar (R$)", value=True)
     covar_rs = st.checkbox("Exibir CoVaR (R$)", value=True)
-    covar_perce = st.checkbox("Exibir CoVaR (%)", value=False)
+    covar_perce = st.checkbox("Exibir CoVaR (%)", value=True)
     var_check = st.checkbox("Exibir VaR", value=False)
     perc_ris_tot = st.checkbox("Exibir % do Risco Total", value=True)
 
@@ -326,14 +326,17 @@ with col1:
             f"**VaR Limite**:(Peso de {var_limite:.1%}) : **R${soma_pl * var_bps * var_limite:,.0f}**")
         var_limite_comparativo = soma_pl * var_bps * var_limite
     st.write(
-        f"**VaR do Portifólio**: {var_port:.4%} : **R${var_port_pl_dinheiro:,.0f}**")
-    st.write(f"**CVaR**: {abs(cvar):.4%} : **R${abs(cvar * soma_pl):,.0f}**")
+        f"**VaR do Portifólio**: R${var_port_dinheiro:,.0f} : **{var_port_dinheiro/soma_pl * 10000:.2f}bps**")
+    st.write(
+        f"**CVaR**: R${abs(cvar * vp_soma):,.0f} : **{abs(cvar * vp_soma)/soma_pl * 10000:.2f}bps**")
     st.write(f"**Volatilidade**: {vol_port_analitica:.2%}")
 
     st.write("---")
     # Ver quantos % do limite a soma do covar usa
+    # st.write(
+    #    f"**R$ {(abs(covar.sum())):,.0f}**")
     st.write(
-        f"**Soma do CoVaR: R$ {(abs(covar.sum())):,.0f} => {abs(covar.sum()/ var_limite_comparativo):.2%} do limite**")
+        f"### {abs(covar.sum()/ var_limite_comparativo):.2%} do risco total")
 
 with col2:
     # Create a table with covar, beta, mvar, and covar for each asset
@@ -343,7 +346,7 @@ with col2:
         'CoVaR(R$)': covar,
         'CoVaR(%)': covar_perc,
         'Var': var_ativos[assets],
-        'Percentual do Risco Total': covar_perc * abs(covar.sum() / var_limite_comparativo)
+        '% do Risco Total': covar_perc * abs(covar.sum() / var_limite_comparativo)
     })
 
     # Filter columns based on selected checkboxes
@@ -360,7 +363,7 @@ with col2:
     if var_check:
         colunas_selecionadas.append('Var')
     if perc_ris_tot:
-        colunas_selecionadas.append('Percentual do Risco Total')
+        colunas_selecionadas.append('% do Risco Total')
 
     st.write("## Risco")
 
@@ -382,8 +385,8 @@ with col2:
     if 'Var' in colunas_selecionadas:
         df_dados['Var'] = df_dados['Var'].apply(lambda x: f"{x:.4f}%")
 
-    if 'Percentual do Risco Total' in colunas_selecionadas:
-        df_dados['Percentual do Risco Total'] = df_dados['Percentual do Risco Total'].apply(
+    if '% do Risco Total' in colunas_selecionadas:
+        df_dados['% do Risco Total'] = df_dados['% do Risco Total'].apply(
             lambda x: f"{x:.2%}")
 
     # Display the filtered table
@@ -398,7 +401,7 @@ with col2:
         sum_row['CoVaR(R$)'] = covar.sum()
         sum_row['CoVaR(%)'] = covar_perc.sum()
         sum_row['Var'] = var_ativos[assets].sum()
-        sum_row['Percentual do Risco Total'] = (
+        sum_row['% do Risco Total'] = (
             covar_perc * abs(covar.sum() / var_limite_comparativo)).sum()
         sum_row = sum_row.to_frame().T
         sum_row['Beta'] = sum_row['Beta'].apply(lambda x: f"{x:.4f}")
@@ -408,7 +411,7 @@ with col2:
             lambda x: f"R${x:,.0f}")
         sum_row['CoVaR(%)'] = sum_row['CoVaR(%)'].apply(lambda x: f"{x:.2%}")
         sum_row['Var'] = sum_row['Var'].apply(lambda x: f"{x:.4f}")
-        sum_row['Percentual do Risco Total'] = sum_row['Percentual do Risco Total'].apply(
+        sum_row['% do Risco Total'] = sum_row['% do Risco Total'].apply(
             lambda x: f"{x:.2%}")
 
         sum_row = sum_row[colunas_selecionadas]
@@ -574,9 +577,10 @@ for col in df_pl_processado_print.columns:
             lambda x: f"R${x:,.0f}")
 
 st.write("---")
-st.write("### Preço de Fechamento e Quantidade Máxima de Contratos por Adm")
-# Ocultar coluna de Quantidade
-df_precos_plot = df_precos_ajustados.drop('Quantidade', axis=1)
+st.write("### Quantidade Máxima de Contratos por Adm")
+# Ocultar coluna de Quantidade Valor Fechamento	Valor Fechamento Ajustado pelo Var
+df_precos_plot = df_precos_ajustados.drop(
+    ['Quantidade', 'Valor Fechamento', 'Valor Fechamento Ajustado pelo Var'], axis=1)
 st.table(df_precos_plot)
 
 st.write("### Quantidade Máxima de Contratos por Fundo")

@@ -324,7 +324,7 @@ with col1:
             f"**VaR Limite**:(Peso de {var_limite:.1%}) : **R${soma_pl * var_bps * var_limite:,.0f}**")
         var_limite_comparativo = soma_pl * var_bps * var_limite
     st.write(
-        f"**VaR do Portifólio**: {var_port:.4%} : **R${var_port_dinheiro:.0f}**")
+        f"**VaR do Portifólio**: {var_port:.4%} : **R${var_port_dinheiro:,.0f}**")
     st.write(f"**Volatilidade**: {vol_port_analitica:.2%}")
     st.write(f"**CVaR**: {abs(cvar):.4%} : **R${abs(cvar * vp_soma):,.0f}**")
     st.write("---")

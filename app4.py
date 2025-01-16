@@ -435,7 +435,16 @@ if len(assets) > 0:
     }, index=['Book Brasil', 'Book US', 'Moedas'])
 
     df_stress_div01 = pd.concat(
-        [df_div01, df_stress, df_stress_sem_pl], axis=1)
+        [df_div01, df_stress_sem_pl, df_stress], axis=1)
+
+    # Criar linha de soma
+    sum_row = df_stress_div01.select_dtypes(include='number').sum()
+    sum_row = sum_row.to_frame().T
+    sum_row['DIV01'] = f"R${df_divone_juros_interno.iloc[0] + df_divone_juros_externo.iloc[0]:.2f}"
+    sum_row['Stress (bps)'] = ""
+    sum_row['Stress (R$)'] = f"R${stress_test_juros_interno['FUT_TICK_VAL'] + stress_test_juros_externo['FUT_TICK_VAL'] + stress_dolar:.2f}"
+    sum_row.index = ['Total']
+    df_stress_div01 = pd.concat([df_stress_div01, sum_row])
 
     # st.write(f"**CoVaR Total**: R$ {covar.sum():,.2f}")
 
@@ -741,7 +750,7 @@ if len(assets) > 0:
     st.write("### Quantidade Máxima de Contratos por Adm")
     # Ocultar coluna de Quantidade Valor Fechamento	Valor Fechamento Ajustado pelo Var
     df_precos_plot = df_precos_ajustados.drop(
-        ['Quantidade'], axis=1)
+        ['Quantidade', 'Valor Fechamento', 'Valor Fechamento Ajustado pelo Var'], axis=1)
     st.table(df_precos_plot)
 
     st.write("### Quantidade Máxima de Contratos por Fundo")

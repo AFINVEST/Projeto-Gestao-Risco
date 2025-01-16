@@ -33,12 +33,13 @@ def process_portfolio(df_pl, Weights):
     )
     # Selecionando linhas de interesse (ajuste conforme a sua necessidade)
     df_pl = df_pl.iloc[[5, 9, 10, 11, 17, 18, 19, 20, 22]]
+    soma_sem_pesos = df_pl['PL'].sum()
     df_pl['Weights'] = Weights
     df_pl['Weights'] = df_pl['Weights'].astype(float)
     df_pl['PL_atualizado'] = df_pl['PL'] * df_pl['Weights']
     df_pl['Adm'] = ['SANTANDER', 'BTG', 'SANTANDER',
                     'SANTANDER', 'BTG', 'BTG', 'BTG', 'BTG', 'BTG']
-    return df_pl, df_pl['PL_atualizado'].sum()
+    return df_pl, df_pl['PL_atualizado'].sum(), soma_sem_pesos
 
 
 def load_and_process_excel(df_excel, assets_sel):
@@ -49,9 +50,45 @@ def load_and_process_excel(df_excel, assets_sel):
     # Ajuste das colunas
     df = df_excel.copy()
     # Seleciona apenas a última linha para ter os "preços de fechamento"
-    df_precos = df.tail(1)[assets_sel]
+    df_precos = df.tail(1)
+    df_precos['TREASURY'] = df_precos['TREASURY'] * df_precos['WDO1'] / 10000
+    df_precos = df_precos[assets_sel]
 
     return df_precos, df
+
+
+def load_and_process_divone(file_bbg, df_excel):
+    df_divone = pd.read_excel(file_bbg, sheet_name='DIV01',
+                              skiprows=1, usecols='E:F', nrows=21)
+    df_divone = df_divone.T
+    columns = [
+        'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
+        'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP25', 'DAP26', 'DAP27',
+        'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY', 'IBOV', 'S&P'
+    ]
+    df_divone.columns = columns
+    # dropar a primeira linha
+    df_divone = df_divone.drop(df_divone.index[0])
+    df_pe = df_excel.copy()
+    # Seleciona apenas a última linha para ter os "preços de fechamento"
+    df_pe = df.tail(1)
+
+    # Garantir que os dados estão em formato string antes de substituição
+    df_divone['TREASURY'] = df_divone['TREASURY'].astype(
+        str).str.replace(',', '.', regex=False)
+    df_pe['WDO1'] = df_pe['WDO1'].astype(
+        str).str.replace(',', '.', regex=False)
+
+    # Converter para numérico após garantir que vírgulas foram substituídas
+    df_divone['TREASURY'] = pd.to_numeric(
+        df_divone['TREASURY'], errors='coerce')
+    df_pe['WDO1'] = pd.to_numeric(df_pe['WDO1'], errors='coerce')
+
+    df_divone['TREASURY'] = df_divone['TREASURY'] * \
+        df_pe['WDO1'].iloc[0] / 10000
+    dolar = df_pe['WDO1'].iloc[0]
+
+    return df_divone, dolar
 
 
 def process_returns(df, assets):
@@ -152,7 +189,8 @@ if fundos:
             f"Peso para {fundo}:", min_value=0.0, value=1.0, step=0.1)
         dict_pesos[fundo] = peso
 Weights = list(dict_pesos.values())
-df_pl_processado, soma_pl = process_portfolio(df_pl, Weights)
+df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(
+    df_pl, Weights)
 st.sidebar.write("---")
 
 df = pd.read_excel(file_bbg, sheet_name='BZ RATES',
@@ -163,16 +201,16 @@ df.drop(['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2',
 df.columns.values[0] = 'Date'
 df = df.drop([0])  # Remover a primeira linha
 df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y')
-df.drop(['OI1 Comdty', 'WSP1 Index'], axis=1, inplace=True)
+df.drop(['WSP1 Index'], axis=1, inplace=True)
 df.columns = [
     'Date', 'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
     'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP25', 'DAP26', 'DAP27',
-    'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'IBOV',
-    'TREASURY', 'S&P'
+    'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY', 'IBOV',
+    'TREASURY_AJUSTADA', 'S&P'
 ]
 
 # recoloquei dolar, conferir dps
-df.drop(['IBOV', 'S&P'], axis=1, inplace=True)
+df.drop(['IBOV', 'S&P', 'TREASURY_AJUSTADA'], axis=1, inplace=True)
 
 default_assets = ['WDO1']
 # Selecionar quais ativos analisar
@@ -209,10 +247,12 @@ if len(assets) > 0:
     # ou, se quiser, inserir via widget do Streamlit:
     # (Coloque valores default para cada ativo na ordem em que aparecem)
     qtd_input = []
+    quantidade_nomes = {}
     for col in df_precos_ajustados.index:
         val = st.sidebar.number_input(
             f"Quantidade para {col}:", min_value=-10000, value=1, step=1)
         qtd_input.append(val)
+        quantidade_nomes[col] = val
     quantidade = np.array(qtd_input)
 
     # Somar o valor de fechamento multiplicado pela quantidade
@@ -293,6 +333,110 @@ if len(assets) > 0:
         df_returns_portifolio['Portifolio'])]['Portifolio']
     cvar = cvar.mean()
 
+    # Calculo do DIVONE &  STRESS TEST
+    df_divone, dolar = load_and_process_divone(file_bbg, df)
+
+    # Verificar DI & DAP no nome da coluna
+    lista_juros_interno = []
+    for asset in assets:
+        if 'DI' in asset:
+            lista_juros_interno.append(asset)
+        if 'DAP' in asset:
+            lista_juros_interno.append(asset)
+    df_divone_juros_interno = df_divone[lista_juros_interno]
+    st.write(f'Juros Internos')
+    st.write(df_divone_juros_interno)
+
+    # Filtrar as quantidades dos ativos de juros internos
+    lista_quantidade = []
+    for asset in lista_juros_interno:
+        lista_quantidade.append(quantidade_nomes[asset])
+    st.write(f'Quantidade de Internos {lista_quantidade}')
+    quantidade_lista = np.array(lista_quantidade)
+    st.write(f'Quantidade de Internos {quantidade_lista}')
+    # Multiplicar os pesos dos ativos de juros internos pelo DIVONE
+    df_divone_juros_interno = df_divone_juros_interno * quantidade_lista
+    df_divone_juros_interno = df_divone_juros_interno.sum(axis=1)
+    st.write(f'Quantidade x DivOne {df_divone_juros_interno}')
+
+    lista_juros_externo = []
+    for asset in assets:
+        if 'TREASURY' in asset:
+            lista_juros_externo.append(asset)
+    df_divone_juros_externo = df_divone[lista_juros_externo]
+    st.write(f'Juros Externos')
+    st.write(df_divone_juros_externo)
+
+    lista_quantidade = []
+    for asset in lista_juros_externo:
+        lista_quantidade.append(quantidade_nomes[asset])
+    st.write(f'Quantidade de Externos {lista_quantidade}')
+    quantidade_lista = np.array(lista_quantidade)
+    st.write(f'Quantidade de Externos {quantidade_lista}')
+    # Multiplicar os pesos dos ativos de juros internos pelo DIVONE
+    df_divone_juros_externo = df_divone_juros_externo * quantidade_lista
+    df_divone_juros_externo = df_divone_juros_externo.sum(axis=1)
+    st.write(f'Quantidade x DivOne {df_divone_juros_externo}')
+
+    st.write('---')
+    # Stress Test
+    stress_test_juros_interno = df_divone_juros_interno * 100
+    st.write(f'100 bps JUROS INTERNOS {stress_test_juros_interno}')
+    stress_test_juros_interno_percent = stress_test_juros_interno / \
+        soma_pl_sem_pesos * 10000
+    st.write(
+        f'100 bps / pl JUROS INTERNOS {stress_test_juros_interno_percent}')
+    st.write('---')
+
+    stress_test_juros_externo = df_divone_juros_externo * 100
+    st.write(f'100 bps JUROS EXTERNOS{stress_test_juros_externo}')
+    stress_test_juros_externo_percent = stress_test_juros_externo / \
+        soma_pl_sem_pesos * 10000
+    st.write(f'100 bps / pl JUROS EXTERNOS{stress_test_juros_externo_percent}')
+    st.write('---')
+    # Dolar
+    lista_dolar = []
+    for asset in assets:
+        if 'WDO1' in asset:
+            lista_dolar.append(asset)
+    if lista_dolar:
+        lista_quantidade = []
+        for asset in lista_dolar:
+            lista_quantidade.append(quantidade_nomes[asset])
+
+        stress_dolar = lista_quantidade[0] * dolar * 0.02
+    else:
+        stress_dolar = 0
+
+    # Criar um dataframe com os ativos e os valores de stress e divone
+    # Criar DataFrame
+    df_stress = pd.DataFrame({
+        'Stress (bps)': [
+            # Convertendo para bps (em %)
+            f"{stress_test_juros_interno_percent['FUT_TICK_VAL']:.2f}bps",
+            # Convertendo para bps (em %)
+            f"{stress_test_juros_externo_percent['FUT_TICK_VAL']:.2f}bps",
+            ''  # Campo vazio para "Moedas"
+        ]
+    }, index=['Book Brasil', 'Book US', 'Moedas'])
+
+    df_div01 = pd.DataFrame({
+        'DIV01': [
+            f"R${df_divone_juros_interno.iloc[0]:.2f}",
+            f"R${df_divone_juros_externo.iloc[0]:.2f}",
+            '']
+    }, index=['Book Brasil', 'Book US', 'Moedas'])
+
+    df_stress_sem_pl = pd.DataFrame({
+        'Stress (R$)': [
+            f"R${stress_test_juros_interno['FUT_TICK_VAL']:.2f}",
+            f"R${stress_test_juros_externo['FUT_TICK_VAL']:.2f}",
+            f"R${stress_dolar:.2f}"]
+    }, index=['Book Brasil', 'Book US', 'Moedas'])
+
+    df_stress_div01 = pd.concat(
+        [df_div01, df_stress, df_stress_sem_pl], axis=1)
+
     # st.write(f"**CoVaR Total**: R$ {covar.sum():,.2f}")
 
     df_precos_ajustados = calculate_portfolio_values(
@@ -301,7 +445,7 @@ if len(assets) > 0:
         df_pl_processado, df_precos_ajustados)
     # Definir tamanhos das colunas: col1 e col2 maiores, col3 menor
     # Ajuste os valores para mudar os tamanhos relativos
-    col1, col2, col3 = st.columns([2.5, 3.5, 1])
+    col1, col11, col2, col3 = st.columns([2.4, 0.2, 3.4, 1])
     with col3:
         # Coloquei as checkboxes aqui e alterei o texto para maior clareza
         st.write("Escolha as colunas a exibir:")
@@ -322,13 +466,25 @@ if len(assets) > 0:
             var_limite_comparativo = var_lim_din
         else:
             st.write(
-                f"**VaR Limite**:(Peso de {var_limite:.1%}) : **R${soma_pl * var_bps * var_limite:,.0f}**")
-            var_limite_comparativo = soma_pl * var_bps * var_limite
+                f"**VaR Limite**:(Peso de {var_limite:.1%}) : **R${soma_pl_sem_pesos * var_bps * var_limite:,.0f}**")
+            var_limite_comparativo = soma_pl_sem_pesos * var_bps * var_limite
         st.write(
-            f"**VaR do Portifólio**: R${var_port_dinheiro:,.0f} : **{var_port_dinheiro/soma_pl * 10000:.2f}bps**")
+            f"**VaR do Portifólio**: R${var_port_dinheiro:,.0f} : **{var_port_dinheiro/soma_pl_sem_pesos * 10000:.2f}bps**")
         st.write(
-            f"**CVaR**: R${abs(cvar * vp_soma):,.0f} : **{abs(cvar * vp_soma)/soma_pl * 10000:.2f}bps**")
+            f"**CVaR**: R${abs(cvar * vp_soma):,.0f} : **{abs(cvar * vp_soma)/soma_pl_sem_pesos * 10000:.2f}bps**")
         st.write(f"**Volatilidade**: {vol_port_analitica:.2%}")
+
+        # st.write(
+        #     f'**DIVONE Juros Internos**: {df_divone_juros_interno.iloc[0]:.0f}')
+        # st.write(
+        #     f'**DIVONE Juros Externos**: {df_divone_juros_externo.iloc[0]:.0f}')
+        # st.write(
+        #     f"**Stress Test Juros Internos**: {stress_test_juros_interno_percent['FUT_TICK_VAL']:.2%}")
+        # st.write(
+        #     f"**Stress Test Juros Externos**: {stress_test_juros_externo_percent['FUT_TICK_VAL']:.2%}")
+        # st.write(
+        #     f"**Stress Test Cambio**: {stress_dolar:.2%}")
+        st.table(df_stress_div01)
 
         st.write("---")
         # Ver quantos % do limite a soma do covar usa
@@ -336,6 +492,25 @@ if len(assets) > 0:
         #    f"**R$ {(abs(covar.sum())):,.0f}**")
         st.write(
             f"### {abs(covar.sum()/ var_limite_comparativo):.2%} do risco total")
+
+    with col11:
+        st.html(
+            '''
+                <div class="divider-vertical-line"></div>
+                <style>
+                    .divider-vertical-line {
+                        border-left: 2px solid rgba(49, 51, 63, 0.2);
+                        height: 80vh;
+                        margin: auto;
+                    }
+                    @media (max-width: 768px) {
+                        .divider-vertical-line {
+                            display: none;
+                        }
+                    }
+                </style>
+                '''
+        )
 
     with col2:
         # Create a table with covar, beta, mvar, and covar for each asset
@@ -566,7 +741,7 @@ if len(assets) > 0:
     st.write("### Quantidade Máxima de Contratos por Adm")
     # Ocultar coluna de Quantidade Valor Fechamento	Valor Fechamento Ajustado pelo Var
     df_precos_plot = df_precos_ajustados.drop(
-        ['Quantidade', 'Valor Fechamento', 'Valor Fechamento Ajustado pelo Var'], axis=1)
+        ['Quantidade'], axis=1)
     st.table(df_precos_plot)
 
     st.write("### Quantidade Máxima de Contratos por Fundo")
@@ -636,13 +811,13 @@ def add_custom_css():
             background-color: White !important; /* Altera o fundo do botão de opção para cinza */
         }
 
-    /* Estiliza o ícone dentro do botão de decremento */
-    button[data-testid="stNumberInput-StepDown"] svg {
-        fill: black !important; /* Garante que o ícone seja preto */
-        
-         div[data-testid="stNumberInput"] input {
-        color: black; /* Define o texto como preto */
-    }
+        /* Estiliza o ícone dentro do botão de decremento */
+        button[data-testid="stNumberInput-StepDown"] svg {
+            fill: black !important; /* Garante que o ícone seja preto */
+            
+            div[data-testid="stNumberInput"] input {
+            color: black; /* Define o texto como preto */
+        }
         
         div[data-testid="stDateInput"] input {
             color: black; /* Define o texto laranja */

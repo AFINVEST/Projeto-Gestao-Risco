@@ -344,56 +344,56 @@ if len(assets) > 0:
         if 'DAP' in asset:
             lista_juros_interno.append(asset)
     df_divone_juros_interno = df_divone[lista_juros_interno]
-    st.write(f'Juros Internos')
-    st.write(df_divone_juros_interno)
+    # st.write(f'Juros Internos')
+    # st.write(df_divone_juros_interno)
 
     # Filtrar as quantidades dos ativos de juros internos
     lista_quantidade = []
     for asset in lista_juros_interno:
         lista_quantidade.append(quantidade_nomes[asset])
-    st.write(f'Quantidade de Internos {lista_quantidade}')
+    # st.write(f'Quantidade de Internos {lista_quantidade}')
     quantidade_lista = np.array(lista_quantidade)
-    st.write(f'Quantidade de Internos {quantidade_lista}')
+    # st.write(f'Quantidade de Internos {quantidade_lista}')
     # Multiplicar os pesos dos ativos de juros internos pelo DIVONE
     df_divone_juros_interno = df_divone_juros_interno * quantidade_lista
     df_divone_juros_interno = df_divone_juros_interno.sum(axis=1)
-    st.write(f'Quantidade x DivOne {df_divone_juros_interno}')
+    # st.write(f'Quantidade x DivOne {df_divone_juros_interno}')
 
     lista_juros_externo = []
     for asset in assets:
         if 'TREASURY' in asset:
             lista_juros_externo.append(asset)
     df_divone_juros_externo = df_divone[lista_juros_externo]
-    st.write(f'Juros Externos')
-    st.write(df_divone_juros_externo)
+    # st.write(f'Juros Externos')
+    # st.write(df_divone_juros_externo)
 
     lista_quantidade = []
     for asset in lista_juros_externo:
         lista_quantidade.append(quantidade_nomes[asset])
-    st.write(f'Quantidade de Externos {lista_quantidade}')
+    # st.write(f'Quantidade de Externos {lista_quantidade}')
     quantidade_lista = np.array(lista_quantidade)
-    st.write(f'Quantidade de Externos {quantidade_lista}')
+    # st.write(f'Quantidade de Externos {quantidade_lista}')
     # Multiplicar os pesos dos ativos de juros internos pelo DIVONE
     df_divone_juros_externo = df_divone_juros_externo * quantidade_lista
     df_divone_juros_externo = df_divone_juros_externo.sum(axis=1)
-    st.write(f'Quantidade x DivOne {df_divone_juros_externo}')
+    # st.write(f'Quantidade x DivOne {df_divone_juros_externo}')
 
-    st.write('---')
+    # st.write('---')
     # Stress Test
     stress_test_juros_interno = df_divone_juros_interno * 100
-    st.write(f'100 bps JUROS INTERNOS {stress_test_juros_interno}')
+    # st.write(f'100 bps JUROS INTERNOS {stress_test_juros_interno}')
     stress_test_juros_interno_percent = stress_test_juros_interno / \
         soma_pl_sem_pesos * 10000
-    st.write(
-        f'100 bps / pl JUROS INTERNOS {stress_test_juros_interno_percent}')
-    st.write('---')
+    # st.write(
+    #    f'100 bps / pl JUROS INTERNOS {stress_test_juros_interno_percent}')
+    # st.write('---')
 
     stress_test_juros_externo = df_divone_juros_externo * 100
-    st.write(f'100 bps JUROS EXTERNOS{stress_test_juros_externo}')
+    # st.write(f'100 bps JUROS EXTERNOS{stress_test_juros_externo}')
     stress_test_juros_externo_percent = stress_test_juros_externo / \
         soma_pl_sem_pesos * 10000
-    st.write(f'100 bps / pl JUROS EXTERNOS{stress_test_juros_externo_percent}')
-    st.write('---')
+    # st.write(f'100 bps / pl JUROS EXTERNOS{stress_test_juros_externo_percent}')
+    # st.write('---')
     # Dolar
     lista_dolar = []
     for asset in assets:

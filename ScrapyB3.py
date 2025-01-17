@@ -5,7 +5,109 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.action_chains import ActionChains
 import pandas as pd
+from datetime import datetime
 import time
+import os
+
+
+
+def processar_dados(processed_data):
+
+    # Definindo as colunas de interesse
+    columns = [
+        'Mercadoria',
+        'Vencimento',
+        'Preço de ajuste anterior',
+        'Preço de ajuste Atual',
+        'Variação',
+        'Valor do ajuste por contrato (R$)'
+    ]
+    
+    # Cria DataFrame principal
+    df = pd.DataFrame(processed_data, columns=columns)
+    
+    # Ajustar o nome da mercadoria para ser as 3 primeiras letras + últimas 2 do vencimento
+    df['Mercadoria'] = df['Mercadoria'].str[:3] + '_' + df['Vencimento'].str[-2:]
+    
+    # Tirar o '1' do nome da DI1
+    df.loc[df['Mercadoria'].str.startswith('DI1'), 'Mercadoria'] = 'DI_' + df['Vencimento'].str[-2:]
+    
+    # Tirar o '1' do nome da DI1
+    df.loc[df['Mercadoria'].str.startswith('DAP'), 'Mercadoria'] = 'DAP' + df['Vencimento'].str[-2:]
+
+    # Mudar nome do DOL e T10 (exemplo)
+    df.loc[df['Mercadoria'].str.startswith('DOL_'), 'Mercadoria'] = 'WDO1'
+    df.loc[df['Mercadoria'].str.startswith('T10_'), 'Mercadoria'] = 'TREASURY'
+    
+    # Remover a coluna Vencimento do DataFrame final
+    df.drop('Vencimento', axis=1, inplace=True)
+    
+    # -------------------------------------------------
+    # Agora, vamos criar (ou atualizar) 2 DataFrames:
+    #  1) df_preco_de_ajuste_atual
+    #  2) df_variacao
+    #
+    # Cada um terá:
+    #   - índice = Mercadoria
+    #   - colunas = datas (string) no formato YYYY-MM-DD (por exemplo)
+    #
+    # ---------------------------------------------------
+    
+    # 1) Transformando o df original em Série para cada componente
+    #    index = Mercadoria, values = coluna correspondente
+    serie_preco_ajuste = pd.Series(df['Preço de ajuste Atual'].values, index=df['Mercadoria'])
+    serie_variacao = pd.Series(df['Variação'].values, index=df['Mercadoria'])
+    
+    # Nome da coluna que será adicionada/atualizada (data do dia)
+    hoje_str = datetime.now().strftime('%Y-%m-%d')
+    
+    # 2) Carregar (ou criar) df_preco_de_ajuste_atual
+    nome_arquivo_preco_ajuste = 'df_preco_de_ajuste_atual.csv'
+    if os.path.exists(nome_arquivo_preco_ajuste):
+        df_preco_de_ajuste_atual = pd.read_csv(nome_arquivo_preco_ajuste, index_col=0)
+    else:
+        df_preco_de_ajuste_atual = pd.DataFrame()
+    
+    # 3) Garantir que o índice contemple todas as Mercadorias
+    #    (Unir o índice atual do df com o novo índice)
+    mercadorias_unificadas = df_preco_de_ajuste_atual.index.union(serie_preco_ajuste.index)
+    df_preco_de_ajuste_atual = df_preco_de_ajuste_atual.reindex(index=mercadorias_unificadas)
+
+    df_preco_de_ajuste_atual.index.name = 'Assets'
+    
+    # 4) Se a coluna (data) não existir, cria; se existir e você quiser atualizar, basta sobrescrever
+    df_preco_de_ajuste_atual[hoje_str] = serie_preco_ajuste
+    
+    # 5) Salvar em CSV
+    df_preco_de_ajuste_atual.to_csv(nome_arquivo_preco_ajuste)
+    
+    # ------------------------------------------
+    #  Mesma lógica para df_variacao
+    # ------------------------------------------
+    nome_arquivo_variacao = 'df_variacao.csv'
+    if os.path.exists(nome_arquivo_variacao):
+        df_variacao_atual = pd.read_csv(nome_arquivo_variacao, index_col=0)
+    else:
+        df_variacao_atual = pd.DataFrame()
+    
+    # Unificar índices
+    mercadorias_unificadas = df_variacao_atual.index.union(serie_variacao.index)
+    df_variacao_atual = df_variacao_atual.reindex(index=mercadorias_unificadas)
+    df_variacao_atual.index.name = 'Assets'
+
+    # Cria/atualiza a coluna de hoje
+    df_variacao_atual[hoje_str] = serie_variacao
+    
+    # Salva em CSV
+    df_variacao_atual.to_csv(nome_arquivo_variacao)
+
+    nome_arquivo_variacao = 'df_variacao.csv'
+    if os.path.exists(nome_arquivo_variacao):
+        df_variacao_atual = pd.read_csv(nome_arquivo_variacao, index_col=0)
+    else:
+        df_variacao_atual = pd.DataFrame()
+    print("Processamento concluído!")
+    
 
 # Configurar o serviço do ChromeDriver
 service = Service()
@@ -60,9 +162,23 @@ try:
             preco_ajuste_atual = data[3]
             variacao = data[4]
             valor_ajuste_contrato = data[5]
-            processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
-                        preco_ajuste_atual, variacao, valor_ajuste_contrato])
-    
+            if mercadoria == 'DI1 - DI de 1 dia':
+                # Se o vencimento conter a letra F é pra ser adicionado
+                if 'F' in vencimento:
+                    processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
+                                           preco_ajuste_atual, variacao, valor_ajuste_contrato])
+            elif mercadoria == 'DAP - Cupom de DI x IPCA':
+                if 'Q' in vencimento:
+                    processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
+                                           preco_ajuste_atual, variacao, valor_ajuste_contrato])
+                if 'K' in vencimento:
+                    processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
+                                           preco_ajuste_atual, variacao, valor_ajuste_contrato])
+
+            elif mercadoria == 'DOL - Dólar comercial' or mercadoria == 'T10 - US T-Note 10 anos':
+                processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
+                                       preco_ajuste_atual, variacao, valor_ajuste_contrato])
+
         else:
             # Se houver menos de 6 elementos, é um vencimento adicional
             vencimento = data[0]
@@ -70,23 +186,24 @@ try:
             preco_ajuste_atual = data[2]
             variacao = data[3]
             valor_ajuste_contrato = data[4]
-    
+            if mercadoria == 'DI1 - DI de 1 dia':
+                # Se o vencimento conter a letra F é pra ser adicionado
+                if 'F' in vencimento:
+                    processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
+                                           preco_ajuste_atual, variacao, valor_ajuste_contrato])
+            elif mercadoria == 'DAP - Cupom de DI x IPCA':
+                if 'Q' in vencimento:
+                    processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
+                                           preco_ajuste_atual, variacao, valor_ajuste_contrato])
+                if 'K' in vencimento:
+                    processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
+                                           preco_ajuste_atual, variacao, valor_ajuste_contrato])
         # Adicionar os dados processados à lista
-
-    
-    # Converter para DataFrame
-    columns = ['Mercadoria', 'Vencimento', 'Preço de ajuste anterior',
-               'Preço de ajuste Atual', 'Variação', 'Valor do ajuste por contrato (R$)']
-    df = pd.DataFrame(processed_data,columns=columns)
-    
-    # Export to CSV
-    df.to_csv("ajustes_do_pregao.csv", index=False)
-    
-
-    # Exibir o DataFrame
-    print(df)
-
     driver.quit()
+
 except Exception as e:
     print(e)
     driver.quit()
+
+processar_dados(processed_data)
+

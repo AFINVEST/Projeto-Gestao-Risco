@@ -1099,93 +1099,6 @@ def analisar_performance_fundos(
     }
 
 
-def app_analise_performance(lista_estrategias, lista_ativos):
-    st.title("Análise de Performance dos Fundos")
-
-    # --- Seletor de Filtro de Tempo ---
-    tipo_filtro = st.sidebar.selectbox("Escolha o filtro de tempo", ["Apenas um dia", "Período"])
-    
-    if tipo_filtro == "Apenas um dia":
-        data_unica = st.sidebar.date_input("Escolha o dia", value=date(2025, 1, 1))
-        data_inicial = data_unica.strftime("%Y-%m-%d")
-        data_final   = data_inicial  # Mesma data
-    else:
-        # Múltiplas datas
-        data_inicial = st.sidebar.date_input("Data inicial", value=date(2024, 12, 16))
-        data_final   = st.sidebar.date_input("Data final",   value=date(2025, 1, 16))
-
-        # Caso o usuário escolha no date_input (retorna objeto date)
-        # Convertendo para string
-        data_inicial = data_inicial.strftime("%Y-%m-%d")
-        data_final   = data_final.strftime("%Y-%m-%d")
-
-    # --- Seletor de Tipo de Visão ---
-    tipo_visao = st.sidebar.radio("Tipo de Visão", ["Fundo", "Estratégia", "Ativo"])
-
-    if st.sidebar.button("Analisar"):
-        # Chama a função de análise
-        dict_result = analisar_performance_fundos(
-            data_inicial, 
-            data_final,
-            lista_estrategias,
-            lista_ativos
-        )
-
-        df_ativo  = dict_result["df_diario_fundo_ativo"]
-        df_estr   = dict_result["df_diario_fundo_estrategia"]
-        df_fundo  = dict_result["df_diario_fundo_total"]
-
-        # REMOVER linhas onde Ativo == "PL"
-        df_ativo = df_ativo[df_ativo["Ativo"] != "PL"]
-
-        # --------------------------------------------------------------------
-        # Exibir apenas a visão escolhida:
-        # --------------------------------------------------------------------
-        if tipo_visao == "Ativo":
-            st.subheader("Rendimento Diário - Fundo x Ativo")
-            st.dataframe(df_ativo)
-
-            # Exemplo de gráfico: escolher 1 fundo e plotar linha ao longo das datas
-            # pivot index=date, columns=Ativo, values=Rendimento_diario
-            fundos_unicos = df_ativo["fundo"].unique()
-            if len(fundos_unicos) > 0:
-                fundo_escolhido = st.selectbox("Escolha o Fundo para Gráfico:", fundos_unicos)
-                df_plot = df_ativo[df_ativo["fundo"] == fundo_escolhido].copy()
-                # pivot
-                df_plot_pivot = df_plot.pivot(index="date", 
-                                              columns="Ativo", 
-                                              values="Rendimento_diario").fillna(0.0)
-                # Ordenar index (date)
-                df_plot_pivot.sort_index(inplace=True)
-                st.line_chart(df_plot_pivot)
-
-        elif tipo_visao == "Estratégia":
-            st.subheader("Rendimento Diário - Fundo x Estratégia")
-            st.dataframe(df_estr)
-            
-            # Exemplo de gráfico: pivot index=date, columns=Estratégia
-            fundos_unicos = df_estr["fundo"].unique()
-            if len(fundos_unicos) > 0:
-                fundo_escolhido = st.selectbox("Escolha o Fundo para Gráfico:", fundos_unicos)
-                df_plot = df_estr[df_estr["fundo"] == fundo_escolhido].copy()
-                df_plot_pivot = df_plot.pivot(index="date", 
-                                              columns="Estratégia", 
-                                              values="Rendimento_diario").fillna(0.0)
-                df_plot_pivot.sort_index(inplace=True)
-                st.line_chart(df_plot_pivot)
-
-        else:  # tipo_visao == "Fundo"
-            st.subheader("Rendimento Diário - Fundo (Total)")
-            st.dataframe(df_fundo)
-
-            # Exemplo de gráfico: pivot index=date, columns=fundo
-            df_plot_pivot = df_fundo.pivot(index="date",
-                                           columns="fundo",
-                                           values="Rendimento_diario").fillna(0.0)
-            df_plot_pivot.sort_index(inplace=True)
-            st.line_chart(df_plot_pivot)
-
-
 
 
 def add_custom_css():
@@ -2252,8 +2165,90 @@ def main_page():
                 'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP25', 'DAP26', 'DAP27',
                 'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY'
             ]
+            st.title("Análise de Performance dos Fundos")
 
-            app_analise_performance(lista_estrategias,lista_ativos)
+            # --- Seletor de Filtro de Tempo ---
+            tipo_filtro = st.sidebar.selectbox("Escolha o filtro de tempo", ["Apenas um dia", "Período"])
+            
+            if tipo_filtro == "Apenas um dia":
+                data_unica = st.sidebar.date_input("Escolha o dia", value=date(2025, 1, 1))
+                data_inicial = data_unica.strftime("%Y-%m-%d")
+                data_final   = data_inicial  # Mesma data
+            else:
+                # Múltiplas datas
+                data_inicial = st.sidebar.date_input("Data inicial", value=date(2024, 12, 16))
+                data_final   = st.sidebar.date_input("Data final",   value=date(2025, 1, 16))
+
+                # Caso o usuário escolha no date_input (retorna objeto date)
+                # Convertendo para string
+                data_inicial = data_inicial.strftime("%Y-%m-%d")
+                data_final   = data_final.strftime("%Y-%m-%d")
+
+            # --- Seletor de Tipo de Visão ---
+            tipo_visao = st.sidebar.radio("Tipo de Visão", ["Fundo", "Estratégia", "Ativo"])
+
+            if st.sidebar.button("Analisar"):
+                # Chama a função de análise
+                dict_result = analisar_performance_fundos(
+                    data_inicial, 
+                    data_final,
+                    lista_estrategias,
+                    lista_ativos
+                )
+
+                df_ativo  = dict_result["df_diario_fundo_ativo"]
+                df_estr   = dict_result["df_diario_fundo_estrategia"]
+                df_fundo  = dict_result["df_diario_fundo_total"]
+
+                # REMOVER linhas onde Ativo == "PL"
+                df_ativo = df_ativo[df_ativo["Ativo"] != "PL"]
+
+                # --------------------------------------------------------------------
+                # Exibir apenas a visão escolhida:
+                # --------------------------------------------------------------------
+                if tipo_visao == "Ativo":
+                    st.subheader("Rendimento Diário - Fundo x Ativo")
+                    st.dataframe(df_ativo)
+
+                    # Exemplo de gráfico: escolher 1 fundo e plotar linha ao longo das datas
+                    # pivot index=date, columns=Ativo, values=Rendimento_diario
+                    fundos_unicos = df_ativo["fundo"].unique()
+                    if len(fundos_unicos) > 0:
+                        fundo_escolhido = st.selectbox("Escolha o Fundo para Gráfico:", fundos_unicos)
+                        df_plot = df_ativo[df_ativo["fundo"] == fundo_escolhido].copy()
+                        # pivot
+                        df_plot_pivot = df_plot.pivot(index="date", 
+                                                    columns="Ativo", 
+                                                    values="Rendimento_diario").fillna(0.0)
+                        # Ordenar index (date)
+                        df_plot_pivot.sort_index(inplace=True)
+                        st.line_chart(df_plot_pivot)
+
+                elif tipo_visao == "Estratégia":
+                    st.subheader("Rendimento Diário - Fundo x Estratégia")
+                    st.dataframe(df_estr)
+                    
+                    # Exemplo de gráfico: pivot index=date, columns=Estratégia
+                    fundos_unicos = df_estr["fundo"].unique()
+                    if len(fundos_unicos) > 0:
+                        fundo_escolhido = st.selectbox("Escolha o Fundo para Gráfico:", fundos_unicos)
+                        df_plot = df_estr[df_estr["fundo"] == fundo_escolhido].copy()
+                        df_plot_pivot = df_plot.pivot(index="date", 
+                                                    columns="Estratégia", 
+                                                    values="Rendimento_diario").fillna(0.0)
+                        df_plot_pivot.sort_index(inplace=True)
+                        st.line_chart(df_plot_pivot)
+
+                else:  # tipo_visao == "Fundo"
+                    st.subheader("Rendimento Diário - Fundo (Total)")
+                    st.dataframe(df_fundo)
+
+                    # Exemplo de gráfico: pivot index=date, columns=fundo
+                    df_plot_pivot = df_fundo.pivot(index="date",
+                                                columns="fundo",
+                                                values="Rendimento_diario").fillna(0.0)
+                    df_plot_pivot.sort_index(inplace=True)
+                    st.line_chart(df_plot_pivot)
         else:
             st.write("Nenhum Ativo selecionado.")
 

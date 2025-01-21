@@ -1556,13 +1556,12 @@ def main_page():
             st.write("Nenhum Ativo selecionado.")
     elif opti == "Ver Portifólio":
         st.sidebar.write("## Ativos atuais de seu Portifólio")
-        df_portifolio_default = portifolio_default.groupby(
-            'Ativo').sum().reset_index()
-        df_portifolio_default.drop(
-            ['Dia de Compra'], axis=1, inplace=True)
-        df_portifolio_default['Preço de Compra'] = df_portifolio_default['Preço de Compra'] / \
-            df_portifolio_default['Quantidade']
-
+        # Agrupamento corrigido
+        df_portifolio_default = portifolio_default.groupby("Ativo").agg({
+            "Quantidade": "sum",  # Soma as quantidades
+            "Preço de Compra": lambda x: (x * portifolio_default.loc[x.index, "Quantidade"]).sum() / portifolio_default.loc[x.index, "Quantidade"].sum(),  # Média ponderada
+            "Preço de Ajuste Atual": "mean",  # Exemplo, calcula a média
+        }).reset_index()
         # Adicionar linha de soma
         sum_row = df_portifolio_default.select_dtypes(include='number').sum()
         sum_row['Ativo'] = 'Total'
@@ -1691,7 +1690,7 @@ def main_page():
                     f"{stress_dolar_percent:.2f}bps"
                 ]
             }, index=['Book Brasil', 'Book US', 'Moedas'])
-            
+
             sum_row = pd.DataFrame({
                 'DIV01': [f"R${df_divone_juros_interno.iloc[0] + df_divone_juros_externo.iloc[0]:,.2f}"],
                 'Stress (R$)': [f"R${stress_test_juros_interno['FUT_TICK_VAL'] + stress_test_juros_externo['FUT_TICK_VAL'] + stress_dolar:,.2f}"],

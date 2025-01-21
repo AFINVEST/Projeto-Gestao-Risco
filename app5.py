@@ -1,3 +1,566 @@
+def atualizar_csv_fundos(
+    df_current,         # DataFrame do dia atual (1 linha por Fundo)
+    dia_operacao,       # Exemplo: "2025-01-20"
+    # DF de transações: [Ativo, Quantidade, Dia de Compra, Preço de Compra, ...]
+    df_info,
+    # DF de preços de fechamento: colunas ["Assets", <data1>, <data2>, ...]
+):
+    """
+    - O CSV final de cada fundo terá linhas = cada ativo (ou "PL") e
+      colunas = ["Ativo","Preco_Compra","Preco_Fechamento_Atual", <data1>, <data2>, ...],
+      onde cada dataX é a posição final do ativo naquele dia.
+    - Sempre que chamamos a função (inclusive mais de uma vez no mesmo dia),
+      se houver aumento de posição (quantidade final maior que a anterior naquele dia),
+      recalculamos o preço médio.
+    - A coluna "Preco_Fechamento_Atual" vem do df_fechamento_b3 para a
+      última data disponível (ex: "2025-01-20").
+    """
+    df_b3_fechamento = processar_b3_portifolio()
+    # ------------------------------------------------------------------
+    # 1) Identificar qual é a última data disponível em df_fechamento_b3
+    # ------------------------------------------------------------------
+    # Supondo que a 1ª coluna é "Assets" e as demais são datas
+    colunas_b3 = list(df_b3_fechamento.columns)
+    colunas_b3.remove("Assets")  # agora só temos as datas
+    colunas_b3_ordenadas = sorted(colunas_b3)
+    ultima_data_fechamento = colunas_b3_ordenadas[-1]  # ex: "2025-01-20"
+
+    # ------------------------------------------------------------------
+    # Itera cada FONDO (linha) em df_current
+    # ------------------------------------------------------------------
+    for fundo, row_fundo in df_current.iterrows():
+        # Caminho do CSV do Fundo
+        nome_arquivo_csv = os.path.join("BaseFundos", f"{fundo}.csv")
+
+        # ----------------------------------------------------------------
+        # 2) Carregar (ou criar) o DataFrame histórico do Fundo (df_fundo)
+        # ----------------------------------------------------------------
+        if os.path.exists(nome_arquivo_csv):
+            df_fundo = pd.read_csv(nome_arquivo_csv, index_col=None)
+        else:
+            df_fundo = pd.DataFrame(
+                columns=["Ativo", "Preco_Compra", "Preco_Fechamento_Atual"])
+
+        # Garante que "Ativo" seja índice
+        if "Ativo" in df_fundo.columns:
+            df_fundo.set_index("Ativo", inplace=True, drop=False)
+
+        # ----------------------------------------------------------------
+        # 3) Verifica PL (se existir)
+        # ----------------------------------------------------------------
+        valor_pl = None
+        if "PL" in df_current.columns:
+            valor_pl = row_fundo["PL"]
+
+        # ----------------------------------------------------------------
+        # 4) Identificar colunas de CONTRATOS no df_current
+        # ----------------------------------------------------------------
+        colunas_contratos = [
+            c for c in df_current.columns
+            if c.startswith("Contratos ")
+        ]
+        # Exemplo: {"Contratos WDO1": 10, "Contratos DI_33": -25, ...}
+        serie_contratos = row_fundo[colunas_contratos]
+
+        # ----------------------------------------------------------------
+        # 5) Garante a coluna do dia_operacao em df_fundo
+        # ----------------------------------------------------------------
+        if dia_operacao not in df_fundo.columns:
+            df_fundo[dia_operacao] = 0.0
+
+        # Se existir "PL", cria/atualiza linha
+        if valor_pl is not None:
+            if "PL" not in df_fundo.index:
+                df_fundo.loc["PL", "Ativo"] = "PL"
+                df_fundo.loc["PL", "Preco_Compra"] = np.nan
+                df_fundo.loc["PL", "Preco_Fechamento_Atual"] = np.nan
+            df_fundo.loc["PL", dia_operacao] = valor_pl
+
+        # ----------------------------------------------------------------
+        # 6) Para cada contrato (ativo), atualizar posição e preço médio
+        # ----------------------------------------------------------------
+        for col_contrato, qtd_dia_raw in serie_contratos.items():
+            ativo = col_contrato.replace("Contratos ", "").strip()
+
+            # Converte a quantidade para float
+            try:
+                qtd_dia_nova = float(qtd_dia_raw)
+            except:
+                qtd_dia_nova = 0.0
+
+            # Se o ativo ainda não existe no df_fundo, cria a linha
+            if ativo not in df_fundo.index:
+                df_fundo.loc[ativo, "Ativo"] = ativo
+                df_fundo.loc[ativo, "Preco_Compra"] = 0.0
+                df_fundo.loc[ativo, "Preco_Fechamento_Atual"] = 0.0
+                df_fundo.loc[ativo, dia_operacao] = 0.0
+
+            # Carrega o preço médio atual (se for NaN, substitui por 0.0)
+            preco_medio_atual = df_fundo.loc[ativo, "Preco_Compra"]
+            if pd.isna(preco_medio_atual):
+                preco_medio_atual = 0.0
+
+            # ----------------------------------------------------------------
+            # 6.1) Descobrir a quantidade que já estava nesse MESMO dia
+            #      (caso tenha sido atualizada em chamadas anteriores hoje)
+            # ----------------------------------------------------------------
+            qtd_dia_anterior = 0.0
+            try:
+                qtd_dia_anterior = float(df_fundo.loc[ativo, dia_operacao])
+            except:
+                # Se não existia nada, fica 0
+                pass
+
+            # ----------------------------------------------------------------
+            # 6.2) Calcula a diferença no MESMO dia
+            #      Se > 0 => houve compra adicional;
+            #      se < 0 => houve venda adicional.
+            # ----------------------------------------------------------------
+            diff = qtd_dia_nova - qtd_dia_anterior
+
+            if diff > 0:
+                # Houve compra adicional no MESMO dia_operacao
+                # Precisamos achar no df_info as linhas do DIA + ATIVO
+                subset = df_info[
+                    (df_info["Ativo"] == ativo) &
+                    (df_info["Dia de Compra"] == dia_operacao)
+                ]
+                if len(subset) == 0:
+                    # Se não encontrou nada em df_info, mantemos o preço
+                    preco_compra_dia = preco_medio_atual
+                else:
+                    # Soma ponderada das quantidades positivas
+                    qtd_total_dia = 0.0
+                    valor_total_dia = 0.0
+                    for i, r in subset.iterrows():
+                        q_linha = float(str(r["Quantidade"]).replace(",", "."))
+                        p_linha = float(
+                            str(r["Preço de Compra"]).replace(",", "."))
+                        if q_linha > 0:
+                            qtd_total_dia += q_linha
+                            valor_total_dia += (q_linha * p_linha)
+
+                    if qtd_total_dia == 0:
+                        preco_compra_dia = preco_medio_atual
+                    else:
+                        preco_compra_dia = valor_total_dia / qtd_total_dia
+
+                # Novo preço médio = ponderação da posição anterior do DIA + compra nova
+                # Posição anterior do dia (qtd_dia_anterior) * preco_medio_atual
+                # + diff * preco_compra_dia
+                # -----------------------------------------
+                # Nova posição final = qtd_dia_nova
+                # (que é qtd_dia_anterior + diff)
+                # -----------------------------------------
+                qtd_comprada = diff
+                qtd_final = qtd_dia_nova  # que é qtd_dia_anterior + diff
+
+                novo_preco_medio = (
+                    (qtd_dia_anterior * preco_medio_atual) +
+                    (qtd_comprada * preco_compra_dia)
+                ) / qtd_final
+
+                df_fundo.loc[ativo, "Preco_Compra"] = novo_preco_medio
+
+            elif diff < 0:
+                # Houve venda no mesmo dia.
+                # Nesse caso, normalmente não mexemos no preço médio se for apenas redução parcial.
+                # Mas se a posição final ficar 0 ou negativa, podemos ter regras específicas.
+
+                # Exemplo de lógica:
+
+                qtd_final = qtd_dia_nova  # lembrando que qtd_dia_nova = qtd_dia_anterior + diff
+
+                if qtd_final == 0:
+                    #
+                    # ZEROU posição -> podemos "resetar" o preço médio
+                    #
+                    df_fundo.loc[ativo, "Preco_Compra"] = 0.0  # ou np.nan, se preferir
+                    # Obs: Aqui não apuramos P&L. Se quiser apurar ganho/perda realizado,
+                    # você precisaria saber o preço de venda (vem do df_info, por ex.)
+                    # e comparar com o preço médio antigo.
+                    pass
+
+                elif qtd_final > 0:
+                    #
+                    # Vendeu parcialmente, mas não zerou. Mantemos o mesmo preço médio.
+                    #
+                    # Se desejar, poderia apurar P&L parcial aqui também.
+                    pass
+
+                else:
+                    #
+                    # Se chegou aqui, significa que a posição final ficou NEGATIVA.
+                    # Exemplo: passou de +10 para -5.
+                    #
+                    # 1) Se quiser, pode dividir a lógica em:
+                    #    - "Zerar" a parte que estava positiva (apurar P&L)
+                    #    - "Abrir" a nova posição short com preço médio próprio.
+                    #
+                    # 2) A maneira mais simples (exemplo) é:
+                    #    - Sempre que virar posição (de + p/ -), redefinimos o preço médio
+                    #      com base no valor de 'venda' da quantidade que 'excedeu' a posição antiga.
+                    #
+                    #    - Caso já estivéssemos short e só aumentou o short, poderíamos
+                    #      recalcular via média ponderada também. (depende do seu controle)
+                    #
+                    # Para ilustrar, vamos ver se a posição anterior era >= 0 e agora é < 0.
+                    # Precisamos identificar quantas unidades "excederam":
+                    qtd_excedida = abs(qtd_final)  # quantas unidades ficaram short
+
+                    # Buscamos o preço de venda no df_info (quantidade negativa e data = dia_operacao)
+                    subset_venda = df_info[
+                        (df_info["Ativo"] == ativo) &
+                        (df_info["Dia de Compra"] == dia_operacao) &
+                        (df_info["Quantidade"] < 0)
+                    ]
+                    # Caso tenha várias linhas de venda, você pode somar/ponderar.
+                    # Neste exemplo, assumimos que existe apenas uma linha ou pegamos a média:
+                    if len(subset_venda) > 0:
+                        # Exemplo simples: pegamos a 1ª linha
+                        p_venda = float(
+                            str(subset_venda.iloc[0]["Preço de Compra"]).replace(",", ".")
+                        )
+                    else:
+                        # Se não encontrou info, use o preço médio anterior
+                        p_venda = preco_medio_atual
+
+                    # (Opcional) "resetar" o preço médio
+                    #           definindo como o preço da 'venda' para a posição short
+                    df_fundo.loc[ativo, "Preco_Compra"] = p_venda
+
+                    # Em muitos sistemas, preço médio de posição short é controlado de forma diferente,
+                    # pois, na verdade, esse "preço médio" significaria quanto se espera recomprar no futuro.
+                    # Vai depender de como você quer registrar.
+                    pass
+
+                # Por fim, independemente do caso, atualizamos a coluna do dia com a nova quantidade final:
+                df_fundo.loc[ativo, dia_operacao] = qtd_final
+
+
+            # Por fim, atualizamos a coluna do dia com a nova quantidade final
+            df_fundo.loc[ativo, dia_operacao] = qtd_dia_nova
+
+            # ----------------------------------------------------------------
+            # 6.3) Atualizar "Preço de Fechamento Atual" com base em df_fechamento_b3
+            # ----------------------------------------------------------------
+            # Localiza o ativo em df_fechamento_b3["Assets"] == ativo
+            row_fech = df_b3_fechamento[df_b3_fechamento["Assets"] == ativo]
+            if not row_fech.empty:
+                valor_fechamento_str = row_fech[ultima_data_fechamento].values[0]
+                # Converter de string (com vírgula) para float:
+                # Exemplo: "6.081,5680" => "6081.5680"
+                valor_fechamento_str = valor_fechamento_str.replace(
+                    ".", "").replace(",", ".")
+                try:
+                    valor_fechamento_float = float(valor_fechamento_str)
+                except:
+                    valor_fechamento_float = 0.0
+                df_fundo.loc[ativo,
+                             "Preco_Fechamento_Atual"] = valor_fechamento_float
+            else:
+                df_fundo.loc[ativo, "Preco_Fechamento_Atual"] = np.nan
+
+        # ----------------------------------------------------------------
+        # 7) Salvar o CSV do fundo
+        # ----------------------------------------------------------------
+        df_fundo.reset_index(drop=True, inplace=True)
+        df_fundo.to_csv(nome_arquivo_csv, index=False, encoding="utf-8")
+        print(f"[{fundo}] -> CSV atualizado: {nome_arquivo_csv}")
+
+#segundo
+import os
+import pandas as pd
+import numpy as np
+
+def processar_b3_portifolio():
+    """
+    Exemplo fictício: Retorna um df de fechamento com colunas:
+    ["Assets", "2025-01-19", "2025-01-20", ...]
+    Você deve adaptar para seu caso real.
+    """
+    data = {
+        "Assets": ["WDO1", "DI_33", "PETR4", "VALE3"],
+        "2025-01-19": ["5.000,00", "1.000,00", "27,00", "70,00"],
+        "2025-01-20": ["5.100,00", "1.050,00", "28,00", "72,00"],
+    }
+    df = pd.DataFrame(data)
+    return df
+
+def atualizar_csv_fundos(
+    df_current,         # DataFrame do dia atual (1 linha por Fundo)
+    dia_operacao,       # Exemplo: "2025-01-20"
+    df_info,            # DF de transações: [Ativo, Quantidade, Dia de Compra, Preço de Compra, ...]
+):
+    """
+    - O CSV final de cada fundo terá linhas = cada ativo (ou "PL") e
+      colunas = ["Ativo","Preco_Compra","Preco_Fechamento_Atual",
+                 "PnL_Realizado", "PnL_Atual", <datas...>],
+      onde cada dataX é a posição final do ativo naquele dia (quantidade).
+    - Apuramos o PnL realizado nas operações de venda (encerrando ou reduzindo long)
+      ou de compra (encerrando ou reduzindo short).
+    - Calculamos PnL_Atual (não realizado) = (Preco_Fechamento_Atual - Preco_Compra)*Quantidade
+      (ajustando sinal se for short).
+    """
+
+    df_b3_fechamento = processar_b3_portifolio()
+
+    # ------------------------------------------------------------------
+    # 1) Identificar a última data disponível em df_b3_fechamento
+    # ------------------------------------------------------------------
+    colunas_b3 = list(df_b3_fechamento.columns)
+    colunas_b3.remove("Assets")  # agora só temos as datas
+    colunas_b3_ordenadas = sorted(colunas_b3)
+    ultima_data_fechamento = colunas_b3_ordenadas[-1]  # ex: "2025-01-20"
+
+    # ------------------------------------------------------------------
+    # Itera cada FUNDO (linha) em df_current
+    # ------------------------------------------------------------------
+    for fundo, row_fundo in df_current.iterrows():
+        # Caminho do CSV do Fundo
+        nome_arquivo_csv = os.path.join("BaseFundos", f"{fundo}.csv")
+
+        # 2) Carregar (ou criar) o DataFrame histórico do Fundo (df_fundo)
+        if os.path.exists(nome_arquivo_csv):
+            df_fundo = pd.read_csv(nome_arquivo_csv, index_col=None)
+        else:
+            df_fundo = pd.DataFrame(
+                columns=[
+                    "Ativo",
+                    "Preco_Compra",
+                    "Preco_Fechamento_Atual",
+                    "PnL_Realizado",   # P&L realizado acumulado
+                    "PnL_Atual"        # P&L não realizado (marcado a mercado)
+                ]
+            )
+
+        # Garante que "Ativo" seja índice
+        if "Ativo" in df_fundo.columns:
+            df_fundo.set_index("Ativo", inplace=True, drop=False)
+
+        # Se colunas de PnL não existirem, cria
+        if "PnL_Realizado" not in df_fundo.columns:
+            df_fundo["PnL_Realizado"] = 0.0
+        if "PnL_Atual" not in df_fundo.columns:
+            df_fundo["PnL_Atual"] = 0.0
+
+        # ----------------------------------------------------------------
+        # 3) Verifica PL do Fundo (se existir) e colunas Contratos
+        # ----------------------------------------------------------------
+        valor_pl = None
+        if "PL" in df_current.columns:
+            valor_pl = row_fundo["PL"]
+
+        colunas_contratos = [c for c in df_current.columns if c.startswith("Contratos ")]
+        serie_contratos = row_fundo[colunas_contratos]
+
+        # ----------------------------------------------------------------
+        # 4) Garante a coluna do dia_operacao em df_fundo (p/ posição)
+        # ----------------------------------------------------------------
+        if dia_operacao not in df_fundo.columns:
+            df_fundo[dia_operacao] = 0.0
+
+        # Se existir "PL", cria/atualiza linha
+        if valor_pl is not None:
+            if "PL" not in df_fundo.index:
+                df_fundo.loc["PL", "Ativo"] = "PL"
+                df_fundo.loc["PL", "Preco_Compra"] = np.nan
+                df_fundo.loc["PL", "Preco_Fechamento_Atual"] = np.nan
+                df_fundo.loc["PL", "PnL_Realizado"] = 0.0
+                df_fundo.loc["PL", "PnL_Atual"] = 0.0
+            df_fundo.loc["PL", dia_operacao] = valor_pl
+
+        # ----------------------------------------------------------------
+        # 5) Para cada contrato (ativo), atualizar posição e preço médio
+        # ----------------------------------------------------------------
+        for col_contrato, qtd_dia_raw in serie_contratos.items():
+            ativo = col_contrato.replace("Contratos ", "").strip()
+
+            # Converte a quantidade para float
+            try:
+                qtd_dia_nova = float(qtd_dia_raw)
+            except:
+                qtd_dia_nova = 0.0
+
+            # Se o ativo ainda não existe no df_fundo, cria a linha
+            if ativo not in df_fundo.index:
+                df_fundo.loc[ativo, "Ativo"] = ativo
+                df_fundo.loc[ativo, "Preco_Compra"] = 0.0
+                df_fundo.loc[ativo, "Preco_Fechamento_Atual"] = 0.0
+                df_fundo.loc[ativo, "PnL_Realizado"] = 0.0
+                df_fundo.loc[ativo, "PnL_Atual"] = 0.0
+                df_fundo.loc[ativo, dia_operacao] = 0.0
+
+            # Carrega variáveis
+            preco_medio_atual = df_fundo.loc[ativo, "Preco_Compra"]
+            if pd.isna(preco_medio_atual):
+                preco_medio_atual = 0.0
+
+            pnl_realizado = df_fundo.loc[ativo, "PnL_Realizado"]  # acumulado
+            # (PnL_Atual será recalculado ao final, não precisamos carregar)
+
+            qtd_dia_anterior = float(df_fundo.loc[ativo, dia_operacao]) if not pd.isna(df_fundo.loc[ativo, dia_operacao]) else 0.0
+
+            # Diferença no mesmo dia
+            diff = qtd_dia_nova - qtd_dia_anterior
+
+            # ------------------------------------------------------------
+            # 5.1) Se houve compra (diff > 0)
+            # ------------------------------------------------------------
+            if diff > 0:
+                # Buscar preço de compra no df_info
+                subset_compra = df_info[
+                    (df_info["Ativo"] == ativo) &
+                    (df_info["Dia de Compra"] == dia_operacao) &
+                    (df_info["Quantidade"] > 0)
+                ]
+                if len(subset_compra) > 0:
+                    p_compra = float(str(subset_compra.iloc[0]["Preço de Compra"]).replace(",", "."))
+                else:
+                    p_compra = preco_medio_atual
+
+                # Se a posição anterior era negativa, parte ou toda essa compra
+                # reduz o short => apuramos PnL realizado na parte encerrada
+                if qtd_dia_anterior < 0:
+                    qtd_cobrindo_short = min(abs(qtd_dia_anterior), diff)
+                    # PnL short = (preco_medio_short - p_compra) * quantidade_coberta
+                    realized_pnl = (preco_medio_atual - p_compra) * qtd_cobrindo_short
+                    pnl_realizado += realized_pnl
+
+                    # Se "virou" para positiva, parte do diff abre nova posição long
+                    qtd_excesso = diff - qtd_cobrindo_short
+                    if (qtd_dia_anterior + diff) > 0:
+                        # Ex.: -10 + 15 = +5 -> abrimos 5 de posição long
+                        if qtd_excesso > 0:
+                            # Novo preço médio para o bloco que excedeu (poderia ponderar)
+                            preco_medio_atual = p_compra
+                        else:
+                            # Não abriu long, só reduziu short (ou zerou).
+                            if (qtd_dia_anterior + diff) == 0:
+                                preco_medio_atual = 0.0
+                    else:
+                        # Ainda fica short, mas menos negativa (ex.: -10 + 5 = -5)
+                        # Em geral, não mexemos no preco médio do short ou poderíamos recalcular.
+                        pass
+                else:
+                    # Posição anterior >= 0 => compra normal => recalcula preço médio
+                    qtd_comprada = diff
+                    qtd_final = qtd_dia_anterior + diff
+                    novo_preco = (
+                        (qtd_dia_anterior * preco_medio_atual) +
+                        (qtd_comprada * p_compra)
+                    ) / qtd_final
+                    preco_medio_atual = novo_preco
+
+            # ------------------------------------------------------------
+            # 5.2) Se houve venda (diff < 0)
+            # ------------------------------------------------------------
+            elif diff < 0:
+                subset_venda = df_info[
+                    (df_info["Ativo"] == ativo) &
+                    (df_info["Dia de Compra"] == dia_operacao) &
+                    (df_info["Quantidade"] < 0)
+                ]
+                if len(subset_venda) > 0:
+                    p_venda = float(str(subset_venda.iloc[0]["Preço de Compra"]).replace(",", "."))
+                else:
+                    p_venda = preco_medio_atual
+
+                qtd_vendida = abs(diff)
+
+                # Se posição anterior era > 0, vendemos parte ou tudo => apuramos PnL
+                if qtd_dia_anterior > 0:
+                    qtd_encerrada_long = min(qtd_vendida, qtd_dia_anterior)
+                    realized_pnl = (p_venda - preco_medio_atual) * qtd_encerrada_long
+                    pnl_realizado += realized_pnl
+
+                    # Se excedeu a quantidade (virou short):
+                    excedente_short = qtd_vendida - qtd_encerrada_long
+                    if excedente_short > 0:
+                        # Passou a posição para negativa
+                        preco_medio_atual = p_venda
+                    else:
+                        # Continua com posição long ou zerou
+                        if (qtd_dia_anterior + diff) == 0:  # zerou
+                            preco_medio_atual = 0.0
+
+                else:
+                    # Posição anterior <= 0 => estamos aumentando short
+                    # Ex.: -5 -> -10
+                    # Podemos recalcular o preco médio do short via média ponderada:
+                    qtd_antiga_short = abs(qtd_dia_anterior)
+                    qtd_nova_short = qtd_vendida  # vendemos mais
+                    qtd_total_short = qtd_antiga_short + qtd_nova_short
+                    # média ponderada
+                    novo_preco_short = (
+                        (qtd_antiga_short * preco_medio_atual) +
+                        (qtd_nova_short * p_venda)
+                    ) / qtd_total_short
+                    preco_medio_atual = novo_preco_short
+
+            # ------------------------------------------------------------
+            # 5.3) Atualiza posição final e colunas
+            # ------------------------------------------------------------
+            qtd_final = qtd_dia_nova
+            df_fundo.loc[ativo, dia_operacao] = qtd_final
+            df_fundo.loc[ativo, "Preco_Compra"] = preco_medio_atual
+            df_fundo.loc[ativo, "PnL_Realizado"] = pnl_realizado
+
+            # ------------------------------------------------------------
+            # 5.4) Atualiza Preço de Fechamento Atual (para PnL_Atual)
+            # ------------------------------------------------------------
+            row_fech = df_b3_fechamento[df_b3_fechamento["Assets"] == ativo]
+            if not row_fech.empty:
+                valor_fechamento_str = row_fech[ultima_data_fechamento].values[0]
+                # Ex.: "5.100,00" -> "5100.00"
+                valor_fechamento_str = valor_fechamento_str.replace(".", "").replace(",", ".")
+                try:
+                    valor_fechamento_float = float(valor_fechamento_str)
+                except:
+                    valor_fechamento_float = 0.0
+            else:
+                valor_fechamento_float = 0.0
+
+            df_fundo.loc[ativo, "Preco_Fechamento_Atual"] = valor_fechamento_float
+
+            # ------------------------------------------------------------
+            # 5.5) Calcula PnL_Atual (Não Realizado) = mark-to-market
+            #      com base em (preço fechamento - preco médio) * qtd
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

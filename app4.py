@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import datetime
 import os
+from datetime import date
 
 # ==========================================================
 #               FUNÇÕES AUXILIARES (MESMAS)
@@ -147,8 +148,9 @@ def processar_b3_portifolio():
 
     # Converter para Float menos a primeira coluna
     df_b3_fechamento.iloc[:, 1:] = df_b3_fechamento.iloc[:, 1:].astype(float)
-    # Printar o tipo das colunas
-    print(df_b3_fechamento.dtypes)
+
+    #Multiplicar a linha da treasury por 1000
+    df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns != 'Assets'] = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns != 'Assets'] * 1000
 
     return df_b3_fechamento
 
@@ -203,7 +205,6 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra):
             'Dia de Compra',
             'Preço de Compra',
             'Preço de Ajuste Atual',
-
             'Rendimento'
         ])
 
@@ -219,12 +220,34 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra):
     data_hoje_str = datetime.date.today().strftime('%Y-%m-%d')
 
     data_hoje_str = '2025-01-20'
-
-    # data_hoje_str = '2025-01-17'
+    
     dia_compra = {k: v.strftime('%Y-%m-%d') if isinstance(v, datetime.date) else v for k, v in dia_compra.items()} \
         if isinstance(dia_compra, dict) else \
         dia_compra.strftime('%Y-%m-%d') if isinstance(dia_compra,
                                                       datetime.date) else dia_compra
+    
+    #Conferir se dia de compra já foi lançado no portifólio alguma vez
+    if os.path.exists(nome_arquivo_portifolio):
+        df_portifolio_salvo = pd.read_csv(nome_arquivo_portifolio)
+
+        # Verificar se `dia_compra` é um dicionário
+    if isinstance(dia_compra, dict):
+        # Pegar o primeiro valor do dicionário
+        dia_compra_unico = next(iter(dia_compra.values()))
+    else:
+        dia_compra_unico = dia_compra
+
+    # Converter o dia de compra para o formato necessário
+    dia_compra_unico = pd.to_datetime(dia_compra_unico).strftime('%Y-%m-%d')
+
+    # Conferir se o dia de compra único já existe no DataFrame
+    if os.path.exists(nome_arquivo_portifolio):
+        if dia_compra_unico in df_portifolio_salvo['Dia de Compra'].values:
+            # Dropar dados desse dia
+            df_portifolio_salvo = df_portifolio_salvo[
+                df_portifolio_salvo['Dia de Compra'] != dia_compra_unico
+            ]
+
 
     for asset in assets:
         qtd_final = quantidades[asset]
@@ -733,59 +756,63 @@ def checkar2_portifolio(assets,
     return df_portifolio
 
 
-def atualizar_csv_fundos(
+def atualizar_csv_fundos( 
     df_current,         # DataFrame do dia atual (1 linha por Fundo)
     dia_operacao,       # Exemplo: "2025-01-20"
-    # DF de transações: [Ativo, Quantidade, Dia de Compra, Preço de Compra, ...]
-    df_info,
-    # DF de preços de fechamento: colunas ["Assets", <data1>, <data2>, ...]
+    df_info,            # DF de transações: [Ativo, Quantidade, Dia de Compra, Preço de Compra, ...]
+    # DF de preços de fechamento B3: colunas ["Assets", <data1>, <data2>, ...]
 ):
     """
-    - O CSV final de cada fundo terá linhas = cada ativo (ou "PL") e
-      colunas = ["Ativo","Preco_Compra","Preco_Fechamento_Atual", <data1>, <data2>, ...],
-      onde cada dataX é a posição final do ativo naquele dia.
-    - Sempre que chamamos a função (inclusive mais de uma vez no mesmo dia),
-      se houver aumento de posição (quantidade final maior que a anterior naquele dia),
-      recalculamos o preço médio.
-    - A coluna "Preco_Fechamento_Atual" vem do df_fechamento_b3 para a
-      última data disponível (ex: "2025-01-20").
+    - O CSV final de cada fundo terá linhas = cada ativo (ou "PL"),
+      e colunas básicas = ["Ativo","Preco_Compra","Preco_Fechamento_Atual", ...],
+      além das colunas diárias geradas a cada dia de operação:
+         <dia_operacao> - Quantidade
+         <dia_operacao> - Preço Pago
+         <dia_operacao> - Rendimento
+    - Lógica geral:
+       1) Se houver aumento de posição no mesmo dia (quantidade final > anterior),
+          recalculamos o preço médio (ponderado).
+       2) A coluna "Preco_Fechamento_Atual" vem do CSV de preços B3 para a
+          última data disponível.
+       3) Tratamento especial da linha "PL":
+          - Se não existir, criamos com quantidade definida (ex.: 1.0).
+          - Armazenamos o PL do dia em "Preco_Fechamento_Atual".
     """
+    # ------------------------------------------------------------------
+    # 1) Carregar (ou processar) DF de preços de fechamento
+    # ------------------------------------------------------------------
+    # Supondo que o arquivo local seja "df_preco_de_ajuste_atual.csv"
     df_fechamento_b3 = pd.read_csv("df_preco_de_ajuste_atual.csv")
-    # ------------------------------------------------------------------
-    # 1) Identificar qual é a última data disponível em df_fechamento_b3
-    # ------------------------------------------------------------------
-    # Supondo que a 1ª coluna é "Assets" e as demais são datas
     colunas_b3 = list(df_fechamento_b3.columns)
-    colunas_b3.remove("Assets")  # agora só temos as datas
+    colunas_b3.remove("Assets")
     colunas_b3_ordenadas = sorted(colunas_b3)
     ultima_data_fechamento = colunas_b3_ordenadas[-1]  # ex: "2025-01-20"
 
     # ------------------------------------------------------------------
-    # Itera cada FONDO (linha) em df_current
+    # 2) Iterar cada fundo (linha) em df_current
     # ------------------------------------------------------------------
     for fundo, row_fundo in df_current.iterrows():
         # Caminho do CSV do Fundo
         nome_arquivo_csv = os.path.join("BaseFundos", f"{fundo}.csv")
 
-        # ----------------------------------------------------------------
-        # 2) Carregar (ou criar) o DataFrame histórico do Fundo (df_fundo)
-        # ----------------------------------------------------------------
+        # 2.1) Carregar (ou criar) o DataFrame histórico do Fundo (df_fundo)
         if os.path.exists(nome_arquivo_csv):
             df_fundo = pd.read_csv(nome_arquivo_csv, index_col=None)
         else:
-            df_fundo = pd.DataFrame(
-                columns=["Ativo", "Preco_Compra", "Preco_Fechamento_Atual"])
-
-        # Garante que "Ativo" seja índice
+            df_fundo = pd.DataFrame(columns=["Ativo", 
+                                             "Preco_Compra", 
+                                             "Preco_Fechamento_Atual"])
+        
+        # 2.2) Garante que "Ativo" seja índice (mas mantendo a coluna)
         if "Ativo" in df_fundo.columns:
             df_fundo.set_index("Ativo", inplace=True, drop=False)
 
         # ----------------------------------------------------------------
-        # 3) Verifica PL (se existir)
+        # 3) Verifica se existe coluna "PL" em df_current
         # ----------------------------------------------------------------
         valor_pl = None
         if "PL" in df_current.columns:
-            valor_pl = row_fundo["PL"]
+            valor_pl = row_fundo["PL"]  # PL atual do fundo
 
         # ----------------------------------------------------------------
         # 4) Identificar colunas de CONTRATOS no df_current
@@ -798,21 +825,38 @@ def atualizar_csv_fundos(
         serie_contratos = row_fundo[colunas_contratos]
 
         # ----------------------------------------------------------------
-        # 5) Garante a coluna do dia_operacao em df_fundo
+        # 5) Para cada ativo do df_current, precisamos garantir 3 colunas novas:
+        #    <dia_operacao> - Quantidade
+        #    <dia_operacao> - Preço Pago
+        #    <dia_operacao> - Rendimento
         # ----------------------------------------------------------------
-        if dia_operacao not in df_fundo.columns:
-            df_fundo[dia_operacao] = 0.0
+        col_qtd = f"{dia_operacao} - Quantidade"
+        col_preco_pago = f"{dia_operacao} - Preço Pago"
+        col_rendimento = f"{dia_operacao} - Rendimento"
 
-        # Se existir "PL", cria/atualiza linha
+        for c_ in [col_qtd, col_preco_pago, col_rendimento]:
+            if c_ not in df_fundo.columns:
+                df_fundo[c_] = 0.0
+
+        # ----------------------------------------------------------------
+        # 6) Se existir PL, criar/atualizar linha "PL"
+        # ----------------------------------------------------------------
         if valor_pl is not None:
             if "PL" not in df_fundo.index:
+                # Linha PL não existe: criamos com alguma quantidade específica
                 df_fundo.loc["PL", "Ativo"] = "PL"
                 df_fundo.loc["PL", "Preco_Compra"] = np.nan
-                df_fundo.loc["PL", "Preco_Fechamento_Atual"] = np.nan
-            df_fundo.loc["PL", dia_operacao] = valor_pl
+                # Aqui, assumimos que você queira dar "1.0" de quantidade para PL,
+                # mas pode alterar para outro valor, se preferir.
+                df_fundo.loc["PL", col_qtd] = 1.0
+            # Sempre que tiver PL, jogamos esse valor em Preco_Fechamento_Atual
+            df_fundo.loc["PL", "Preco_Fechamento_Atual"] = valor_pl
+            # Se quiser calcular "rendimento" do PL, defina a lógica.
+            # Por default, deixaremos 0.0
+            df_fundo.loc["PL", col_rendimento] = 0.0
 
         # ----------------------------------------------------------------
-        # 6) Para cada contrato (ativo), atualizar posição e preço médio
+        # 7) Processar cada ativo (contratos)
         # ----------------------------------------------------------------
         for col_contrato, qtd_dia_raw in serie_contratos.items():
             ativo = col_contrato.replace("Contratos ", "").strip()
@@ -828,109 +872,320 @@ def atualizar_csv_fundos(
                 df_fundo.loc[ativo, "Ativo"] = ativo
                 df_fundo.loc[ativo, "Preco_Compra"] = 0.0
                 df_fundo.loc[ativo, "Preco_Fechamento_Atual"] = 0.0
-                df_fundo.loc[ativo, dia_operacao] = 0.0
 
-            # Carrega o preço médio atual (se for NaN, substitui por 0.0)
+            # Carrega o preço médio atual (se for NaN, vira 0.0)
             preco_medio_atual = df_fundo.loc[ativo, "Preco_Compra"]
             if pd.isna(preco_medio_atual):
                 preco_medio_atual = 0.0
 
-            # ----------------------------------------------------------------
-            # 6.1) Descobrir a quantidade que já estava nesse MESMO dia
-            #      (caso tenha sido atualizada em chamadas anteriores hoje)
-            # ----------------------------------------------------------------
-            qtd_dia_anterior = 0.0
-            try:
-                qtd_dia_anterior = float(df_fundo.loc[ativo, dia_operacao])
-            except:
-                # Se não existia nada, fica 0
-                pass
+            # 7.1) Descobre a quantidade que já estava neste MESMO dia
+            qtd_dia_anterior = df_fundo.loc[ativo, col_qtd]
+            if pd.isna(qtd_dia_anterior):
+                qtd_dia_anterior = 0.0
 
-            # ----------------------------------------------------------------
-            # 6.2) Calcula a diferença no MESMO dia
-            #      Se > 0 => houve compra adicional;
-            #      se < 0 => houve venda adicional.
-            # ----------------------------------------------------------------
             diff = qtd_dia_nova - qtd_dia_anterior
-
+            # 7.2) Se houve compra adicional (diff > 0), recalcular preço médio
             if diff > 0:
-                # Houve compra adicional no MESMO dia_operacao
-                # Precisamos achar no df_info as linhas do DIA + ATIVO
+                # Localizar no df_info as linhas para este dia/ativo
                 subset = df_info[
                     (df_info["Ativo"] == ativo) &
                     (df_info["Dia de Compra"] == dia_operacao)
                 ]
                 if len(subset) == 0:
-                    # Se não encontrou nada em df_info, mantemos o preço
+                    # Se não encontrou nada em df_info, mantemos o preço anterior
                     preco_compra_dia = preco_medio_atual
                 else:
-                    # Soma ponderada das quantidades positivas
+                    # Faz soma ponderada das quantidades positivas
                     qtd_total_dia = 0.0
                     valor_total_dia = 0.0
                     for i, r in subset.iterrows():
                         q_linha = float(str(r["Quantidade"]).replace(",", "."))
-                        p_linha = float(
-                            str(r["Preço de Compra"]).replace(",", "."))
+                        p_linha = float(str(r["Preço de Compra"]).replace(",", "."))
                         if q_linha > 0:
                             qtd_total_dia += q_linha
                             valor_total_dia += (q_linha * p_linha)
-
                     if qtd_total_dia == 0:
                         preco_compra_dia = preco_medio_atual
                     else:
                         preco_compra_dia = valor_total_dia / qtd_total_dia
 
-                # Novo preço médio = ponderação da posição anterior do DIA + compra nova
-                # Posição anterior do dia (qtd_dia_anterior) * preco_medio_atual
-                # + diff * preco_compra_dia
-                # -----------------------------------------
-                # Nova posição final = qtd_dia_nova
-                # (que é qtd_dia_anterior + diff)
-                # -----------------------------------------
+                # Novo preço médio = ponderação do que havia até qtd_dia_anterior + diff
                 qtd_comprada = diff
-                qtd_final = qtd_dia_nova  # que é qtd_dia_anterior + diff
-
+                qtd_final = qtd_dia_nova
                 novo_preco_medio = (
                     (qtd_dia_anterior * preco_medio_atual) +
                     (qtd_comprada * preco_compra_dia)
                 ) / qtd_final
 
                 df_fundo.loc[ativo, "Preco_Compra"] = novo_preco_medio
+                # Também vamos registrar em "<dia> - Preço Pago" a média do dia
+                df_fundo.loc[ativo, col_preco_pago] = preco_compra_dia
 
             elif diff < 0:
-                # Houve venda no mesmo dia => usualmente não mexemos no preço médio,
-                # mas se quiser tratar "zerar posição", pode fazer aqui.
-                pass
+                # Se houve venda, normalmente não alteramos o preço médio
+                # (a menos que queira zerar posição ou recalcular).
+                # No caso de venda, se quiser, pode registrar "Preço Pago" do dia
+                # com o mesmo valor do preço médio anterior, ou outro.
+                df_fundo.loc[ativo, col_preco_pago] = preco_medio_atual
 
-            # Por fim, atualizamos a coluna do dia com a nova quantidade final
-            df_fundo.loc[ativo, dia_operacao] = qtd_dia_nova
+            else:
+                # Se não houve alteração de posição neste dia, mantemos o Preço Pago
+                # para o que já estava (caso já tenha sido setado acima).
+                if pd.isna(df_fundo.loc[ativo, col_preco_pago]):
+                    df_fundo.loc[ativo, col_preco_pago] = 0.0
 
-            # ----------------------------------------------------------------
-            # 6.3) Atualizar "Preço de Fechamento Atual" com base em df_fechamento_b3
-            # ----------------------------------------------------------------
-            # Localiza o ativo em df_fechamento_b3["Assets"] == ativo
+            # Atualiza a coluna de quantidade do dia
+            df_fundo.loc[ativo, col_qtd] = qtd_dia_nova
+
+            # 7.3) Atualizar Preço de Fechamento Atual com base em df_fechamento_b3
             row_fech = df_fechamento_b3[df_fechamento_b3["Assets"] == ativo]
             if not row_fech.empty:
-                valor_fechamento_str = row_fech[ultima_data_fechamento].values[0]
-                # Converter de string (com vírgula) para float:
-                # Exemplo: "6.081,5680" => "6081.5680"
-                valor_fechamento_str = valor_fechamento_str.replace(
-                    ".", "").replace(",", ".")
+                valor_fechamento_str = str(row_fech[ultima_data_fechamento].values[0])
+                # Exemplo de conversão "6.081,5680" -> "6081.5680"
+                valor_fechamento_str = valor_fechamento_str.replace(".", "").replace(",", ".")
                 try:
                     valor_fechamento_float = float(valor_fechamento_str)
                 except:
                     valor_fechamento_float = 0.0
-                df_fundo.loc[ativo,
-                             "Preco_Fechamento_Atual"] = valor_fechamento_float
+                df_fundo.loc[ativo, "Preco_Fechamento_Atual"] = valor_fechamento_float
             else:
                 df_fundo.loc[ativo, "Preco_Fechamento_Atual"] = np.nan
 
         # ----------------------------------------------------------------
-        # 7) Salvar o CSV do fundo
+        # 8) Calcular "Rendimento" do dia para cada ativo
+        #    (exemplo: (Preco_Fechamento_Atual - Preco_Compra) * Quantidade_dia)
+        # ----------------------------------------------------------------
+        for ativo_idx in df_fundo.index:
+            # Se for "PL", já tratamos lá em cima, mas se quiser,
+            # podemos garantir zero ou outro valor aqui
+            if ativo_idx == "PL":
+                # Se desejar, pode redefinir aqui a fórmula de rendimento do PL
+                continue
+
+            preco_fech = df_fundo.loc[ativo_idx, "Preco_Fechamento_Atual"]
+            preco_med = df_fundo.loc[ativo_idx, "Preco_Compra"]
+            qtd_hoje = df_fundo.loc[ativo_idx, col_qtd]
+
+            if (not pd.isna(preco_fech)) and (not pd.isna(preco_med)) and (not pd.isna(qtd_hoje)):
+                rendimento_dia = (preco_fech - preco_med) * qtd_hoje
+            else:
+                rendimento_dia = 0.0
+
+            df_fundo.loc[ativo_idx, col_rendimento] = rendimento_dia
+
+        # ----------------------------------------------------------------
+        # 9) Salvar o CSV do fundo
         # ----------------------------------------------------------------
         df_fundo.reset_index(drop=True, inplace=True)
         df_fundo.to_csv(nome_arquivo_csv, index=False, encoding="utf-8")
+
         print(f"[{fundo}] -> CSV atualizado: {nome_arquivo_csv}")
+
+
+def analisar_performance_fundos(
+    data_inicial, 
+    data_final, 
+    lista_estrategias,
+    lista_ativos
+):
+    """
+    Lê todos os arquivos CSV na pasta 'BaseFundos', extrai colunas diárias
+    de Rendimento (ex: "YYYY-MM-DD - Rendimento"), monta um DataFrame 'long'
+    com colunas [date, fundo, Ativo, Rendimento_diario], faz mapeamento
+    de Estratégia e filtra o intervalo [data_inicial, data_final].
+
+    Retorna um dicionário contendo DataFrames de performance diária:
+      - df_diario_fundo_ativo:
+          colunas = [date, fundo, Ativo, Rendimento_diario, Estratégia]
+      - df_diario_fundo_estrategia:
+          colunas = [date, fundo, Estratégia, Rendimento_diario]
+      - df_diario_fundo_total:
+          colunas = [date, fundo, Rendimento_diario]
+    """
+
+    dt_ini = datetime.datetime.strptime(data_inicial, "%Y-%m-%d").date()
+    dt_fim = datetime.datetime.strptime(data_final,   "%Y-%m-%d").date()
+
+    def mapear_estrategia(ativo):
+        """Mapeia o ativo para a estratégia, usando substring."""
+        for prefixo, nome_estrategia in lista_estrategias.items():
+            if prefixo in ativo:  # substring "DI", "DAP", "WDO1", etc.
+                return nome_estrategia
+        return "Estratégia Desconhecida"
+
+    pasta_fundos = "BaseFundos"
+    if not os.path.isdir(pasta_fundos):
+        raise FileNotFoundError(f"Pasta '{pasta_fundos}' não encontrada.")
+
+    arquivos = [arq for arq in os.listdir(pasta_fundos) if arq.endswith(".csv")]
+
+    registros = []
+    # Cada elemento em 'registros' será um dict:
+    # { "date": dt_col, "fundo": nome_fundo, "Ativo": ativo, "Rendimento_diario": rend_val }
+
+    for arquivo_csv in arquivos:
+        caminho_csv = os.path.join(pasta_fundos, arquivo_csv)
+        nome_fundo = arquivo_csv.replace(".csv", "")
+
+        df_fundo = pd.read_csv(caminho_csv)
+        if "Ativo" not in df_fundo.columns:
+            continue  # ignora se não tiver coluna 'Ativo'
+
+        # Todas as colunas do tipo "YYYY-MM-DD - Rendimento"
+        colunas_rendimento = [c for c in df_fundo.columns if c.endswith(" - Rendimento")]
+
+        for _, row_ in df_fundo.iterrows():
+            ativo = row_["Ativo"]
+            # Se não quiser considerar "PL" em hipótese alguma, você pode ignorar aqui.
+            # (Também podemos filtrar depois, no Streamlit.)
+
+            for col_rend in colunas_rendimento:
+                try:
+                    data_str = col_rend.replace(" - Rendimento", "").strip()
+                    dt_col = datetime.datetime.strptime(data_str, "%Y-%m-%d").date()
+                except:
+                    continue  # erro de formato de data
+
+                if dt_ini <= dt_col <= dt_fim:
+                    rend_val = row_[col_rend]
+                    if pd.isna(rend_val):
+                        rend_val = 0.0
+                    registros.append({
+                        "date": dt_col,
+                        "fundo": nome_fundo,
+                        "Ativo": ativo,
+                        "Rendimento_diario": rend_val
+                    })
+
+    if len(registros) == 0:
+        # Nada encontrado no período
+        df_diario_fundo_ativo = pd.DataFrame(columns=["date","fundo","Ativo","Rendimento_diario","Estratégia"])
+        df_diario_fundo_estrategia = pd.DataFrame(columns=["date","fundo","Estratégia","Rendimento_diario"])
+        df_diario_fundo_total = pd.DataFrame(columns=["date","fundo","Rendimento_diario"])
+        return {
+            "df_diario_fundo_ativo": df_diario_fundo_ativo,
+            "df_diario_fundo_estrategia": df_diario_fundo_estrategia,
+            "df_diario_fundo_total": df_diario_fundo_total
+        }
+
+    # Monta DataFrame consolidado
+    df_all = pd.DataFrame(registros)
+    df_all["Estratégia"] = df_all["Ativo"].apply(mapear_estrategia)
+
+    # 1) Performance diária por Fundo x Ativo
+    df_diario_fundo_ativo = df_all[["date","fundo","Ativo","Rendimento_diario","Estratégia"]].copy()
+    df_diario_fundo_ativo.sort_values(["fundo","date","Ativo"], inplace=True)
+
+    # 2) Performance diária por Fundo x Estratégia
+    df_diario_fundo_estrategia = (
+        df_all
+        .groupby(["date","fundo","Estratégia"], as_index=False)["Rendimento_diario"]
+        .sum()
+        .sort_values(["fundo","date","Estratégia"])
+    )
+
+    # 3) Performance diária agregada do Fundo (somando todos os ativos)
+    df_diario_fundo_total = (
+        df_all
+        .groupby(["date","fundo"], as_index=False)["Rendimento_diario"]
+        .sum()
+        .sort_values(["fundo","date"])
+    )
+
+    return {
+        "df_diario_fundo_ativo": df_diario_fundo_ativo,
+        "df_diario_fundo_estrategia": df_diario_fundo_estrategia,
+        "df_diario_fundo_total": df_diario_fundo_total
+    }
+
+
+def app_analise_performance(lista_estrategias, lista_ativos):
+    st.title("Análise de Performance dos Fundos")
+
+    # --- Seletor de Filtro de Tempo ---
+    tipo_filtro = st.sidebar.selectbox("Escolha o filtro de tempo", ["Apenas um dia", "Período"])
+    
+    if tipo_filtro == "Apenas um dia":
+        data_unica = st.sidebar.date_input("Escolha o dia", value=date(2025, 1, 1))
+        data_inicial = data_unica.strftime("%Y-%m-%d")
+        data_final   = data_inicial  # Mesma data
+    else:
+        # Múltiplas datas
+        data_inicial = st.sidebar.date_input("Data inicial", value=date(2024, 12, 16))
+        data_final   = st.sidebar.date_input("Data final",   value=date(2025, 1, 16))
+
+        # Caso o usuário escolha no date_input (retorna objeto date)
+        # Convertendo para string
+        data_inicial = data_inicial.strftime("%Y-%m-%d")
+        data_final   = data_final.strftime("%Y-%m-%d")
+
+    # --- Seletor de Tipo de Visão ---
+    tipo_visao = st.sidebar.radio("Tipo de Visão", ["Fundo", "Estratégia", "Ativo"])
+
+    if st.sidebar.button("Analisar"):
+        # Chama a função de análise
+        dict_result = analisar_performance_fundos(
+            data_inicial, 
+            data_final,
+            lista_estrategias,
+            lista_ativos
+        )
+
+        df_ativo  = dict_result["df_diario_fundo_ativo"]
+        df_estr   = dict_result["df_diario_fundo_estrategia"]
+        df_fundo  = dict_result["df_diario_fundo_total"]
+
+        # REMOVER linhas onde Ativo == "PL"
+        df_ativo = df_ativo[df_ativo["Ativo"] != "PL"]
+
+        # --------------------------------------------------------------------
+        # Exibir apenas a visão escolhida:
+        # --------------------------------------------------------------------
+        if tipo_visao == "Ativo":
+            st.subheader("Rendimento Diário - Fundo x Ativo")
+            st.dataframe(df_ativo)
+
+            # Exemplo de gráfico: escolher 1 fundo e plotar linha ao longo das datas
+            # pivot index=date, columns=Ativo, values=Rendimento_diario
+            fundos_unicos = df_ativo["fundo"].unique()
+            if len(fundos_unicos) > 0:
+                fundo_escolhido = st.selectbox("Escolha o Fundo para Gráfico:", fundos_unicos)
+                df_plot = df_ativo[df_ativo["fundo"] == fundo_escolhido].copy()
+                # pivot
+                df_plot_pivot = df_plot.pivot(index="date", 
+                                              columns="Ativo", 
+                                              values="Rendimento_diario").fillna(0.0)
+                # Ordenar index (date)
+                df_plot_pivot.sort_index(inplace=True)
+                st.line_chart(df_plot_pivot)
+
+        elif tipo_visao == "Estratégia":
+            st.subheader("Rendimento Diário - Fundo x Estratégia")
+            st.dataframe(df_estr)
+            
+            # Exemplo de gráfico: pivot index=date, columns=Estratégia
+            fundos_unicos = df_estr["fundo"].unique()
+            if len(fundos_unicos) > 0:
+                fundo_escolhido = st.selectbox("Escolha o Fundo para Gráfico:", fundos_unicos)
+                df_plot = df_estr[df_estr["fundo"] == fundo_escolhido].copy()
+                df_plot_pivot = df_plot.pivot(index="date", 
+                                              columns="Estratégia", 
+                                              values="Rendimento_diario").fillna(0.0)
+                df_plot_pivot.sort_index(inplace=True)
+                st.line_chart(df_plot_pivot)
+
+        else:  # tipo_visao == "Fundo"
+            st.subheader("Rendimento Diário - Fundo (Total)")
+            st.dataframe(df_fundo)
+
+            # Exemplo de gráfico: pivot index=date, columns=fundo
+            df_plot_pivot = df_fundo.pivot(index="date",
+                                           columns="fundo",
+                                           values="Rendimento_diario").fillna(0.0)
+            df_plot_pivot.sort_index(inplace=True)
+            st.line_chart(df_plot_pivot)
+
+
 
 
 def add_custom_css():
@@ -1561,6 +1816,7 @@ def main_page():
             "Quantidade": "sum",  # Soma as quantidades
             "Preço de Compra": lambda x: (x * portifolio_default.loc[x.index, "Quantidade"]).sum() / portifolio_default.loc[x.index, "Quantidade"].sum(),  # Média ponderada
             "Preço de Ajuste Atual": "mean",  # Exemplo, calcula a média
+            "Rendimento": "sum"  # Soma os rendimentos
         }).reset_index()
         # Adicionar linha de soma
         sum_row = df_portifolio_default.select_dtypes(include='number').sum()
@@ -1981,6 +2237,23 @@ def main_page():
                 st.write("OBS: Os contratos estão arrendodandos para inteiros.")
             else:
                 st.write("Selecione ao menos uma coluna para exibir os dados.")
+            
+
+
+
+            lista_estrategias = { 
+                'DI': 'Juros Nominais Brasil', 
+                'DAP': 'Juros Reais Brasil',  
+                'TREASURY': 'Juros US', 
+                'WDO1': 'Moedas'
+            }
+            lista_ativos = [
+                'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
+                'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP25', 'DAP26', 'DAP27',
+                'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY'
+            ]
+
+            app_analise_performance(lista_estrategias,lista_ativos)
         else:
             st.write("Nenhum Ativo selecionado.")
 

@@ -1691,7 +1691,7 @@ def main_page():
                     f"{stress_dolar_percent:.2f}bps"
                 ]
             }, index=['Book Brasil', 'Book US', 'Moedas'])
-
+            
             sum_row = pd.DataFrame({
                 'DIV01': [f"R${df_divone_juros_interno.iloc[0] + df_divone_juros_externo.iloc[0]:,.2f}"],
                 'Stress (R$)': [f"R${stress_test_juros_interno['FUT_TICK_VAL'] + stress_test_juros_externo['FUT_TICK_VAL'] + stress_dolar:,.2f}"],

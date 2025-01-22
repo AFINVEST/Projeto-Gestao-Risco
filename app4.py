@@ -536,8 +536,7 @@ def calcular_metricas_de_port(assets, quantidades):
         'Stress (R$)': [
             f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL']:,.2f}",
             f"R${stress_test_juros_interno_Reais['FUT_TICK_VAL']:,.2f}",
-            f"R${stress_test_juros_externo:,.2f}" if lista_juros_externo else f"R${stress_test_juros_externo[
-                'FUT_TICK_VAL']: , .2f}",
+            f"R${stress_test_juros_externo:,.2f}" if lista_juros_externo else f"R${stress_test_juros_externo['FUT_TICK_VAL']:,.2f}",
             f"R${stress_dolar:.2f}"
         ],
         'Stress (bps)': [

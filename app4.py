@@ -802,6 +802,11 @@ def atualizar_csv_fundos(
     # Converter para float todas as colunas menos a primeira
     df_fechamento_b3.iloc[:, 2:] = df_fechamento_b3.iloc[:, 2:].astype(float)
 
+    # Multiplicar a linha que tem o Ativo TREASURY por 1000
+    # Multiplicar a linha da treasury por 1000
+    df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'TREASURY', df_fechamento_b3.columns !=
+                         'Assets'] = df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'TREASURY', df_fechamento_b3.columns != 'Assets'] * 1000
+
     ultimo_fechamento = df_fechamento_b3.columns[-1]
     df_current.set_index("Fundos/Carteiras Adm", inplace=True)
 
@@ -1442,8 +1447,8 @@ def main_page():
                 'Stress (R$)': [
                     f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL']:,.2f}",
                     f"R${stress_test_juros_interno_Reais['FUT_TICK_VAL']:,.2f}",
-                    f"R${stress_test_juros_externo:,.2f}" if lista_juros_externo else f"R${stress_test_juros_externo[
-                        'FUT_TICK_VAL']:,.2f}",
+                    f"R${stress_test_juros_externo:,.2f}" if lista_juros_externo else f"R${stress_test_juros_externo['FUT_TICK_VAL']:,.2f}",
+                    # teste
                     f"R${stress_dolar:.2f}"
                 ],
                 'Stress (bps)': [

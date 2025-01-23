@@ -155,6 +155,7 @@ def processar_b3_portifolio():
     df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns !=
                          'Assets'] = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns != 'Assets'] * 1000
 
+    
     return df_b3_fechamento
 
 
@@ -220,9 +221,12 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra):
         'Preço de Ajuste Atual',
         'Rendimento'
     ])
-    data_hoje_str = datetime.date.today().strftime('%Y-%m-%d')
 
-    data_hoje_str = '2025-01-20'
+
+    #Mudar para a ultima data de fechamento disponivel
+
+    ultimo_fechamento = df_b3_fechamento.columns[-1]
+
 
     dia_compra = {k: v.strftime('%Y-%m-%d') if isinstance(v, datetime.date) else v for k, v in dia_compra.items()} \
         if isinstance(dia_compra, dict) else \
@@ -265,10 +269,12 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra):
             else:
                 preco_compra = compra_especifica[asset]
 
-            preco_ajuste_atual = df_b3_fechamento.loc[filtro_ativo,
-                                                      data_hoje_str].values[0]
+            
+            preco_fechamento_atual = df_b3_fechamento.loc[df_b3_fechamento["Assets"]
+                                                    == asset, ultimo_fechamento].values[0]
+            preco_fechamento_atual = pd.to_numeric(preco_fechamento_atual, errors='coerce')
 
-            rendimento = qtd_final * (preco_ajuste_atual - preco_compra)
+            rendimento = qtd_final * (preco_fechamento_atual - preco_compra)
 
             # Adicionar linha ao novo DataFrame
             novo_portifolio = pd.concat([novo_portifolio, pd.DataFrame([{
@@ -276,7 +282,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra):
                 'Quantidade': qtd_final,
                 'Dia de Compra': dia_de_compra_atual,
                 'Preço de Compra': preco_compra,
-                'Preço de Ajuste Atual': preco_ajuste_atual,
+                'Preço de Ajuste Atual': preco_fechamento_atual,
                 'Rendimento': rendimento
             }])], ignore_index=True)
 
@@ -476,20 +482,28 @@ def calcular_metricas_de_port(assets, quantidades):
 
     lista_juros_interno_real = [
         asset for asset in assets if 'DAP' in asset]
+    
     df_divone_juros_real = df_divone[lista_juros_interno_real]
+
     lista_quantidade = [quantidade_nomes[asset]
                         for asset in lista_juros_interno_real]
+    
     df_divone_juros_real = df_divone_juros_real * \
         np.array(lista_quantidade)
+    
     df_divone_juros_real = df_divone_juros_real.sum(axis=1)
 
     lista_juros_externo = [
         asset for asset in assets if 'TREASURY' in asset]
+    
     df_divone_juros_externo = df_divone[lista_juros_externo]
+
     lista_quantidade = [quantidade_nomes[asset]
                         for asset in lista_juros_externo]
+    
     df_divone_juros_externo = df_divone_juros_externo * \
         np.array(lista_quantidade)
+    
     df_divone_juros_externo = df_divone_juros_externo.sum(axis=1)
 
     stress_test_juros_interno_Nominais = df_divone_juros_nominais * 100
@@ -499,45 +513,55 @@ def calcular_metricas_de_port(assets, quantidades):
     stress_test_juros_interno_Reais = df_divone_juros_real * 100
     stress_test_juros_interno_Reais_percent = stress_test_juros_interno_Reais / \
         soma_pl_sem_pesos * 10000
+    
+    df_divone_juros_externo_certo = df_divone_juros_externo
 
-    st.write(f'Antigo divone Treasury: {df_divone_juros_externo.iloc[0]}')
     if lista_juros_externo:
         df_divone_juros_externo = df_retorno['TREASURY'].min()
+        df_divone_juros_externo = abs(df_divone_juros_externo) * treasury * dolar / 10000
         df_divone_juros_externo = df_divone_juros_externo * \
             np.array(lista_quantidade)
         df_divone_juros_externo = df_divone_juros_externo.sum()
-        df_divone_juros_externo = abs(df_divone_juros_externo) * treasury
-        st.write(f'Novo divone Treasury: {df_divone_juros_externo}')
 
-    stress_test_juros_externo = df_divone_juros_externo * 100
+
+    stress_test_juros_externo = df_divone_juros_externo
+
     stress_test_juros_externo_percent = stress_test_juros_externo / \
         soma_pl_sem_pesos * 10000
 
-    lista_dolar = [asset for asset in assets if 'WDO1' in asset]
+    lista_dolar = [
+        asset for asset in assets if 'WDO1' in asset]
     if lista_dolar:
         quantidade_dolar = quantidade_nomes[lista_dolar[0]]
         stress_dolar = quantidade_dolar * dolar * 0.02
         df_divone_dolar = df_retorno['WDO1'].min()
         df_divone_dolar = df_divone_dolar * quantidade_dolar
         df_divone_dolar = abs(df_divone_dolar) * dolar
+        stress_dolar = df_divone_dolar
+        stress_dolar_percent = stress_dolar / soma_pl_sem_pesos * 10000
+        df_divone_dolar = df_divone[lista_dolar] * \
+            np.array(quantidade_dolar)
+        df_divone_dolar = df_divone_dolar.sum()
+
+
 
     else:
         stress_dolar = 0
         df_divone_dolar = 0
-
+    
     stress_dolar_percent = stress_dolar / soma_pl_sem_pesos * 10000
     df_stress_div01 = pd.DataFrame({
         'DIV01': [
             f"R${df_divone_juros_nominais.iloc[0]:,.2f}",
             f"R${df_divone_juros_real.iloc[0]:,.2f}",
-            f"R${df_divone_juros_externo:,.2f}" if lista_juros_externo else f"R${df_divone_juros_externo.iloc[0]:,.2f}",
-            f'R${df_divone_dolar:,.2f}'
+            f"R${df_divone_juros_externo_certo.iloc[0]:,.2f}",
+            f'R${df_divone_dolar.iloc[0]:,.2f}'
         ],
         'Stress (R$)': [
             f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL']:,.2f}",
             f"R${stress_test_juros_interno_Reais['FUT_TICK_VAL']:,.2f}",
             f"R${stress_test_juros_externo:,.2f}" if lista_juros_externo else f"R${stress_test_juros_externo['FUT_TICK_VAL']:,.2f}",
-            f"R${stress_dolar:.2f}"
+            f"R${stress_dolar:,.2f}"
         ],
         'Stress (bps)': [
             f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL']:,.2f}bps",
@@ -548,7 +572,7 @@ def calcular_metricas_de_port(assets, quantidades):
     }, index=['Juros Nominais Brasil', 'Juros Reais Brasil', 'Juros US', 'Moedas'])
 
     sum_row = pd.DataFrame({
-        'DIV01': [f"R${df_divone_juros_nominais.iloc[0] + df_divone_juros_real[0] + df_divone_juros_externo + df_divone_dolar:,.2f}" if lista_juros_externo else f"R${df_divone_juros_nominais.iloc[0] + df_divone_juros_real.iloc[0] + df_divone_juros_externo.iloc[0] + df_divone_dolar:,.2f}"],
+        'DIV01': [f"R${df_divone_juros_nominais.iloc[0] + df_divone_juros_real[0] + df_divone_juros_externo_certo.iloc[0] + df_divone_dolar.iloc[0]:,.2f}"],
         'Stress (R$)': [f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL'] + stress_test_juros_interno_Reais['FUT_TICK_VAL'] + stress_test_juros_externo + stress_dolar:,.2f}"] if lista_juros_externo else [f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL'] + stress_test_juros_interno_Reais['FUT_TICK_VAL'] + stress_test_juros_externo['FUT_TICK_VAL'] + stress_dolar:,.2f}"],
         'Stress (bps)': [f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent + stress_dolar_percent:,.2f}bps" if lista_juros_externo else f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent['FUT_TICK_VAL'] + stress_dolar_percent:,.2f}bps"]
     }, index=['Total'])
@@ -731,7 +755,6 @@ def checkar2_portifolio(assets,
     ############################## ---- PROBLEMA ---- ##############################
     #
     data_hoje_str = datetime.date.today().strftime('%Y-%m-%d')
-    data_hoje_str = '2025-01-17'
 
     for asset in df_portifolio.index:
         try:
@@ -808,6 +831,7 @@ def atualizar_csv_fundos(
                          'Assets'] = df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'TREASURY', df_fechamento_b3.columns != 'Assets'] * 1000
 
     ultimo_fechamento = df_fechamento_b3.columns[-1]
+
     df_current.set_index("Fundos/Carteiras Adm", inplace=True)
 
     for fundo, row_fundo in df_current.iterrows():
@@ -915,7 +939,6 @@ def analisar_performance_fundos(
       - df_diario_fundo_total:
           colunas = [date, fundo, Rendimento_diario]
     """
-
     dt_ini = datetime.datetime.strptime(data_inicial, "%Y-%m-%d").date()
     dt_fim = datetime.datetime.strptime(data_final,   "%Y-%m-%d").date()
 
@@ -1409,8 +1432,7 @@ def main_page():
             stress_test_juros_interno_Reais_percent = stress_test_juros_interno_Reais / \
                 soma_pl_sem_pesos * 10000
 
-            st.write(
-                f'Antigo divone Treasury: {df_divone_juros_externo.iloc[0]}')
+
             if lista_juros_externo:
                 df_divone_juros_externo = df_retorno['TREASURY'].min()
                 df_divone_juros_externo = df_divone_juros_externo * \
@@ -1418,7 +1440,6 @@ def main_page():
                 df_divone_juros_externo = df_divone_juros_externo.sum()
                 df_divone_juros_externo = abs(
                     df_divone_juros_externo) * treasury
-                st.write(f'Novo divone Treasury: {df_divone_juros_externo}')
 
             stress_test_juros_externo = df_divone_juros_externo * 100
             stress_test_juros_externo_percent = stress_test_juros_externo / \
@@ -1484,7 +1505,6 @@ def main_page():
             # ------------------------------------------------
             #   TABELA DF_PL (FILTROS) & Contratos por Fundo
             # ------------------------------------------------
-            st.write("---")
             st.write("## Quantidade de Contratos por Fundo")
 
             # Formatações
@@ -1580,7 +1600,7 @@ def main_page():
                     lambda x: round(x)).sum()
 
                 if soma_atual == quantidade_nomes[asset]:
-                    st.write(f"Quantidade de {asset} está correta.")
+                    continue
                 else:
                     # Calcula o número de contratos que faltam ou excedem
                     diferencas = quantidade_nomes[asset] - soma_atual
@@ -1821,20 +1841,28 @@ def main_page():
 
             lista_juros_interno_real = [
                 asset for asset in default_assets if 'DAP' in asset]
+            
             df_divone_juros_real = df_divone[lista_juros_interno_real]
+
             lista_quantidade = [quantidade_inicial[asset]
                                 for asset in lista_juros_interno_real]
+            
             df_divone_juros_real = df_divone_juros_real * \
                 np.array(lista_quantidade)
+            
             df_divone_juros_real = df_divone_juros_real.sum(axis=1)
 
             lista_juros_externo = [
                 asset for asset in default_assets if 'TREASURY' in asset]
+            
             df_divone_juros_externo = df_divone[lista_juros_externo]
+
             lista_quantidade = [quantidade_inicial[asset]
                                 for asset in lista_juros_externo]
+            
             df_divone_juros_externo = df_divone_juros_externo * \
                 np.array(lista_quantidade)
+            
             df_divone_juros_externo = df_divone_juros_externo.sum(axis=1)
 
             stress_test_juros_interno_Nominais = df_divone_juros_nominais * 100
@@ -1844,19 +1872,19 @@ def main_page():
             stress_test_juros_interno_Reais = df_divone_juros_real * 100
             stress_test_juros_interno_Reais_percent = stress_test_juros_interno_Reais / \
                 soma_pl_sem_pesos * 10000
+            
+            df_divone_juros_externo_certo = df_divone_juros_externo
 
-            st.write(
-                f'Antigo divone Treasury: {df_divone_juros_externo.iloc[0]}')
             if lista_juros_externo:
                 df_divone_juros_externo = df_retorno['TREASURY'].min()
+                df_divone_juros_externo = abs(df_divone_juros_externo) * treasury * dolar / 10000
                 df_divone_juros_externo = df_divone_juros_externo * \
                     np.array(lista_quantidade)
                 df_divone_juros_externo = df_divone_juros_externo.sum()
-                df_divone_juros_externo = abs(
-                    df_divone_juros_externo) * treasury
-                st.write(f'Novo divone Treasury: {df_divone_juros_externo}')
 
-            stress_test_juros_externo = df_divone_juros_externo * 100
+
+            stress_test_juros_externo = df_divone_juros_externo
+
             stress_test_juros_externo_percent = stress_test_juros_externo / \
                 soma_pl_sem_pesos * 10000
 
@@ -1868,18 +1896,25 @@ def main_page():
                 df_divone_dolar = df_retorno['WDO1'].min()
                 df_divone_dolar = df_divone_dolar * quantidade_dolar
                 df_divone_dolar = abs(df_divone_dolar) * dolar
+                stress_dolar = df_divone_dolar
+                stress_dolar_percent = stress_dolar / soma_pl_sem_pesos * 10000
+                df_divone_dolar = df_divone[lista_dolar] * \
+                    np.array(quantidade_dolar)
+                df_divone_dolar = df_divone_dolar.sum()
+
+
 
             else:
                 stress_dolar = 0
                 df_divone_dolar = 0
-
+            
             stress_dolar_percent = stress_dolar / soma_pl_sem_pesos * 10000
             df_stress_div01 = pd.DataFrame({
                 'DIV01': [
                     f"R${df_divone_juros_nominais.iloc[0]:,.2f}",
                     f"R${df_divone_juros_real.iloc[0]:,.2f}",
-                    f"R${df_divone_juros_externo:,.2f}" if lista_juros_externo else f"R${df_divone_juros_externo.iloc[0]:,.2f}",
-                    f'R${df_divone_dolar:,.2f}'
+                    f"R${df_divone_juros_externo_certo.iloc[0]:,.2f}",
+                    f'R${df_divone_dolar.iloc[0]:,.2f}'
                 ],
                 'Stress (R$)': [
                     f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL']:,.2f}",
@@ -1896,7 +1931,7 @@ def main_page():
             }, index=['Juros Nominais Brasil', 'Juros Reais Brasil', 'Juros US', 'Moedas'])
 
             sum_row = pd.DataFrame({
-                'DIV01': [f"R${df_divone_juros_nominais.iloc[0] + df_divone_juros_real[0] + df_divone_juros_externo + df_divone_dolar:,.2f}" if lista_juros_externo else f"R${df_divone_juros_nominais.iloc[0] + df_divone_juros_real.iloc[0] + df_divone_juros_externo.iloc[0] + df_divone_dolar:,.2f}"],
+                'DIV01': [f"R${df_divone_juros_nominais.iloc[0] + df_divone_juros_real[0] + df_divone_juros_externo_certo.iloc[0] + df_divone_dolar.iloc[0]:,.2f}"],
                 'Stress (R$)': [f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL'] + stress_test_juros_interno_Reais['FUT_TICK_VAL'] + stress_test_juros_externo + stress_dolar:,.2f}"] if lista_juros_externo else [f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL'] + stress_test_juros_interno_Reais['FUT_TICK_VAL'] + stress_test_juros_externo['FUT_TICK_VAL'] + stress_dolar:,.2f}"],
                 'Stress (bps)': [f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent + stress_dolar_percent:,.2f}bps" if lista_juros_externo else f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent['FUT_TICK_VAL'] + stress_dolar_percent:,.2f}bps"]
             }, index=['Total'])
@@ -1906,6 +1941,8 @@ def main_page():
                 df_precos_ajustados, df_pl_processado, var_bps)
             df_pl_processado = calculate_contracts_per_fund(
                 df_pl_processado, df_precos_ajustados)
+            
+
 
             # --- Layout ---
             col1, col11, col2, col3 = st.columns([2.4, 0.2, 3.4, 1])
@@ -2202,24 +2239,40 @@ def main_page():
             # --- Seletor de Filtro de Tempo ---
             tipo_filtro = st.sidebar.selectbox("Escolha o filtro de tempo", [
                                                "Apenas um dia", "Período"])
-
+            dados_portifolio_atual = pd.read_csv('portifolio_posições.csv')
+            ultimo_dia_dados = dados_portifolio_atual['Dia de Compra'].max()
+            ultimo_dia_dados = datetime.datetime.strptime(
+                ultimo_dia_dados, "%Y-%m-%d")
+            primeiro_dia_dados = dados_portifolio_atual['Dia de Compra'].min()
+            primeiro_dia_dados = datetime.datetime.strptime(
+                primeiro_dia_dados, "%Y-%m-%d")
             if tipo_filtro == "Apenas um dia":
                 data_unica = st.sidebar.date_input(
-                    "Escolha o dia", value=date(2025, 1, 1))
-                data_inicial = data_unica.strftime("%Y-%m-%d")
-                data_final = data_inicial  # Mesma data
+                    "Escolha o dia", value=ultimo_dia_dados,min_value=primeiro_dia_dados)
+                data_inicial = primeiro_dia_dados.strftime("%Y-%m-%d")
+                data_final = data_unica.strftime("%Y-%m-%d")
             else:
                 # Múltiplas datas
                 data_inicial = st.sidebar.date_input(
-                    "Data inicial", value=date(2024, 12, 16))
+                    "Data inicial", value=primeiro_dia_dados, min_value=primeiro_dia_dados)
                 data_final = st.sidebar.date_input(
-                    "Data final",   value=date(2025, 1, 16))
+                    "Data final",   value=ultimo_dia_dados, min_value=primeiro_dia_dados)
 
                 # Caso o usuário escolha no date_input (retorna objeto date)
                 # Convertendo para string
                 data_inicial = data_inicial.strftime("%Y-%m-%d")
                 data_final = data_final.strftime("%Y-%m-%d")
-
+            st.html(
+                '''
+                <style>
+                div[data-testid="stDateInput"] input {
+                    color: black; /* Define o texto */
+                                                    }
+                
+                </style>   
+        
+                '''
+                )   
             # --- Seletor de Tipo de Visão ---
             tipo_visao = st.sidebar.radio(
                 "Tipo de Visão", ["Fundo", "Estratégia", "Ativo"])
@@ -2240,56 +2293,59 @@ def main_page():
                 # REMOVER linhas onde Ativo == "PL"
                 df_ativo = df_ativo[df_ativo["Ativo"] != "PL"]
 
-                # --------------------------------------------------------------------
-                # Exibir apenas a visão escolhida:
-                # --------------------------------------------------------------------
+                df_teste_fundos =df_ativo[df_ativo['fundo'] != 'Total']
+                df_teste = df_ativo[df_ativo['fundo'] == 'Total']
+
+                #Agrupar por dia
+                df_teste_dia = df_teste.groupby(['date']).sum().reset_index()
+                df_teste_dia.drop(columns=['fundo','Ativo','Estratégia'], inplace=True)
+                df_teste_estrategia = df_teste[['Estratégia','Rendimento_diario']]
+                df_teste_estrategia = df_teste_estrategia.groupby(['Estratégia']).sum().reset_index()
+
+                df_teste_estrategia_data = df_teste.groupby(['date','Estratégia']).sum().reset_index()
+                df_teste_estrategia_data.drop(columns=['fundo','Ativo'], inplace=True)
+                st.write("## Performance Diária Total")               
+                col1, col2 = st.columns([7, 3])
+                #Criar gráficos de barra para performance diária
+                with col1:
+                    sns.set_theme(style="whitegrid")
+                    fig, ax = plt.subplots(figsize=(15, 6))
+                    sns.barplot(x='date', y='Rendimento_diario', data=df_teste_dia, ax=ax)
+                    plt.xticks(rotation=45)
+                    st.pyplot(fig)
+                with col2:
+                    st.table(df_teste_dia)
+
+                if tipo_visao == "Estratégia":
+                    st.write('---')
+                    st.write("## Performance Diária por Estratégia")
+                    coll1, coll2 = st.columns([1, 1])
+
+                    with coll1:
+                        fig, ax = plt.subplots(figsize=(15, 6))
+                        sns.barplot(x='Estratégia', y='Rendimento_diario', data=df_teste_estrategia, ax=ax)
+                        st.pyplot(fig)
+                    with coll2:
+                        st.table(df_teste_estrategia)
+                        st.table(df_teste_estrategia_data)
+                
+                if tipo_visao == "Fundo":
+                    st.write('---')
+                    st.write("## Performance Diária por Fundo")
+                    fig, ax = plt.subplots(figsize=(15, 6))
+                    sns.barplot(x='date', y='Rendimento_diario', hue='fundo', data=df_teste_fundos, ax=ax)
+                    plt.xticks(rotation=45)
+                    st.pyplot(fig)
+                
                 if tipo_visao == "Ativo":
-                    st.subheader("Rendimento Diário - Fundo x Ativo")
-                    st.dataframe(df_ativo)
+                
+                    st.write('---')
+                    st.write("## Performance Diária por Ativo")
+                    fig, ax = plt.subplots(figsize=(15, 6))
+                    sns.lineplot(x='date', y='Rendimento_diario', hue='Ativo', data=df_teste, ax=ax)
+                    plt.xticks(rotation=45)
+                    st.pyplot(fig)
 
-                    # Exemplo de gráfico: escolher 1 fundo e plotar linha ao longo das datas
-                    # pivot index=date, columns=Ativo, values=Rendimento_diario
-                    fundos_unicos = df_ativo["fundo"].unique()
-                    if len(fundos_unicos) > 0:
-                        fundo_escolhido = st.selectbox(
-                            "Escolha o Fundo para Gráfico:", fundos_unicos)
-                        df_plot = df_ativo[df_ativo["fundo"]
-                                           == fundo_escolhido].copy()
-                        # pivot
-                        df_plot_pivot = df_plot.pivot(index="date",
-                                                      columns="Ativo",
-                                                      values="Rendimento_diario").fillna(0.0)
-                        # Ordenar index (date)
-                        df_plot_pivot.sort_index(inplace=True)
-                        st.line_chart(df_plot_pivot)
-
-                elif tipo_visao == "Estratégia":
-                    st.subheader("Rendimento Diário - Fundo x Estratégia")
-                    st.dataframe(df_estr)
-
-                    # Exemplo de gráfico: pivot index=date, columns=Estratégia
-                    fundos_unicos = df_estr["fundo"].unique()
-                    if len(fundos_unicos) > 0:
-                        fundo_escolhido = st.selectbox(
-                            "Escolha o Fundo para Gráfico:", fundos_unicos)
-                        df_plot = df_estr[df_estr["fundo"]
-                                          == fundo_escolhido].copy()
-                        df_plot_pivot = df_plot.pivot(index="date",
-                                                      columns="Estratégia",
-                                                      values="Rendimento_diario").fillna(0.0)
-                        df_plot_pivot.sort_index(inplace=True)
-                        st.line_chart(df_plot_pivot)
-
-                else:  # tipo_visao == "Fundo"
-                    st.subheader("Rendimento Diário - Fundo (Total)")
-                    st.dataframe(df_fundo)
-
-                    # Exemplo de gráfico: pivot index=date, columns=fundo
-                    df_plot_pivot = df_fundo.pivot(index="date",
-                                                   columns="fundo",
-                                                   values="Rendimento_diario").fillna(0.0)
-                    df_plot_pivot.sort_index(inplace=True)
-                    st.line_chart(df_plot_pivot)
         else:
             st.write("Nenhum Ativo selecionado.")
 
@@ -2300,8 +2356,21 @@ def main_page():
         st.write(
             "Insira uma data para que os dados registrados dessa data sejam apagados")
         st.sidebar.write("Selecione o dia que deseja apagar:")
+
         data_apag = st.sidebar.date_input(
             "Data que será apagada", value=datetime.date.today())
+
+        st.html(
+                '''
+                <style>
+                div[data-testid="stDateInput"] input {
+                    color: black; /* Define o texto */
+                                                    }
+                
+                </style>   
+        
+                '''
+        )
 
         # Converter para o formato '2025-01-16'
         data_apag = data_apag.strftime("%Y-%m-%d")

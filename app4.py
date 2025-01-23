@@ -576,6 +576,8 @@ def calcular_metricas_de_port(assets, quantidades):
         'Stress (bps)': [f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent + stress_dolar_percent:,.2f}bps" if lista_juros_externo else f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent['FUT_TICK_VAL'] + stress_dolar_percent:,.2f}bps"]
     }, index=['Total'])
     df_stress_div01 = pd.concat([df_stress_div01, sum_row])
+    df_stress_div01 = abs(df_stress_div01)
+
 
     df_precos_ajustados = calculate_portfolio_values(
         df_precos_ajustados, df_pl_processado, var_bps)
@@ -1935,6 +1937,7 @@ def main_page():
                 'Stress (bps)': [f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent + stress_dolar_percent:,.2f}bps" if lista_juros_externo else f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent['FUT_TICK_VAL'] + stress_dolar_percent:,.2f}bps"]
             }, index=['Total'])
             df_stress_div01 = pd.concat([df_stress_div01, sum_row])
+            df_stress_div01 = abs(df_stress_div01)
 
             df_precos_ajustados = calculate_portfolio_values(
                 df_precos_ajustados, df_pl_processado, var_bps)

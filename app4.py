@@ -551,32 +551,31 @@ def calcular_metricas_de_port(assets, quantidades):
     stress_dolar_percent = stress_dolar / soma_pl_sem_pesos * 10000
     df_stress_div01 = pd.DataFrame({
         'DIV01': [
-            f"R${df_divone_juros_nominais.iloc[0]:,.2f}",
-            f"R${df_divone_juros_real.iloc[0]:,.2f}",
-            f"R${df_divone_juros_externo_certo.iloc[0]:,.2f}",
-            f'R${df_divone_dolar.iloc[0]:,.2f}' if lista_dolar else 0
+            f"R${abs(df_divone_juros_nominais.iloc[0]):,.2f}",
+            f"R${abs(df_divone_juros_real.iloc[0]):,.2f}",
+            f"R${abs(df_divone_juros_externo_certo.iloc[0]):,.2f}",
+            f'R${abs(df_divone_dolar.iloc[0]):,.2f}' if lista_dolar else 0
         ],
         'Stress (R$)': [
-            f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL']:,.2f}",
-            f"R${stress_test_juros_interno_Reais['FUT_TICK_VAL']:,.2f}",
-            f"R${stress_test_juros_externo:,.2f}" if lista_juros_externo else f"R${stress_test_juros_externo['FUT_TICK_VAL']:,.2f}",
-            f"R${stress_dolar:,.2f}"
+            f"R${abs(stress_test_juros_interno_Nominais['FUT_TICK_VAL']):,.2f}",
+            f"R${abs(stress_test_juros_interno_Reais['FUT_TICK_VAL']):,.2f}",
+            f"R${abs(stress_test_juros_externo):,.2f}" if lista_juros_externo else f"R${abs(stress_test_juros_externo['FUT_TICK_VAL']):,.2f}",
+            f"R${abs(stress_dolar):,.2f}"
         ],
         'Stress (bps)': [
-            f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL']:,.2f}bps",
-            f"{stress_test_juros_interno_Reais_percent['FUT_TICK_VAL']:,.2f}bps",
-            f"{stress_test_juros_externo_percent:,.2f}bps" if lista_juros_externo else f"{stress_test_juros_externo_percent['FUT_TICK_VAL']:,.2f}bps",
-            f"{stress_dolar_percent:,.2f}bps"
+            f"{abs(stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL']):,.2f}bps",
+            f"{abs(stress_test_juros_interno_Reais_percent['FUT_TICK_VAL']):,.2f}bps",
+            f"{abs(stress_test_juros_externo_percent):,.2f}bps" if lista_juros_externo else f"{abs(stress_test_juros_externo_percent['FUT_TICK_VAL']):,.2f}bps",
+            f"{abs(stress_dolar_percent):,.2f}bps"
         ]
     }, index=['Juros Nominais Brasil', 'Juros Reais Brasil', 'Juros US', 'Moedas'])
 
     sum_row = pd.DataFrame({
-        'DIV01': [f"R${df_divone_juros_nominais.iloc[0] + df_divone_juros_real[0] + df_divone_juros_externo_certo.iloc[0] + df_divone_dolar.iloc[0]:,.2f}"] if lista_dolar else [f"R${df_divone_juros_nominais.iloc[0] + df_divone_juros_real[0] + df_divone_juros_externo_certo.iloc[0]:,.2f}"],
-        'Stress (R$)': [f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL'] + stress_test_juros_interno_Reais['FUT_TICK_VAL'] + stress_test_juros_externo + stress_dolar:,.2f}"] if lista_juros_externo else [f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL'] + stress_test_juros_interno_Reais['FUT_TICK_VAL'] + stress_test_juros_externo['FUT_TICK_VAL'] + stress_dolar:,.2f}"],
-        'Stress (bps)': [f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent + stress_dolar_percent:,.2f}bps" if lista_juros_externo else f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent['FUT_TICK_VAL'] + stress_dolar_percent:,.2f}bps"]
+        'DIV01': [f"R${abs(df_divone_juros_nominais.iloc[0] + df_divone_juros_real[0] + df_divone_juros_externo_certo.iloc[0] + df_divone_dolar.iloc[0]):,.2f}"] if lista_dolar else [f"R${df_divone_juros_nominais.iloc[0] + df_divone_juros_real[0] + df_divone_juros_externo_certo.iloc[0]:,.2f}"],
+        'Stress (R$)': [f"R${abs(stress_test_juros_interno_Nominais['FUT_TICK_VAL'] + stress_test_juros_interno_Reais['FUT_TICK_VAL'] + stress_test_juros_externo + stress_dolar):,.2f}"] if lista_juros_externo else [f"R${abs(stress_test_juros_interno_Nominais['FUT_TICK_VAL'] + stress_test_juros_interno_Reais['FUT_TICK_VAL'] + stress_test_juros_externo['FUT_TICK_VAL'] + stress_dolar):,.2f}"],
+        'Stress (bps)': [f"{abs(stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent + stress_dolar_percent):,.2f}bps" if lista_juros_externo else f"{abs(stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent['FUT_TICK_VAL'] + stress_dolar_percent):,.2f}bps"]
     }, index=['Total'])
     df_stress_div01 = pd.concat([df_stress_div01, sum_row])
-    df_stress_div01 = df_stress_div01.abs()
 
 
     df_precos_ajustados = calculate_portfolio_values(
@@ -1912,32 +1911,31 @@ def main_page():
             stress_dolar_percent = stress_dolar / soma_pl_sem_pesos * 10000
             df_stress_div01 = pd.DataFrame({
                 'DIV01': [
-                    f"R${df_divone_juros_nominais.iloc[0]:,.2f}",
-                    f"R${df_divone_juros_real.iloc[0]:,.2f}",
-                    f"R${df_divone_juros_externo_certo.iloc[0]:,.2f}",
-                    f'R${df_divone_dolar.iloc[0]:,.2f}' if lista_dolar else 0
+                    f"R${abs(df_divone_juros_nominais.iloc[0]):,.2f}",
+                    f"R${abs(df_divone_juros_real.iloc[0]):,.2f}",
+                    f"R${abs(df_divone_juros_externo_certo.iloc[0]):,.2f}",
+                    f'R${abs(df_divone_dolar.iloc[0]):,.2f}' if lista_dolar else 0
                 ],
                 'Stress (R$)': [
-                    f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL']:,.2f}",
-                    f"R${stress_test_juros_interno_Reais['FUT_TICK_VAL']:,.2f}",
-                    f"R${stress_test_juros_externo:,.2f}" if lista_juros_externo else f"R${stress_test_juros_externo['FUT_TICK_VAL']:,.2f}",
-                    f"R${stress_dolar:,.2f}"
+                    f"R${abs(stress_test_juros_interno_Nominais['FUT_TICK_VAL']):,.2f}",
+                    f"R${abs(stress_test_juros_interno_Reais['FUT_TICK_VAL']):,.2f}",
+                    f"R${abs(stress_test_juros_externo):,.2f}" if lista_juros_externo else f"R${abs(stress_test_juros_externo['FUT_TICK_VAL']):,.2f}",
+                    f"R${abs(stress_dolar):,.2f}"
                 ],
                 'Stress (bps)': [
-                    f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL']:,.2f}bps",
-                    f"{stress_test_juros_interno_Reais_percent['FUT_TICK_VAL']:,.2f}bps",
-                    f"{stress_test_juros_externo_percent:,.2f}bps" if lista_juros_externo else f"{stress_test_juros_externo_percent['FUT_TICK_VAL']:,.2f}bps",
-                    f"{stress_dolar_percent:,.2f}bps"
+                    f"{abs(stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL']):,.2f}bps",
+                    f"{abs(stress_test_juros_interno_Reais_percent['FUT_TICK_VAL']):,.2f}bps",
+                    f"{abs(stress_test_juros_externo_percent):,.2f}bps" if lista_juros_externo else f"{abs(stress_test_juros_externo_percent['FUT_TICK_VAL']):,.2f}bps",
+                    f"{abs(stress_dolar_percent):,.2f}bps"
                 ]
             }, index=['Juros Nominais Brasil', 'Juros Reais Brasil', 'Juros US', 'Moedas'])
 
             sum_row = pd.DataFrame({
-                'DIV01': [f"R${df_divone_juros_nominais.iloc[0] + df_divone_juros_real[0] + df_divone_juros_externo_certo.iloc[0] + df_divone_dolar.iloc[0]:,.2f}"] if lista_dolar else [f"R${df_divone_juros_nominais.iloc[0] + df_divone_juros_real[0] + df_divone_juros_externo_certo.iloc[0]:,.2f}"],
-                'Stress (R$)': [f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL'] + stress_test_juros_interno_Reais['FUT_TICK_VAL'] + stress_test_juros_externo + stress_dolar:,.2f}"] if lista_juros_externo else [f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL'] + stress_test_juros_interno_Reais['FUT_TICK_VAL'] + stress_test_juros_externo['FUT_TICK_VAL'] + stress_dolar:,.2f}"],
-                'Stress (bps)': [f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent + stress_dolar_percent:,.2f}bps" if lista_juros_externo else f"{stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent['FUT_TICK_VAL'] + stress_dolar_percent:,.2f}bps"]
+                'DIV01': [f"R${abs(df_divone_juros_nominais.iloc[0] + df_divone_juros_real[0] + df_divone_juros_externo_certo.iloc[0] + df_divone_dolar.iloc[0]):,.2f}"] if lista_dolar else [f"R${df_divone_juros_nominais.iloc[0] + df_divone_juros_real[0] + df_divone_juros_externo_certo.iloc[0]:,.2f}"],
+                'Stress (R$)': [f"R${abs(stress_test_juros_interno_Nominais['FUT_TICK_VAL'] + stress_test_juros_interno_Reais['FUT_TICK_VAL'] + stress_test_juros_externo + stress_dolar):,.2f}"] if lista_juros_externo else [f"R${abs(stress_test_juros_interno_Nominais['FUT_TICK_VAL'] + stress_test_juros_interno_Reais['FUT_TICK_VAL'] + stress_test_juros_externo['FUT_TICK_VAL'] + stress_dolar):,.2f}"],
+                'Stress (bps)': [f"{abs(stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent + stress_dolar_percent):,.2f}bps" if lista_juros_externo else f"{abs(stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent['FUT_TICK_VAL'] + stress_dolar_percent):,.2f}bps"]
             }, index=['Total'])
             df_stress_div01 = pd.concat([df_stress_div01, sum_row])
-            df_stress_div01 = df_stress_div01.abs()
 
             df_precos_ajustados = calculate_portfolio_values(
                 df_precos_ajustados, df_pl_processado, var_bps)

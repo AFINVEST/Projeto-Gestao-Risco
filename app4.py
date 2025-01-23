@@ -544,7 +544,6 @@ def calcular_metricas_de_port(assets, quantidades):
         df_divone_dolar = df_divone_dolar.sum()
 
 
-
     else:
         stress_dolar = 0
         df_divone_dolar = 0
@@ -555,7 +554,7 @@ def calcular_metricas_de_port(assets, quantidades):
             f"R${df_divone_juros_nominais.iloc[0]:,.2f}",
             f"R${df_divone_juros_real.iloc[0]:,.2f}",
             f"R${df_divone_juros_externo_certo.iloc[0]:,.2f}",
-            f'R${df_divone_dolar.iloc[0]:,.2f}'
+            f'R${df_divone_dolar.iloc[0]:,.2f}' if lista_dolar else 0
         ],
         'Stress (R$)': [
             f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL']:,.2f}",
@@ -1914,7 +1913,7 @@ def main_page():
                     f"R${df_divone_juros_nominais.iloc[0]:,.2f}",
                     f"R${df_divone_juros_real.iloc[0]:,.2f}",
                     f"R${df_divone_juros_externo_certo.iloc[0]:,.2f}",
-                    f'R${df_divone_dolar.iloc[0]:,.2f}'
+                    f'R${df_divone_dolar.iloc[0]:,.2f}' if lista_dolar else 0
                 ],
                 'Stress (R$)': [
                     f"R${stress_test_juros_interno_Nominais['FUT_TICK_VAL']:,.2f}",

@@ -584,7 +584,6 @@ def calcular_metricas_de_port(assets, quantidades):
         df_pl_processado, df_precos_ajustados)
 
     # --- Layout ---
-
     st.write("## Dados do Portifólio")
     st.write(f"**Soma do PL atualizado: R$ {soma_pl:,.0f}**")
 
@@ -700,6 +699,7 @@ def checkar2_portifolio(assets,
     # 1) Carrega portfólio existente (se existir)
     if os.path.exists(nome_arquivo_portifolio):
         df_portifolio = pd.read_csv(nome_arquivo_portifolio, index_col=0)
+    
     else:
         # Podemos criar um DataFrame com colunas definidas para evitar problemas de colunas inexistentes
         df_portifolio = pd.DataFrame(columns=[
@@ -819,7 +819,7 @@ def atualizar_csv_fundos(
     df_info,
     # DF de preços de fechamento B3: colunas ["Assets", <data1>, <data2>, ...]
 ):
-    df_fechamento_b3 = pd.read_csv("df_fechamento_b3.csv")
+    df_fechamento_b3 = pd.read_csv("df_preco_de_ajuste_atual.csv")
     df_fechamento_b3 = df_fechamento_b3.replace('\.', '', regex=True)
     df_fechamento_b3 = df_fechamento_b3.replace({',': '.'}, regex=True)
     # Converter para float todas as colunas menos a primeira
@@ -866,6 +866,14 @@ def atualizar_csv_fundos(
                                                               == asset, ultimo_fechamento].values[0]
                 preco_fechamento_atual = pd.to_numeric(
                     preco_fechamento_atual, errors='coerce')
+                preco_fechamento_dia = df_fechamento_b3.loc[df_fechamento_b3["Assets"]
+                                                            == asset, dia_operacao].values[0]
+                preco_fechamento_dia = pd.to_numeric(
+                    preco_fechamento_dia, errors='coerce')
+                
+                df_fundo.loc[asset,
+                                f"{dia_operacao} - Preco_Fechamento"] = preco_fechamento_dia
+
                 df_fundo.loc[asset,
                              "Preco_Fechamento_Atual"] = preco_fechamento_atual
 
@@ -892,6 +900,15 @@ def atualizar_csv_fundos(
                                                               == asset, ultimo_fechamento].values[0]
                 preco_fechamento_atual = pd.to_numeric(
                     preco_fechamento_atual, errors='coerce')
+                
+                preco_fechamento_dia = df_fechamento_b3.loc[df_fechamento_b3["Assets"]
+                                                            == asset, dia_operacao].values[0]
+                preco_fechamento_dia = pd.to_numeric(
+                    preco_fechamento_dia, errors='coerce')
+                
+                df_fundo.loc[asset,
+                                f"{dia_operacao} - Preco_Fechamento"] = preco_fechamento_dia
+
                 df_fundo.loc[asset,
                              "Preco_Fechamento_Atual"] = preco_fechamento_atual
 
@@ -2187,6 +2204,53 @@ def main_page():
                 )
 
             filtered_df = df_pl_processado_input.copy()
+            for asset in default_assets:
+                # Verifica se a soma dos contratos arredondados está correta
+                soma_atual = filtered_df[f'Contratos {asset}'].apply(
+                    lambda x: round(x)).sum()
+
+                if soma_atual == quantidade_inicial[asset]:
+                    continue
+                else:
+                    # Calcula o número de contratos que faltam ou excedem
+                    diferencas = quantidade_inicial[asset] - soma_atual
+
+                    # Calcula o peso relativo e os resíduos
+                    filtered_df['Peso Relativo'] = (
+                        filtered_df[f'Contratos {asset}'] /
+                        filtered_df[f'Contratos {asset}'].sum()
+                    )
+                    filtered_df['Contratos Proporcionais'] = (
+                        filtered_df['Peso Relativo'] * quantidade_inicial[asset]
+                    )
+                    filtered_df['Contratos Inteiros'] = filtered_df['Contratos Proporcionais'].apply(
+                        np.floor).astype(int)
+                    filtered_df['Resíduo'] = filtered_df['Contratos Proporcionais'] - \
+                        filtered_df['Contratos Inteiros']
+
+                    # Ajusta contratos restantes com base nos pesos e resíduos
+                    contratos_restantes = quantidade_inicial[asset] - \
+                        filtered_df['Contratos Inteiros'].sum()
+
+                    if contratos_restantes != 0:
+                        # Ordena para priorizar maior resíduo e maior peso relativo
+                        ordem_ajuste = filtered_df.sort_values(
+                            by=['Resíduo', 'Peso Relativo'], ascending=[False, False]).index if contratos_restantes > 0 else \
+                            filtered_df.sort_values(
+                                by=['Resíduo', 'Peso Relativo'], ascending=[True, True]).index
+
+                        for i in range(abs(contratos_restantes)):
+                            idx_to_adjust = ordem_ajuste[i]
+                            filtered_df.at[idx_to_adjust,
+                                           'Contratos Inteiros'] += 1 if contratos_restantes > 0 else -1
+
+                    # Atualiza a coluna final com os contratos ajustados
+                    filtered_df[f'Contratos {asset}'] = filtered_df['Contratos Inteiros']
+
+                    # Remove colunas auxiliares
+                    filtered_df.drop(columns=[
+                        'Peso Relativo', 'Contratos Proporcionais', 'Contratos Inteiros', 'Resíduo'], inplace=True)
+
             if filtro_fundo:
                 filtered_df = filtered_df[filtered_df["Fundos/Carteiras Adm"].isin(
                     filtro_fundo)]

@@ -83,7 +83,6 @@ try:
     df = df.drop(columns=["Semana","17/12/2024", "MTD", "YTD", "30D", "90D", "180D", "12M", "24M", "36M", "Desde Cri.", "Dt de Cri."])
 
     print(df)
-
     
     # Salvar o DataFrame em um arquivo CSV
     df.to_csv("pl_fundos.csv")

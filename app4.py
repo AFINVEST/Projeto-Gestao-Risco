@@ -376,6 +376,40 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra):
     return df_portifolio_salvo, key
 
 
+def read_atual_contratos():
+        files = os.listdir('BaseFundos')
+        df_fundos = pd.DataFrame()
+        lista_files = []
+        for file in files:
+            df_fundos = pd.concat([df_fundos, pd.read_csv(f'BaseFundos/{file}')])
+            #Adiciona o nome do arquivo como uma linha da coluna Fundo
+            contagem = df_fundos['Ativo'].unique()
+            contagem = len(contagem)
+            for i in range(contagem):
+                lista_files.append(file.split('.')[0])
+        #Pegar a quantidade de ativos unicos
+        df_fundos['Fundo'] = lista_files 
+        df_fundos = df_fundos.reset_index(drop=True)
+        contratos = []
+
+        for fundo in df_fundos['Fundo'].unique():
+            ativos = df_fundos[df_fundos['Fundo'] == fundo]
+            col_quantidade = [col for col in ativos.columns if col.endswith('Quantidade')]
+            
+            # Agrupar por ativo e somar as quantidades
+            agrupados = ativos.groupby('Ativo')[col_quantidade].sum().reset_index()
+            
+            for idx, row in agrupados.iterrows():
+                quantidade = row[col_quantidade].sum()  # Soma total das colunas 'Quantidade'
+                contratos.append([fundo, row['Ativo'], quantidade])
+
+        #DF_CONTRATOS TEM O FUNDO COMO INDEX, ATIVO COMO COLUNA E A QUANTIDADE DE CONTRATOS COMO VALOR
+        df_contratos = pd.DataFrame(contratos, columns=['Fundo', 'Ativo', 'Quantidade'])
+        df_contratos = df_contratos.pivot(index='Fundo', columns='Ativo', values='Quantidade')
+        df_contratos = df_contratos.fillna(0)
+        return df_contratos
+
+
 def calcular_metricas_de_port(assets, quantidades):
 
     file_pl = "pl_fundos.csv"
@@ -834,6 +868,18 @@ def atualizar_csv_fundos(
 
     df_current.set_index("Fundos/Carteiras Adm", inplace=True)
 
+    pl_dias = pd.read_csv("pl_fundos_teste.csv", index_col=0)
+
+    pl_dias = pl_dias.replace('\.', '', regex=True)
+    pl_dias = pl_dias.replace({',': '.'}, regex=True)
+    for col in pl_dias.columns:
+        if col != 'Fundos/Carteiras Adm':
+            pl_dias[col] = pl_dias[col].str.replace('R$', '')
+            pl_dias[col] = pl_dias[col].replace('--', np.nan)
+            pl_dias[col] = pl_dias[col].astype(float,errors='ignore')
+
+    # Atualizar todas as colunas para float menos a primeira
+    pl_dias = pl_dias.set_index("Fundos/Carteiras Adm")
     for fundo, row_fundo in df_current.iterrows():
         # Caminho do CSV do Fundo
         nome_arquivo_csv = os.path.join("BaseFundos", f"{fundo}.csv")
@@ -859,7 +905,10 @@ def atualizar_csv_fundos(
             # Se o ativo ainda não existe no df_fundo, cria a linha
             if asset not in df_fundo.index:
                 df_fundo.loc[asset, "Ativo"] = asset
-                df_fundo.loc[asset, f"{dia_operacao} - PL"] = row_fundo["PL"]
+                if fundo == "Total":
+                    df_fundo.loc[asset, f"{dia_operacao} - PL"] = pl_dias.loc['TOTAL', dia_operacao]
+                else:
+                    df_fundo.loc[asset, f"{dia_operacao} - PL"] = pl_dias.loc[fundo, dia_operacao]
 
                 # Garantir que o valor seja numérico
                 preco_fechamento_atual = df_fechamento_b3.loc[df_fechamento_b3["Assets"]
@@ -893,7 +942,10 @@ def atualizar_csv_fundos(
                 df_fundo.loc[asset,
                              f'{dia_operacao} - Rendimento'] = quantidade * rendimento
             else:
-                df_fundo.loc[asset, f"{dia_operacao} - PL"] = row_fundo["PL"]
+                if fundo == "Total":
+                    df_fundo.loc[asset, f"{dia_operacao} - PL"] = pl_dias.loc['TOTAL', dia_operacao]
+                else:
+                    df_fundo.loc[asset, f"{dia_operacao} - PL"] = pl_dias.loc[fundo, dia_operacao]
 
                 # Garantir que o valor seja numérico
                 preco_fechamento_atual = df_fechamento_b3.loc[df_fechamento_b3["Assets"]
@@ -928,8 +980,7 @@ def atualizar_csv_fundos(
                 df_fundo.loc[asset,
                              f'{dia_operacao} - Rendimento'] = quantidade * rendimento
 
-            # Pegar o Preco de compra de cada ativo
-
+        # Pegar o Preco de compra de cada ativo
         df_fundo.reset_index(drop=True, inplace=True)
         df_fundo.to_csv(nome_arquivo_csv, index=False, encoding="utf-8")
 
@@ -2204,6 +2255,7 @@ def main_page():
                 )
 
             filtered_df = df_pl_processado_input.copy()
+
             for asset in default_assets:
                 # Verifica se a soma dos contratos arredondados está correta
                 soma_atual = filtered_df[f'Contratos {asset}'].apply(
@@ -2264,7 +2316,11 @@ def main_page():
                 [filtered_df, sum_row.to_frame().T], ignore_index=True)
 
             filtered_df.index = filtered_df['Fundos/Carteiras Adm']
-
+            df_contratos = read_atual_contratos()
+            # Pegar as colunas que começam com 'Contratos' e remover os espaços
+            col_contratos = [col for col in filtered_df.columns if col.startswith('Contratos')]
+            for col in col_contratos:
+                filtered_df[col] = df_contratos[col.replace('Contratos ', '')]
             if columns:
                 # Formatação
                 for c in columns:
@@ -2336,7 +2392,8 @@ def main_page():
                 </style>   
         
                 '''
-                )   
+                )
+            
             # --- Seletor de Tipo de Visão ---
             tipo_visao = st.sidebar.radio(
                 "Tipo de Visão", ["Fundo", "Estratégia", "Ativo"])
@@ -2401,8 +2458,7 @@ def main_page():
                     plt.xticks(rotation=45)
                     st.pyplot(fig)
                 
-                if tipo_visao == "Ativo":
-                
+                if tipo_visao == "Ativo":                
                     st.write('---')
                     st.write("## Performance Diária por Ativo")
                     fig, ax = plt.subplots(figsize=(15, 6))

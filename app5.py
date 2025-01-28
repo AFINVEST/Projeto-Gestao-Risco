@@ -1350,3 +1350,172 @@ df_ativo = dict_result["df_diario_fundo_ativo"]
                 sns.lineplot(x='date', y='Rendimento_diario', hue='Ativo', data=df_teste, ax=ax)
                 plt.xticks(rotation=45)
                 st.pyplot(fig)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def analisar_dados_fundos():
+    files = os.listdir('BaseFundos')    
+    df_b3_fechamento = pd.read_csv("df_preco_de_ajuste_atual.csv")
+    df_b3_fechamento = df_b3_fechamento.replace('\.', '', regex=True)
+    df_b3_fechamento = df_b3_fechamento.replace(',', '.', regex=True)
+    df_b3_fechamento.iloc[:, 1:] = df_b3_fechamento.iloc[:, 1:].astype(float)
+    df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns !=
+                            'Assets'] = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns != 'Assets'] * 1000
+    df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', df_b3_fechamento.columns !=
+                            'Assets'] = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', df_b3_fechamento.columns != 'Assets'] * 10
+    
+    df_final = pd.DataFrame()
+    dia_atual = df_b3_fechamento.columns[-1]
+    dolar = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', dia_atual].values[0]
+
+    # Supõe-se que `files`, `df_b3_fechamento`, e `dia_atual` estão definidos
+    for file in files:
+        # Lê o arquivo CSV
+        df_fundos = pd.read_csv(f'BaseFundos/{file}')
+        file = file.split('.')[0]  # Remove a extensão do nome do arquivo
+
+        # Configura o índice para a coluna 'Ativo'
+        df_fundos.set_index('Ativo', inplace=True)
+
+
+
+        # Itera pelas linhas do DataFrame
+        for idx, row in df_fundos.iterrows():
+            # DataFrame para armazenar os rendimentos por operação e por dia
+            df_rendimentos = pd.DataFrame()
+            # Identifica as colunas relacionadas a 'Quantidade' e 'Preço de Compra'
+            col_quantidade = [col for col in df_fundos.columns if col.endswith('Quantidade')]
+
+            # Processa cada operação (quantidade/compras de cada dia)
+            for col in col_quantidade:
+                quantidade = row[col]
+
+                # Ignorar operações com quantidade 0
+                if quantidade == 0 or pd.isna(quantidade):
+                    continue
+                
+                # Obtém o preço de compra correspondente
+                preco_compra = row[col.replace('Quantidade', 'Preco_Compra')]
+
+                # Extrai a data da coluna
+                data_operacao = col.split(' ')[0]
+
+                # Itera por cada data no DataFrame de fechamentos (até o dia atual)
+                for data_fechamento in df_b3_fechamento.columns[1:]:  # Ignora a coluna de "Assets"
+                    # Calcula o rendimento apenas se a data de fechamento for posterior à data de operação
+                    if datetime.datetime.strptime(data_fechamento, '%Y-%m-%d') >= datetime.datetime.strptime(data_operacao, '%Y-%m-%d'):
+                        # Preço de fechamento no dia específico
+                        preco_fechamento = df_b3_fechamento.loc[
+                            df_b3_fechamento["Assets"] == idx, data_fechamento
+                        ].values[0]
+                        
+                        if idx == 'TREASURY':
+                        # Calcula o rendimento
+                            rendimento = (preco_fechamento - preco_compra) * quantidade * dolar / 10000
+                        else:
+                            rendimento = (preco_fechamento - preco_compra) * quantidade
+
+                        # Adiciona o rendimento ao DataFrame de resultados
+                        df_rendimentos.loc[f"{idx} - {data_operacao}", data_fechamento] = rendimento
+
+            # Verifica se há dados no DataFrame `df_rendimentos`
+            if not df_rendimentos.empty:
+                # Adicionar uma linha de total
+                df_rendimentos.loc['Total'] = df_rendimentos.sum()
+
+                # Dropar as linhas que não sejam 'Total'
+                df_rendimentos_append = df_rendimentos.loc[['Total']].copy()
+
+                # Renomear a linha Total
+                df_rendimentos_append.rename(index={'Total': f'{idx} - {file} - P&L'}, inplace=True)
+
+                # Adicionar a nova linha ao DataFrame final
+                df_final = pd.concat([df_final, df_rendimentos_append])
+
+    df_final_pl = pd.DataFrame()
+
+    # Supõe-se que `files`, `df_b3_fechamento`, e `dia_atual` estão definidos
+    for file in files:
+        # Lê o arquivo CSV
+        df_fundos = pd.read_csv(f'BaseFundos/{file}')
+        file = file.split('.')[0]  # Remove a extensão do nome do arquivo
+
+        # Configura o índice para a coluna 'Ativo'
+        df_fundos.set_index('Ativo', inplace=True)
+
+
+
+        # Itera pelas linhas do DataFrame
+        for idx, row in df_fundos.iterrows():
+            # DataFrame para armazenar os rendimentos por operação e por dia
+            df_rendimentos = pd.DataFrame()
+            # Identifica as colunas relacionadas a 'Quantidade' e 'Preço de Compra'
+            col_quantidade = [col for col in df_fundos.columns if col.endswith('Quantidade')]
+
+            # Processa cada operação (quantidade/compras de cada dia)
+            for col in col_quantidade:
+                quantidade = row[col]
+
+                # Ignorar operações com quantidade 0
+                if quantidade == 0 or pd.isna(quantidade):
+                    continue
+                
+                # Obtém o preço de compra correspondente
+                preco_compra = row[col.replace('Quantidade', 'Preco_Compra')]
+                soma_pl = row[col.replace('Quantidade', 'PL')]
+                # Extrai a data da coluna
+                data_operacao = col.split(' ')[0]
+
+                # Itera por cada data no DataFrame de fechamentos (até o dia atual)
+                for data_fechamento in df_b3_fechamento.columns[1:]:  # Ignora a coluna de "Assets"
+                    # Calcula o rendimento apenas se a data de fechamento for posterior à data de operação
+                    if datetime.datetime.strptime(data_fechamento, '%Y-%m-%d') >= datetime.datetime.strptime(data_operacao, '%Y-%m-%d'):
+                        # Preço de fechamento no dia específico
+                        preco_fechamento = df_b3_fechamento.loc[
+                            df_b3_fechamento["Assets"] == idx, data_fechamento
+                        ].values[0]
+                        
+                        if idx == 'TREASURY':
+                        # Calcula o rendimento
+                            rendimento = (preco_fechamento - preco_compra) * quantidade * dolar / 10000
+                        else:
+                            rendimento = (preco_fechamento - preco_compra) * quantidade
+
+                        rendimento = (rendimento / soma_pl ) * 10000
+
+                        # Adiciona o rendimento ao DataFrame de resultados
+                        df_rendimentos.loc[f"{idx}  EM BIPS - {data_operacao}", data_fechamento] = rendimento
+
+            # Verifica se há dados no DataFrame `df_rendimentos`
+            if not df_rendimentos.empty:
+                # Adicionar uma linha de total
+                df_rendimentos.loc['Total'] = df_rendimentos.sum()
+
+                # Dropar as linhas que não sejam 'Total'
+                df_rendimentos_append = df_rendimentos.loc[['Total']].copy()
+
+                # Renomear a linha Total
+                df_rendimentos_append.rename(index={'Total': f'{idx} - {file} - P&L'}, inplace=True)
+
+                # Adicionar a nova linha ao DataFrame final
+                df_final_pl = pd.concat([df_final_pl, df_rendimentos_append])
+
+    return df_final,df_final_pl

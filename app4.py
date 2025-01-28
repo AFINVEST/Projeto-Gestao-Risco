@@ -228,7 +228,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra):
     #Mudar para a ultima data de fechamento disponivel
 
     ultimo_fechamento = df_b3_fechamento.columns[-1]
-
+    dolar = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', ultimo_fechamento].values[0]
 
     dia_compra = {k: v.strftime('%Y-%m-%d') if isinstance(v, datetime.date) else v for k, v in dia_compra.items()} \
         if isinstance(dia_compra, dict) else \
@@ -276,7 +276,13 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra):
                                                     == asset, ultimo_fechamento].values[0]
             preco_fechamento_atual = pd.to_numeric(preco_fechamento_atual, errors='coerce')
 
-            rendimento = qtd_final * (preco_fechamento_atual - preco_compra)
+            if asset == 'TREASURY':
+
+                rendimento = qtd_final * (preco_fechamento_atual - preco_compra) * (dolar / 10000)
+
+            else: 
+
+                rendimento = qtd_final * (preco_fechamento_atual - preco_compra)
 
             # Adicionar linha ao novo DataFrame
             novo_portifolio = pd.concat([novo_portifolio, pd.DataFrame([{
@@ -870,6 +876,7 @@ def atualizar_csv_fundos(
                          'Assets'] = df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'WDO1', df_fechamento_b3.columns != 'Assets'] * 10
 
     ultimo_fechamento = df_fechamento_b3.columns[-1]
+    dolar = df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'WDO1', ultimo_fechamento].values[0]
 
     df_current.set_index("Fundos/Carteiras Adm", inplace=True)
 
@@ -943,10 +950,14 @@ def atualizar_csv_fundos(
                              f'{dia_operacao} - Quantidade'] = quantidade
 
                 # Calcular o rendimento
-                rendimento = preco_fechamento_dia - preco_compra
-                df_fundo.loc[asset,
-                             f'{dia_operacao} - Rendimento'] = quantidade * rendimento
-                
+                if asset == 'TREASURY':
+                    rendimento = preco_fechamento_dia - preco_compra
+                    df_fundo.loc[asset,
+                                f'{dia_operacao} - Rendimento'] = quantidade * rendimento * dolar / 10000
+                else:
+                    rendimento = preco_fechamento_dia - preco_compra
+                    df_fundo.loc[asset,
+                                f'{dia_operacao} - Rendimento'] = quantidade * rendimento
                 
             else:
                 if fundo == "Total":
@@ -982,10 +993,15 @@ def atualizar_csv_fundos(
                 df_fundo.loc[asset,
                              f'{dia_operacao} - Quantidade'] = quantidade
 
-                # Calcular o rendimento
-                rendimento = preco_fechamento_dia - preco_compra
-                df_fundo.loc[asset,
-                             f'{dia_operacao} - Rendimento'] = quantidade * rendimento
+                  # Calcular o rendimento
+                if asset == 'TREASURY':
+                    rendimento = preco_fechamento_dia - preco_compra
+                    df_fundo.loc[asset,
+                                f'{dia_operacao} - Rendimento'] = quantidade * rendimento * dolar / 10000
+                else:
+                    rendimento = preco_fechamento_dia - preco_compra
+                    df_fundo.loc[asset,
+                                f'{dia_operacao} - Rendimento'] = quantidade * rendimento
                 
                 
 
@@ -1181,6 +1197,7 @@ def analisar_dados_fundos():
     
     df_final = pd.DataFrame()
     dia_atual = df_b3_fechamento.columns[-1]
+    dolar = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', dia_atual].values[0]
 
     # Supõe-se que `files`, `df_b3_fechamento`, e `dia_atual` estão definidos
     for file in files:
@@ -1211,6 +1228,8 @@ def analisar_dados_fundos():
                 # Obtém o preço de compra correspondente
                 preco_compra = row[col.replace('Quantidade', 'Preco_Compra')]
 
+                #Preco Anterior
+                preco_anterior = preco_compra
                 # Extrai a data da coluna
                 data_operacao = col.split(' ')[0]
 
@@ -1223,11 +1242,17 @@ def analisar_dados_fundos():
                             df_b3_fechamento["Assets"] == idx, data_fechamento
                         ].values[0]
                         
+                        if idx == 'TREASURY':
                         # Calcula o rendimento
-                        rendimento = (preco_fechamento - preco_compra) * quantidade
+                            rendimento = (preco_fechamento - preco_anterior) * quantidade * dolar / 10000
+                        else:
+                            rendimento = (preco_fechamento - preco_anterior) * quantidade
+
 
                         # Adiciona o rendimento ao DataFrame de resultados
                         df_rendimentos.loc[f"{idx} - {data_operacao}", data_fechamento] = rendimento
+
+                        preco_anterior = preco_fechamento
 
             # Verifica se há dados no DataFrame `df_rendimentos`
             if not df_rendimentos.empty:
@@ -1238,7 +1263,7 @@ def analisar_dados_fundos():
                 df_rendimentos_append = df_rendimentos.loc[['Total']].copy()
 
                 # Renomear a linha Total
-                df_rendimentos_append.rename(index={'Total': f'{idx} - {file} - Total Rendimentos'}, inplace=True)
+                df_rendimentos_append.rename(index={'Total': f'{idx} - {file} - P&L'}, inplace=True)
 
                 # Adicionar a nova linha ao DataFrame final
                 df_final = pd.concat([df_final, df_rendimentos_append])
@@ -1276,7 +1301,7 @@ def analisar_dados_fundos():
                 soma_pl = row[col.replace('Quantidade', 'PL')]
                 # Extrai a data da coluna
                 data_operacao = col.split(' ')[0]
-
+                preco_anterior = preco_compra
                 # Itera por cada data no DataFrame de fechamentos (até o dia atual)
                 for data_fechamento in df_b3_fechamento.columns[1:]:  # Ignora a coluna de "Assets"
                     # Calcula o rendimento apenas se a data de fechamento for posterior à data de operação
@@ -1286,14 +1311,18 @@ def analisar_dados_fundos():
                             df_b3_fechamento["Assets"] == idx, data_fechamento
                         ].values[0]
                         
+                        if idx == 'TREASURY':
                         # Calcula o rendimento
-                        rendimento = (preco_fechamento - preco_compra) * quantidade
+                            rendimento = (preco_fechamento - preco_anterior) * quantidade * dolar / 10000
+                        else:
+                            rendimento = (preco_fechamento - preco_anterior) * quantidade
 
                         rendimento = (rendimento / soma_pl ) * 10000
 
                         # Adiciona o rendimento ao DataFrame de resultados
                         df_rendimentos.loc[f"{idx}  EM BIPS - {data_operacao}", data_fechamento] = rendimento
 
+                        preco_anterior = preco_fechamento
             # Verifica se há dados no DataFrame `df_rendimentos`
             if not df_rendimentos.empty:
                 # Adicionar uma linha de total
@@ -1303,7 +1332,7 @@ def analisar_dados_fundos():
                 df_rendimentos_append = df_rendimentos.loc[['Total']].copy()
 
                 # Renomear a linha Total
-                df_rendimentos_append.rename(index={'Total': f'{idx} - {file} - Total Rendimentos'}, inplace=True)
+                df_rendimentos_append.rename(index={'Total': f'{idx} - {file} - P&L'}, inplace=True)
 
                 # Adicionar a nova linha ao DataFrame final
                 df_final_pl = pd.concat([df_final_pl, df_rendimentos_append])
@@ -2542,7 +2571,11 @@ def main_page():
                 div[data-testid="stDateInput"] input {
                     color: black; /* Define o texto */
                                                     }
-                
+                .st-jc {
+                 color: black !important;  /* Define o texto como preto */
+                    }
+
+                                
                 </style>   
         
                 '''
@@ -2607,6 +2640,7 @@ def main_page():
 
                     df_fundos_copy = df_fundos.copy()
                     df_fundos_copy.loc['Total'] = df_fundos_copy.sum()
+
                     if bps_reais:
                         for col in df_fundos_copy.columns:
                             df_fundos_copy[col] = df_fundos_copy[col].apply(lambda x: f"{x:.2f}bps")
@@ -2614,7 +2648,7 @@ def main_page():
                         for col in df_fundos_copy.columns:
                             df_fundos_copy[col] = df_fundos_copy[col].apply(lambda x: f"R${x:,.2f}")
 
-                    st.table(df_fundos)
+                    st.table(df_fundos_copy)
                     
                     # Transforma o DataFrame de formato largo para longo
                     df_fundos_long = df_fundos.T.reset_index()  # T (transpose) para transformar colunas em linhas

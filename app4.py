@@ -2571,9 +2571,10 @@ def main_page():
                 div[data-testid="stDateInput"] input {
                     color: black; /* Define o texto */
                                                     }
-                .st-jc {
-                 color: black !important;  /* Define o texto como preto */
-                    }
+                                                    
+                    div[data-testid="stSelectbox"] div {
+                   color: black; /* Define o texto como preto */
+                                                    }
 
                                 
                 </style>   

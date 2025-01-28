@@ -1771,6 +1771,8 @@ def main_page():
                 lambda x: f"{x:.0f}")
 
             df_precos_ajustados['Quantidade'] = quantidade
+            df_pl_processado.to_csv('df_pl_processado.csv')
+            df_precos_ajustados.to_csv('df_precos_ajustados.csv')
             df_pl_processado_input = calculate_contracts_per_fund_input(
                 df_pl_processado, df_precos_ajustados)
 
@@ -1843,7 +1845,6 @@ def main_page():
                     'Filtrar por Fundos/Carteiras Adm',
                     df_pl_processado["Fundos/Carteiras Adm"].unique()
                 )
-
             filtered_df = df_pl_processado_input.copy()
             for asset in assets:
                 # Verifica se a soma dos contratos arredondados está correta
@@ -1960,7 +1961,7 @@ def main_page():
                     if col.startswith("Contratos"):
                         filtered_df[col] = filtered_df[col].apply(
                             lambda x: f"{x:.0f}")
-
+                st.write('teste')
                 st.table(filtered_df[columns])
                 st.write("OBS: Os contratos estão arrendodandos para inteiros.")
                 if key == True:
@@ -2519,7 +2520,6 @@ def main_page():
                     if col.startswith("Contratos"):
                         filtered_df[col] = filtered_df[col].apply(
                             lambda x: f"{x:.0f}")
-
                 st.table(filtered_df[columns])
                 st.write("OBS: Os contratos estão arrendodandos para inteiros.")
             else:
@@ -2571,12 +2571,10 @@ def main_page():
                 div[data-testid="stDateInput"] input {
                     color: black; /* Define o texto */
                                                     }
-                                                    
+
                     div[data-testid="stSelectbox"] div {
                    color: black; /* Define o texto como preto */
-                                                    }
-
-                                
+                                                    }                 
                 </style>   
         
                 '''

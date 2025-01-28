@@ -1254,3 +1254,99 @@ df_precos_ajustados = calculate_portfolio_values(
     df_precos_ajustados, df_pl_processado, var_bps)
 df_pl_processado = calculate_contracts_per_fund(
     df_pl_processado, df_precos_ajustados)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+df_ativo = dict_result["df_diario_fundo_ativo"]
+            df_estr = dict_result["df_diario_fundo_estrategia"]
+            df_fundo = dict_result["df_diario_fundo_total"]
+
+            # REMOVER linhas onde Ativo == "PL"
+            df_ativo = df_ativo[df_ativo["Ativo"] != "PL"]
+
+            df_teste_fundos =df_ativo[df_ativo['fundo'] != 'Total']
+            df_teste = df_ativo[df_ativo['fundo'] == 'Total']
+
+            #Agrupar por dia
+            df_teste_dia = df_teste.groupby(['date']).sum().reset_index()
+            df_teste_dia.drop(columns=['fundo','Ativo','Estratégia'], inplace=True)
+            df_teste_estrategia = df_teste[['Estratégia','Rendimento_diario']]
+            df_teste_estrategia = df_teste_estrategia.groupby(['Estratégia']).sum().reset_index()
+
+            df_teste_estrategia_data = df_teste.groupby(['date','Estratégia']).sum().reset_index()
+            df_teste_estrategia_data.drop(columns=['fundo','Ativo'], inplace=True)
+            st.write("## Performance Diária Total")               
+            col1, col2 = st.columns([7, 3])
+            st.write('---')
+            st.write("## Performance Diária Total")
+            #Criar Multiselect para escolher os fundos ativos e estratégias
+
+            st.table(df_final)
+
+            st.write('---')
+            st.write("## Performance Diária por PL")
+            st.table(df_final_pl)
+            #Criar gráficos de barra para performance diária
+            with col1:
+                sns.set_theme(style="whitegrid")
+                fig, ax = plt.subplots(figsize=(15, 6))
+                sns.barplot(x='date', y='Rendimento_diario', data=df_teste_dia, ax=ax)
+                plt.xticks(rotation=45)
+                st.pyplot(fig)
+            with col2:
+                st.table(df_teste_dia)
+
+            if tipo_visao == "Estratégia":
+                st.write('---')
+                st.write("## Performance Diária por Estratégia")
+                coll1, coll2 = st.columns([1, 1])
+
+                with coll1:
+                    fig, ax = plt.subplots(figsize=(15, 6))
+                    sns.barplot(x='Estratégia', y='Rendimento_diario', data=df_teste_estrategia, ax=ax)
+                    st.pyplot(fig)
+                with coll2:
+                    st.table(df_teste_estrategia)
+                    st.table(df_teste_estrategia_data)
+            
+            if tipo_visao == "Fundo":
+                st.write('---')
+                st.write("## Performance Diária por Fundo")
+                fig, ax = plt.subplots(figsize=(15, 6))
+                sns.barplot(x='date', y='Rendimento_diario', hue='fundo', data=df_teste_fundos, ax=ax)
+                plt.xticks(rotation=45)
+                st.pyplot(fig)
+            
+            if tipo_visao == "Ativo":                
+                st.write('---')
+                st.write("## Performance Diária por Ativo")
+                fig, ax = plt.subplots(figsize=(15, 6))
+                sns.lineplot(x='date', y='Rendimento_diario', hue='Ativo', data=df_teste, ax=ax)
+                plt.xticks(rotation=45)
+                st.pyplot(fig)

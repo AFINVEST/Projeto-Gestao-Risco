@@ -154,6 +154,8 @@ def processar_b3_portifolio():
     # Multiplicar a linha da treasury por 1000
     df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns !=
                          'Assets'] = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns != 'Assets'] * 1000
+    df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', df_b3_fechamento.columns !=
+                        'Assets'] = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', df_b3_fechamento.columns != 'Assets'] * 10
 
     
     return df_b3_fechamento
@@ -864,6 +866,9 @@ def atualizar_csv_fundos(
     df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'TREASURY', df_fechamento_b3.columns !=
                          'Assets'] = df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'TREASURY', df_fechamento_b3.columns != 'Assets'] * 1000
 
+    df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'WDO1', df_fechamento_b3.columns !=
+                         'Assets'] = df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'WDO1', df_fechamento_b3.columns != 'Assets'] * 10
+
     ultimo_fechamento = df_fechamento_b3.columns[-1]
 
     df_current.set_index("Fundos/Carteiras Adm", inplace=True)
@@ -938,9 +943,11 @@ def atualizar_csv_fundos(
                              f'{dia_operacao} - Quantidade'] = quantidade
 
                 # Calcular o rendimento
-                rendimento = preco_fechamento_atual - preco_compra
+                rendimento = preco_fechamento_dia - preco_compra
                 df_fundo.loc[asset,
                              f'{dia_operacao} - Rendimento'] = quantidade * rendimento
+                
+                
             else:
                 if fundo == "Total":
                     df_fundo.loc[asset, f"{dia_operacao} - PL"] = pl_dias.loc['TOTAL', dia_operacao]
@@ -976,9 +983,11 @@ def atualizar_csv_fundos(
                              f'{dia_operacao} - Quantidade'] = quantidade
 
                 # Calcular o rendimento
-                rendimento = preco_fechamento_atual - preco_compra
+                rendimento = preco_fechamento_dia - preco_compra
                 df_fundo.loc[asset,
                              f'{dia_operacao} - Rendimento'] = quantidade * rendimento
+                
+                
 
         # Pegar o Preco de compra de cada ativo
         df_fundo.reset_index(drop=True, inplace=True)
@@ -1158,6 +1167,151 @@ def apagar_dados_data(data_apag):
     df_portifolio = df_portifolio[df_portifolio['Dia de Compra'] != data_apag]
     df_portifolio.to_csv(nome_arquivo_portifolio)
     print(f"[{nome_arquivo_portifolio}] -> CSV atualizado: {nome_arquivo_portifolio}")
+
+def analisar_dados_fundos():
+    files = os.listdir('BaseFundos')    
+    df_b3_fechamento = pd.read_csv("df_preco_de_ajuste_atual.csv")
+    df_b3_fechamento = df_b3_fechamento.replace('\.', '', regex=True)
+    df_b3_fechamento = df_b3_fechamento.replace(',', '.', regex=True)
+    df_b3_fechamento.iloc[:, 1:] = df_b3_fechamento.iloc[:, 1:].astype(float)
+    df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns !=
+                            'Assets'] = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns != 'Assets'] * 1000
+    df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', df_b3_fechamento.columns !=
+                            'Assets'] = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', df_b3_fechamento.columns != 'Assets'] * 10
+    
+    df_final = pd.DataFrame()
+    dia_atual = df_b3_fechamento.columns[-1]
+
+    # Supõe-se que `files`, `df_b3_fechamento`, e `dia_atual` estão definidos
+    for file in files:
+        # Lê o arquivo CSV
+        df_fundos = pd.read_csv(f'BaseFundos/{file}')
+        file = file.split('.')[0]  # Remove a extensão do nome do arquivo
+
+        # Configura o índice para a coluna 'Ativo'
+        df_fundos.set_index('Ativo', inplace=True)
+
+
+
+        # Itera pelas linhas do DataFrame
+        for idx, row in df_fundos.iterrows():
+            # DataFrame para armazenar os rendimentos por operação e por dia
+            df_rendimentos = pd.DataFrame()
+            # Identifica as colunas relacionadas a 'Quantidade' e 'Preço de Compra'
+            col_quantidade = [col for col in df_fundos.columns if col.endswith('Quantidade')]
+
+            # Processa cada operação (quantidade/compras de cada dia)
+            for col in col_quantidade:
+                quantidade = row[col]
+
+                # Ignorar operações com quantidade 0
+                if quantidade == 0 or pd.isna(quantidade):
+                    continue
+                
+                # Obtém o preço de compra correspondente
+                preco_compra = row[col.replace('Quantidade', 'Preco_Compra')]
+
+                # Extrai a data da coluna
+                data_operacao = col.split(' ')[0]
+
+                # Itera por cada data no DataFrame de fechamentos (até o dia atual)
+                for data_fechamento in df_b3_fechamento.columns[1:]:  # Ignora a coluna de "Assets"
+                    # Calcula o rendimento apenas se a data de fechamento for posterior à data de operação
+                    if datetime.datetime.strptime(data_fechamento, '%Y-%m-%d') >= datetime.datetime.strptime(data_operacao, '%Y-%m-%d'):
+                        # Preço de fechamento no dia específico
+                        preco_fechamento = df_b3_fechamento.loc[
+                            df_b3_fechamento["Assets"] == idx, data_fechamento
+                        ].values[0]
+                        
+                        # Calcula o rendimento
+                        rendimento = (preco_fechamento - preco_compra) * quantidade
+
+                        # Adiciona o rendimento ao DataFrame de resultados
+                        df_rendimentos.loc[f"{idx} - {data_operacao}", data_fechamento] = rendimento
+
+            # Verifica se há dados no DataFrame `df_rendimentos`
+            if not df_rendimentos.empty:
+                # Adicionar uma linha de total
+                df_rendimentos.loc['Total'] = df_rendimentos.sum()
+
+                # Dropar as linhas que não sejam 'Total'
+                df_rendimentos_append = df_rendimentos.loc[['Total']].copy()
+
+                # Renomear a linha Total
+                df_rendimentos_append.rename(index={'Total': f'{idx} - {file} - Total Rendimentos'}, inplace=True)
+
+                # Adicionar a nova linha ao DataFrame final
+                df_final = pd.concat([df_final, df_rendimentos_append])
+
+    df_final_pl = pd.DataFrame()
+
+    # Supõe-se que `files`, `df_b3_fechamento`, e `dia_atual` estão definidos
+    for file in files:
+        # Lê o arquivo CSV
+        df_fundos = pd.read_csv(f'BaseFundos/{file}')
+        file = file.split('.')[0]  # Remove a extensão do nome do arquivo
+
+        # Configura o índice para a coluna 'Ativo'
+        df_fundos.set_index('Ativo', inplace=True)
+
+
+
+        # Itera pelas linhas do DataFrame
+        for idx, row in df_fundos.iterrows():
+            # DataFrame para armazenar os rendimentos por operação e por dia
+            df_rendimentos = pd.DataFrame()
+            # Identifica as colunas relacionadas a 'Quantidade' e 'Preço de Compra'
+            col_quantidade = [col for col in df_fundos.columns if col.endswith('Quantidade')]
+
+            # Processa cada operação (quantidade/compras de cada dia)
+            for col in col_quantidade:
+                quantidade = row[col]
+
+                # Ignorar operações com quantidade 0
+                if quantidade == 0 or pd.isna(quantidade):
+                    continue
+                
+                # Obtém o preço de compra correspondente
+                preco_compra = row[col.replace('Quantidade', 'Preco_Compra')]
+                soma_pl = row[col.replace('Quantidade', 'PL')]
+                # Extrai a data da coluna
+                data_operacao = col.split(' ')[0]
+
+                # Itera por cada data no DataFrame de fechamentos (até o dia atual)
+                for data_fechamento in df_b3_fechamento.columns[1:]:  # Ignora a coluna de "Assets"
+                    # Calcula o rendimento apenas se a data de fechamento for posterior à data de operação
+                    if datetime.datetime.strptime(data_fechamento, '%Y-%m-%d') >= datetime.datetime.strptime(data_operacao, '%Y-%m-%d'):
+                        # Preço de fechamento no dia específico
+                        preco_fechamento = df_b3_fechamento.loc[
+                            df_b3_fechamento["Assets"] == idx, data_fechamento
+                        ].values[0]
+                        
+                        # Calcula o rendimento
+                        rendimento = (preco_fechamento - preco_compra) * quantidade
+
+                        rendimento = (rendimento / soma_pl ) * 10000
+
+                        # Adiciona o rendimento ao DataFrame de resultados
+                        df_rendimentos.loc[f"{idx}  EM BIPS - {data_operacao}", data_fechamento] = rendimento
+
+            # Verifica se há dados no DataFrame `df_rendimentos`
+            if not df_rendimentos.empty:
+                # Adicionar uma linha de total
+                df_rendimentos.loc['Total'] = df_rendimentos.sum()
+
+                # Dropar as linhas que não sejam 'Total'
+                df_rendimentos_append = df_rendimentos.loc[['Total']].copy()
+
+                # Renomear a linha Total
+                df_rendimentos_append.rename(index={'Total': f'{idx} - {file} - Total Rendimentos'}, inplace=True)
+
+                # Adicionar a nova linha ao DataFrame final
+                df_final_pl = pd.concat([df_final_pl, df_rendimentos_append])
+
+    return df_final,df_final_pl
+
+
+
 
 
 def add_custom_css():
@@ -2260,7 +2414,6 @@ def main_page():
                 # Verifica se a soma dos contratos arredondados está correta
                 soma_atual = filtered_df[f'Contratos {asset}'].apply(
                     lambda x: round(x)).sum()
-
                 if soma_atual == quantidade_inicial[asset]:
                     continue
                 else:
@@ -2357,6 +2510,7 @@ def main_page():
             st.title("Análise de Performance dos Fundos")
 
             # --- Seletor de Filtro de Tempo ---
+            visao = st.sidebar.selectbox("Escolha o tipo de visão", ["Fundo", "Estratégia", "Ativo"])
             tipo_filtro = st.sidebar.selectbox("Escolha o filtro de tempo", [
                                                "Apenas um dia", "Período"])
             dados_portifolio_atual = pd.read_csv('portifolio_posições.csv')
@@ -2395,77 +2549,216 @@ def main_page():
                 )
             
             # --- Seletor de Tipo de Visão ---
-            tipo_visao = st.sidebar.radio(
-                "Tipo de Visão", ["Fundo", "Estratégia", "Ativo"])
 
-            if st.sidebar.button("Analisar"):
-                # Chama a função de análise
-                dict_result = analisar_performance_fundos(
-                    data_inicial,
-                    data_final,
-                    lista_estrategias,
-                    lista_ativos
-                )
+            df_final, df_final_pl = analisar_dados_fundos()
 
-                df_ativo = dict_result["df_diario_fundo_ativo"]
-                df_estr = dict_result["df_diario_fundo_estrategia"]
-                df_fundo = dict_result["df_diario_fundo_total"]
+            df_final.columns = pd.to_datetime(df_final.columns)
+            df_final_pl.columns = pd.to_datetime(df_final_pl.columns)
 
-                # REMOVER linhas onde Ativo == "PL"
-                df_ativo = df_ativo[df_ativo["Ativo"] != "PL"]
+            #Preciso dropar as colunas das datas que estiverem fora do range
+            # Filtrando as colunas do DataFrame de acordo com o intervalo de datas fornecido
+            df_final = df_final.loc[:, (df_final.columns >= pd.to_datetime(data_inicial)) & (df_final.columns <= pd.to_datetime(data_final))]
+            df_final_pl = df_final_pl.loc[:, (df_final_pl.columns >= pd.to_datetime(data_inicial)) & (df_final_pl.columns <= pd.to_datetime(data_final))]
 
-                df_teste_fundos =df_ativo[df_ativo['fundo'] != 'Total']
-                df_teste = df_ativo[df_ativo['fundo'] == 'Total']
 
-                #Agrupar por dia
-                df_teste_dia = df_teste.groupby(['date']).sum().reset_index()
-                df_teste_dia.drop(columns=['fundo','Ativo','Estratégia'], inplace=True)
-                df_teste_estrategia = df_teste[['Estratégia','Rendimento_diario']]
-                df_teste_estrategia = df_teste_estrategia.groupby(['Estratégia']).sum().reset_index()
+            #vOLTAR AS COLUNAS PARA O FORMATO ORIGINAL
+            df_final.columns = df_final.columns.strftime('%Y-%m-%d')
+            df_final_pl.columns = df_final_pl.columns.strftime('%Y-%m-%d')
 
-                df_teste_estrategia_data = df_teste.groupby(['date','Estratégia']).sum().reset_index()
-                df_teste_estrategia_data.drop(columns=['fundo','Ativo'], inplace=True)
-                st.write("## Performance Diária Total")               
-                col1, col2 = st.columns([7, 3])
-                #Criar gráficos de barra para performance diária
-                with col1:
-                    sns.set_theme(style="whitegrid")
-                    fig, ax = plt.subplots(figsize=(15, 6))
-                    sns.barplot(x='date', y='Rendimento_diario', data=df_teste_dia, ax=ax)
-                    plt.xticks(rotation=45)
-                    st.pyplot(fig)
-                with col2:
-                    st.table(df_teste_dia)
 
-                if tipo_visao == "Estratégia":
-                    st.write('---')
-                    st.write("## Performance Diária por Estratégia")
-                    coll1, coll2 = st.columns([1, 1])
+            #ADICIONAR UMA COLUNA DE TOTAL PARA O DF_FINAL
+            df_final['Total'] = df_final.sum(axis=1)
+            df_final_pl['Total'] = df_final_pl.sum(axis=1)
 
-                    with coll1:
-                        fig, ax = plt.subplots(figsize=(15, 6))
-                        sns.barplot(x='Estratégia', y='Rendimento_diario', data=df_teste_estrategia, ax=ax)
-                        st.pyplot(fig)
-                    with coll2:
-                        st.table(df_teste_estrategia)
-                        st.table(df_teste_estrategia_data)
+            # Chama a função de análise
+            dict_result = analisar_performance_fundos(
+                data_inicial,
+                data_final,
+                lista_estrategias,
+                lista_ativos
+            )
+            
+
+            bps_reais = st.checkbox("Exibir em bps do PL do fundo", value=False)     
+            if visao == "Fundo":
+                if bps_reais:
+                    df_final = df_final_pl
                 
-                if tipo_visao == "Fundo":
-                    st.write('---')
-                    st.write("## Performance Diária por Fundo")
-                    fig, ax = plt.subplots(figsize=(15, 6))
-                    sns.barplot(x='date', y='Rendimento_diario', hue='fundo', data=df_teste_fundos, ax=ax)
-                    plt.xticks(rotation=45)
-                    st.pyplot(fig)
-                
-                if tipo_visao == "Ativo":                
-                    st.write('---')
-                    st.write("## Performance Diária por Ativo")
-                    fig, ax = plt.subplots(figsize=(15, 6))
-                    sns.lineplot(x='date', y='Rendimento_diario', hue='Ativo', data=df_teste, ax=ax)
-                    plt.xticks(rotation=45)
+                lista_fundos = df_final.index
+                lista_fundos = lista_fundos.to_list()
+                lista_fundos = [i.split(' - ')[1] for i in lista_fundos]  # Extrai os nomes dos fundos
+                lista_fundos = list(set(lista_fundos))  # Remove duplicatas
+                lista_ativos = df_final.index
+                lista_ativos = lista_ativos.tolist()
+                lista_ativos = [i.split(' - ')[0] for i in lista_ativos]
+                lista_ativos = list(set(lista_ativos))
+
+                col111,col222 = st.columns([5,5])
+                with col111:
+                    fundos_lista = st.multiselect("Escolha os fundos", lista_fundos)
+                with col222:
+                    ativos_lista = st.multiselect("Escolha os ativos", lista_ativos)
+
+                if fundos_lista:
+                    # Filtra os dados com base nos fundos escolhidos
+                    df_fundos = df_final.loc[df_final.index.str.contains('|'.join(fundos_lista))]
+                    if ativos_lista:
+                        df_fundos = df_fundos.loc[df_fundos.index.str.contains('|'.join(ativos_lista))]
+
+                    df_fundos_copy = df_fundos.copy()
+                    df_fundos_copy.loc['Total'] = df_fundos_copy.sum()
+                    if bps_reais:
+                        for col in df_fundos_copy.columns:
+                            df_fundos_copy[col] = df_fundos_copy[col].apply(lambda x: f"{x:.2f}bps")
+                    else:
+                        for col in df_fundos_copy.columns:
+                            df_fundos_copy[col] = df_fundos_copy[col].apply(lambda x: f"R${x:,.2f}")
+
+                    st.table(df_fundos)
+                    
+                    # Transforma o DataFrame de formato largo para longo
+                    df_fundos_long = df_fundos.T.reset_index()  # T (transpose) para transformar colunas em linhas
+                    df_fundos_long.columns = ['date'] + list(df_fundos.index)  # A primeira coluna será a data e as demais são os fundos
+                    df_fundos_long = df_fundos_long.melt(id_vars=["date"], var_name="fundo", value_name="Rendimento_diario")
+
+                    # Filtra as linhas que são datas reais (elimina "Total" ou outros valores não-datas)
+                    df_fundos_long = df_fundos_long[pd.to_datetime(df_fundos_long['date'], errors='coerce').notna()]
+
+                    # Convertendo a coluna 'date' para datetime
+                    df_fundos_long['date'] = pd.to_datetime(df_fundos_long['date'])
+
+                    # Criando o gráfico de barras
+                    fig, ax = plt.subplots(figsize=(10, 6))  # Cria a figura e os eixos
+                    sns.barplot(x='date', y='Rendimento_diario', hue='fundo', data=df_fundos_long, ax=ax, palette="Blues")
+                    ax.set_xticklabels(ax.get_xticklabels(), rotation=45)  # Rotaciona as datas para melhor visualização
+                    ax.set_title("Rendimento Diário por Fundo")
+                    ax.set_xlabel("Data")
+                    ax.set_ylabel("Rendimento Diário")
+                    plt.tight_layout()
+
+                    # Exibe o gráfico com o Streamlit, passando a figura
                     st.pyplot(fig)
 
+            elif visao == "Estratégia":
+                if bps_reais:
+                    df_final = df_final_pl
+                lista_estrategias = {
+                'DI': 'Juros Nominais Brasil',
+                'DAP': 'Juros Reais Brasil',
+                'TREASURY': 'Juros US',
+                'WDO1': 'Moedas'
+                }
+                lista_ativos = df_final.index
+                lista_ativos = lista_ativos.tolist()
+                lista_ativos = [i.split(' - ')[0] for i in lista_ativos]
+                lista_ativos = list(set(lista_ativos))
+
+                 # Criação das colunas para seleção múltipla no Streamlit
+                col111, col222 = st.columns([5, 5])
+                with col111:
+                    estrategias_lista = st.multiselect("Escolha as estratégias", lista_estrategias.values())  # Estratégias selecionadas
+                with col222:
+                    ativos_lista = st.multiselect("Escolha os ativos", lista_ativos)  # Ativos selecionados
+
+                if estrategias_lista:
+                    # Aqui, estamos mapeando os valores das estratégias para suas chaves
+                    estrategias_chaves = [k for k, v in lista_estrategias.items() if v in estrategias_lista]
+                    
+                    # Se estratégias e ativos forem selecionados, realizamos o filtro
+                    if ativos_lista:
+                        # Filtra o df_final com base nas estratégias e ativos escolhidos
+                        df_estrategias = df_final.loc[df_final.index.str.contains('|'.join(estrategias_chaves))]  # Filtra pela estratégia
+                        df_estrategias = df_estrategias.loc[df_estrategias.index.str.contains('|'.join(ativos_lista))]  # Filtra pelo ativo
+
+                    else:
+                        # Se não selecionar nenhum ativo, apenas filtra pela estratégia
+                        df_estrategias = df_final.loc[df_final.index.str.contains('|'.join(estrategias_chaves))]
+                    df_estrategias_copy = df_estrategias.copy()
+                    df_estrategias_copy.loc['Total'] = df_estrategias_copy.sum()
+                    if bps_reais:
+                        for col in df_estrategias_copy.columns:
+                            df_estrategias_copy[col] = df_estrategias_copy[col].apply(lambda x: f"{x:.2f}bps")
+                    else:
+                        for col in df_estrategias_copy.columns:
+                            df_estrategias_copy[col] = df_estrategias_copy[col].apply(lambda x: f"R${x:,.2f}")
+                    #Adicionar a linha Total
+                    
+
+                    # Exibe a tabela filtrada
+                    st.table(df_estrategias_copy)
+
+                    # Transforma o DataFrame de formato largo para longo
+                    df_estrategias_long = df_estrategias.T.reset_index()  # T (transpose) para transformar colunas em linhas
+                    df_estrategias_long.columns = ['date'] + list(df_estrategias.index)  # A primeira coluna será a data e as demais são as estratégias
+                    df_estrategias_long = df_estrategias_long.melt(id_vars=["date"], var_name="estratégia", value_name="Rendimento_diario")
+
+                    # Filtra as linhas que são datas reais (elimina "Total" ou outros valores não-datas)
+                    df_estrategias_long = df_estrategias_long[pd.to_datetime(df_estrategias_long['date'], errors='coerce').notna()]
+
+                    # Convertendo a coluna 'date' para datetime
+                    df_estrategias_long['date'] = pd.to_datetime(df_estrategias_long['date'])
+
+                    # Criando o gráfico de barras
+                    fig, ax = plt.subplots(figsize=(10, 6))  # Cria a figura e os eixos
+                    sns.barplot(x='date', y='Rendimento_diario', hue='estratégia', data=df_estrategias_long, ax=ax, palette="Blues")
+                    ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+                    ax.set_title("Rendimento Diário por Estratégia")
+                    ax.set_xlabel("Data")
+                    ax.set_ylabel("Rendimento Diário")
+                    plt.tight_layout()
+
+                    # Exibe o gráfico com o Streamlit, passando a figura
+                    st.pyplot(fig)
+
+
+            elif visao == "Ativo":
+                if bps_reais:
+                    df_final = df_final_pl
+                lista_ativos = df_final.index
+                lista_ativos = lista_ativos.tolist()
+                lista_ativos = [i.split(' - ')[0] for i in lista_ativos]
+                lista_ativos = list(set(lista_ativos))
+
+                # Criação das colunas para seleção múltipla no Streamlit
+                ativos_lista = st.multiselect("Escolha os ativos", lista_ativos)
+
+                if ativos_lista:
+                    # Filtra o df_final com base nos ativos escolhidos
+                    df_ativos = df_final.loc[df_final.index.str.contains('|'.join(ativos_lista))]
+                    df_ativos_copy = df_ativos.copy()
+                    df_ativos_copy.loc['Total'] = df_ativos_copy.sum()
+                    if bps_reais:
+                        for col in df_ativos_copy.columns:
+                            df_ativos_copy[col] = df_ativos_copy[col].apply(lambda x: f"{x:.2f}bps")
+                    else:
+                        for col in df_ativos_copy.columns:
+                            df_ativos_copy[col] = df_ativos_copy[col].apply(lambda x: f"R${x:,.2f}")
+
+                    # Exibe a tabela filtrada
+                    st.table(df_ativos_copy)
+
+                    # Transforma o DataFrame de formato largo para longo
+                    df_ativos_long = df_ativos.T.reset_index()  # T (transpose) para transformar colunas em linhas
+                    df_ativos_long.columns = ['date'] + list(df_ativos.index)  # A primeira coluna será a data e as demais são os ativos
+                    df_ativos_long = df_ativos_long.melt(id_vars=["date"], var_name="ativo", value_name="Rendimento_diario")
+
+                    # Filtra as linhas que são datas reais (elimina "Total" ou outros valores não-datas)
+                    df_ativos_long = df_ativos_long[pd.to_datetime(df_ativos_long['date'], errors='coerce').notna()]
+                    
+                    # Convertendo a coluna 'date' para datetime
+                    df_ativos_long['date'] = pd.to_datetime(df_ativos_long['date'])
+
+                    # Criando o gráfico de barras
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    sns.barplot(x='date', y='Rendimento_diario', hue='ativo', data=df_ativos_long, ax=ax, palette="Blues")
+                    ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+                    ax.set_title("Rendimento Diário por Ativo")
+                    ax.set_xlabel("Data")
+                    ax.set_ylabel("Rendimento Diário")
+                    plt.tight_layout()
+
+                    # Exibe o gráfico com o Streamlit, passando a figura
+                    st.pyplot(fig)
         else:
             st.write("Nenhum Ativo selecionado.")
 

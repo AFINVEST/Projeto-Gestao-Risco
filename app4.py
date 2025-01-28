@@ -1771,8 +1771,6 @@ def main_page():
                 lambda x: f"{x:.0f}")
 
             df_precos_ajustados['Quantidade'] = quantidade
-            df_pl_processado.to_csv('df_pl_processado.csv')
-            df_precos_ajustados.to_csv('df_precos_ajustados.csv')
             df_pl_processado_input = calculate_contracts_per_fund_input(
                 df_pl_processado, df_precos_ajustados)
 

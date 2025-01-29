@@ -1771,8 +1771,16 @@ def main_page():
                 lambda x: f"{x:.0f}")
 
             df_precos_ajustados['Quantidade'] = quantidade
+
+            df_precos_ajustados_copy = df_precos_ajustados.copy()
+
+            df_contratos_2 = read_atual_contratos()
+            #Adicionar os contratos já existentes df_precos_ajustados
+            for col in df_contratos_2.columns:
+                df_precos_ajustados_copy.loc[col, 'Quantidade'] = df_precos_ajustados_copy.loc[col, 'Quantidade'] + df_contratos_2.loc['Total', col]
+            st.table(df_precos_ajustados_copy)
             df_pl_processado_input = calculate_contracts_per_fund_input(
-                df_pl_processado, df_precos_ajustados)
+                df_pl_processado, df_precos_ajustados_copy)
 
             # Cria uma cópia para exibição final
             df_pl_processado_print = df_pl_processado_input.copy()
@@ -1844,6 +1852,10 @@ def main_page():
                     df_pl_processado["Fundos/Carteiras Adm"].unique()
                 )
             filtered_df = df_pl_processado_input.copy()
+            quantidade_nomes_original = quantidade_nomes.copy()
+            for asset in assets:
+                quantidade_nomes[asset] = df_precos_ajustados_copy.loc[asset, 'Quantidade']
+            
             for asset in assets:
                 # Verifica se a soma dos contratos arredondados está correta
                 soma_atual = filtered_df[f'Contratos {asset}'].apply(
@@ -1890,6 +1902,26 @@ def main_page():
                     # Remove colunas auxiliares
                     filtered_df.drop(columns=[
                         'Peso Relativo', 'Contratos Proporcionais', 'Contratos Inteiros', 'Resíduo'], inplace=True)
+                    # Criar tabela editável
+
+            
+            for asset in assets:
+                for idx, row in filtered_df.iterrows():
+                    fundo = row['Fundos/Carteiras Adm']
+                    if asset in df_contratos_2.columns:
+                        valor_contrato = df_contratos_2.loc[fundo,asset]
+                    else:
+                        valor_contrato = 0
+                    filtered_df.at[idx, f'Contratos {asset}'] -= valor_contrato
+            
+            quantidade_nomes = quantidade_nomes_original.copy()
+            column_config = {}
+            for col in filtered_df.columns:
+                if not col.startswith("Contratos"):  # Bloquear edição das outras colunas
+                    column_config[col] = st.column_config.TextColumn(col, disabled=True)
+                else:
+                    column_config[col] = st.column_config.NumberColumn(col, step=1)  # Permitir edição
+
 
             # # OPERAÇÃO AQUI
             # for asset in assets:
@@ -1927,48 +1959,99 @@ def main_page():
             #         # Confirma ajuste
             #         st.write(
             #             f"Quantidade de {asset} ajustada corretamente para {quantidade_nomes[asset]}.")
+
             if filtro_fundo:
                 filtered_df = filtered_df[filtered_df["Fundos/Carteiras Adm"].isin(
                     filtro_fundo)]
             if filtro_adm:
                 filtered_df = filtered_df[filtered_df["Adm"].isin(filtro_adm)]
 
-            sum_row = filtered_df.select_dtypes(include='number').sum()
-            sum_row['Fundos/Carteiras Adm'] = 'Total'
-            sum_row['Adm'] = ''
-            filtered_df = pd.concat(
-                [filtered_df, sum_row.to_frame().T], ignore_index=True)
-
             filtered_df.index = filtered_df['Fundos/Carteiras Adm']
+            
+            filtered_df_2 = filtered_df.copy()
+            col_max = [col for col in filtered_df_2.columns if col.startswith("Max")]
+            filtered_df_2 = filtered_df_2.drop(
+                ['PL', 'Adm','Weights','PL_atualizado'], axis=1)
+            filtered_df_2 = filtered_df_2.drop(col_max, axis=1)
+            filtered_df_2 = filtered_df_2.set_index('Fundos/Carteiras Adm')
+            cool1,cool2,cool3 = st.columns([3.8,0.2,6.0])
+            with cool1:
+                st.write('### Edição de Contratos')
+                df_editado = st.data_editor(
+                    filtered_df_2, 
+                    hide_index=False,  # Mostrar o índice
+                    num_rows="fixed",  # Impede adicionar ou remover linhas
+                    key="data_editor",  
+                    column_config=column_config) 
+            
+            for idx, row in filtered_df.iterrows():
+                for asset in assets:
+                    fundo = row['Fundos/Carteiras Adm']
+                    filtered_df.at[idx, f'Contratos {asset}'] = df_editado.loc[fundo, f'Contratos {asset}']
+                    #Transformar linha em número
+                    filtered_df.at[idx, f'Contratos {asset}'] = int(filtered_df.at[idx, f'Contratos {asset}'])
+            #Adicionar sumrow
+            #Resetar indice para poder adicionar a linha de soma
+            # Resetar índice para poder adicionar a linha de soma
+            # Resetar índice para poder adicionar a linha de soma (sem adicionar a coluna 'Fundos/Carteiras Adm' novamente)
+            filtered_df = filtered_df.reset_index(drop=True)
 
-            if columns:
-                # Formatação
-                for c in columns:
-                    if c == 'PL_atualizado':
-                        filtered_df[c] = filtered_df[c].apply(
-                            lambda x: f"R${x:,.0f}")
-                    else:
-                        if c == 'Adm' or 'Fundos/Carteiras Adm':
-                            filtered_df[c] = filtered_df[c].apply(lambda x: x)
-                        else:
-                            filtered_df[c] = filtered_df[c].apply(
-                                lambda x: f"{x:.0f}")
-                            st.write(filtered_df[c])
+            # Calculando a soma das colunas numéricas
+            sum_row = filtered_df.select_dtypes(include='number').sum()
 
-                for col in filtered_df.columns:
-                    if col.startswith("Contratos"):
-                        filtered_df[col] = filtered_df[col].apply(
-                            lambda x: f"{x:.0f}")
-                st.write('teste')
+            # Adicionando a linha de soma e atribuindo o nome 'Total' à coluna 'Fundos/Carteiras Adm'
+            sum_row['Fundos/Carteiras Adm'] = 'Total'
+
+            # Adicionando a linha de soma no final do DataFrame
+            filtered_df = pd.concat([filtered_df, sum_row.to_frame().T], ignore_index=True)
+
+            # Restaurar a coluna 'Fundos/Carteiras Adm' como índice
+            filtered_df.set_index('Fundos/Carteiras Adm', inplace=True)
+
+                        #formatação
+            for col_ in filtered_df.columns:
+                if col_.startswith("Contratos"):
+                    filtered_df[col_] = filtered_df[col_].apply(
+                        lambda x: f"{x:.0f}")
+                elif col_ == 'PL_atualizado':
+                    filtered_df[col_] = filtered_df[col_].apply(
+                        lambda x: f"R${x:,.2f}")
+                elif col_ == 'PL':
+                    filtered_df[col_] = filtered_df[col_].apply(
+                        lambda x: f"R${x:,.0f}")
+                elif col_ == 'Weights':
+                    filtered_df[col_] = filtered_df[col_].apply(
+                        lambda x: f"{x:.0f}")
+
+            st.write("OBS: Os contratos estão arrendodandos para inteiros.")
+
+            
+            with cool2:
+                #Adicionar linha vertical
+                st.html(
+                    '''
+                            <div class="divider-vertical-lines"></div>
+                            <style>
+                                .divider-vertical-lines {
+                                    border-left: 2px solid rgba(49, 51, 63, 0.2);
+                                    height: 40vh;
+                                    margin: auto;
+                                }
+                                @media (max-width: 768px) {
+                                    .divider-vertical-lines {
+                                        display: none;
+                                    }
+                                }
+                            </style>
+                            '''
+                )
+                    
+            if key == True:
+                atualizar_csv_fundos(
+                    filtered_df, data_compra_todos, df_port)
+            with cool3:
+                st.write("### Portifólio Atualizado")
                 st.table(filtered_df[columns])
-                st.write("OBS: Os contratos estão arrendodandos para inteiros.")
-                if key == True:
-                    atualizar_csv_fundos(
-                        filtered_df, data_compra_todos, df_port)
-
-            else:
-                st.write("Selecione ao menos uma coluna para exibir os dados.")
-
             # Formata tabela final
             for col_ in df_pl_processado_print.columns:
                 if col_ != 'PL_atualizado':

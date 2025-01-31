@@ -1519,3 +1519,62 @@ def analisar_dados_fundos():
                 df_final_pl = pd.concat([df_final_pl, df_rendimentos_append])
 
     return df_final,df_final_pl
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            # Garante que "quantidade_inicial" esteja em st.session_state
+            if "quantidade_inicial" not in st.session_state:
+                st.session_state["quantidade_inicial"] = quantidade_inicial
+
+            data_compra_todos = data_compra_todos.strftime("%Y-%m-%d")
+            precos_user = {}
+
+            for col in df_precos_ajustados.index:
+                # Verifica se existe valor em st.session_state["quantidade_inicial"] para a ação col
+                default_qty = st.session_state["quantidade_inicial"].get(col, 1)
+                
+                # Número de contratos
+                val = st.sidebar.number_input(
+                    f"Quantidade para {col}:",
+                    min_value=-10000,
+                    value=default_qty,
+                    step=1
+                )
+                # Atualiza no session_state para que persista
+                st.session_state["quantidade_inicial"][col] = val
+
+                # Preço (você pode ou não persistir em session_state)
+                precos_user[col] = st.sidebar.number_input(
+                    f"Preço de {col}:",
+                    min_value=0.0,
+                    value=0.0,
+                    step=0.5
+                )
+
+                qtd_input.append(val)
+                quantidade_nomes[col] = val
+
+            quantidade = np.array(qtd_input)

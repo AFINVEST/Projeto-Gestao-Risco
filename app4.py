@@ -22,7 +22,16 @@ def process_portfolio(df_pl, Weights):
         .astype(float)
     )
     df_pl = df_pl.iloc[[5, 9, 10, 11, 17, 18, 19, 20, 22]]
-    soma_sem_pesos = df_pl['PL'].sum()
+    weights_zero = []
+    for weight in Weights:
+        if weight == 0:
+            weights_zero.append(0)
+        else:
+            weights_zero.append(1)
+    df_pl['Weights Zero'] = weights_zero
+    df_pl['PL_ZeroPeso'] = df_pl['PL'] * df_pl['Weights Zero']
+    soma_sem_pesos = df_pl['PL_ZeroPeso'].sum()
+    df_pl.drop(['Weights Zero', 'PL_ZeroPeso'], axis=1, inplace=True)
     df_pl['Weights'] = Weights
     df_pl['Weights'] = df_pl['Weights'].astype(float)
     df_pl['PL_atualizado'] = df_pl['PL'] * df_pl['Weights']
@@ -190,7 +199,7 @@ def processar_dados_port():
 #               'WDO1': '2025-01-17', 'TREASURY': '2025-01-17'}
 
 
-def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra):
+def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra,df_contratos):
     """
     Verifica ou cria um CSV de portfólio. Exibe dois DataFrames:
       1) Posição atual salva no CSV.
@@ -345,13 +354,26 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra):
         st.subheader("Portifólio processado")
         st.table(df_teste)
     st.write("---")
+    df_contratos_2 = read_atual_contratos()
+    for col in df_contratos_2.columns:
+        df_contratos_2.rename(columns={col: f'Contratos {col}'}, inplace=True)
+    # Somar as duas tabelas
+    # Garantir que todas as colunas que são relevantes para a soma sejam numéricas
+    df_contratos = df_contratos.apply(pd.to_numeric, errors='coerce')  # Coerce converte valores não numéricos para NaN
+    df_contratos_2 = df_contratos_2.apply(pd.to_numeric, errors='coerce')  # O mesmo para df_contratos_2
+
+    df_contratos = df_contratos.add(df_contratos_2, fill_value=0)
+    #Preciso somar os contratos e   m df_contratos_2 e df_contratos
+
+    df_contratos.drop(['Adm','PL','PL_atualizado','Weights'], axis=1, inplace=True)
+    
     col_pp1, col_pp3, col_pp2 = st.columns([4.9, 0.2, 4.9])
     with col_pp1:
         st.write("## Portifólio Atual")
-        calcular_metricas_de_port(assets_atual, quantidades_atual)
+        calcular_metricas_de_port(assets_atual, quantidades_atual,df_contratos_2)
     with col_pp2:
         st.write("## Novo Portifólio")
-        calcular_metricas_de_port(assets_teste, quantidades_teste)
+        calcular_metricas_de_port(assets_teste, quantidades_teste,df_contratos)
         # Botão para concatenar os DataFrames
         if st.button("Salvar novo portfólio"):
             df_portifolio_salvo = pd.concat(
@@ -417,8 +439,7 @@ def read_atual_contratos():
         df_contratos = df_contratos.fillna(0)
         return df_contratos
 
-
-def calcular_metricas_de_port(assets, quantidades):
+def calcular_metricas_de_port(assets, quantidades,df_contratos):
 
     file_pl = "pl_fundos.csv"
     df_pl = pd.read_csv(file_pl, index_col=0)
@@ -426,18 +447,30 @@ def calcular_metricas_de_port(assets, quantidades):
 
     # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
     dict_pesos = {
-        'Global Bonds': 4,
+        'GLOBAL BONDS': 4,
         'HORIZONTE': 1,
         'JERA2026': 2,
         'REAL FIM': 2,
         'BH FIRF INFRA': 2,
         'BORDEAUX INFRA': 2,
-        'TOPAZIO': 2,
+        'TOPAZIO INFRA': 2,
         'MANACA INFRA FIRF': 2,
-        'AF DEB INCENTIVADA': 3
+        'AF DEB INCENTIVADAS': 3
     }
-    Weights = list(dict_pesos.values())
+    # Zerar os pesos de fundos que não tem contratos
+    for idx, row in df_contratos.iterrows():
+        if idx == 'Total':
+            continue
+        else:
+            fundo = idx
+            check = 0
+            for asset in assets:
+                if int(row[f'Contratos {asset}']) != 0:
+                    check = 1
+            if check == 0:
+                dict_pesos[fundo] = 0
 
+    Weights = list(dict_pesos.values())
     df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(
         df_pl, Weights)
 
@@ -627,7 +660,7 @@ def calcular_metricas_de_port(assets, quantidades):
 
     # --- Layout ---
     st.write("## Dados do Portifólio")
-    st.write(f"**Soma do PL atualizado: R$ {soma_pl:,.0f}**")
+    st.write(f"**PL: R$ {soma_pl_sem_pesos:,.0f}**")
 
     var_limite_comparativo = soma_pl_sem_pesos * var_bps * var_limite
     st.write(
@@ -861,6 +894,7 @@ def atualizar_csv_fundos(
     df_info,
     # DF de preços de fechamento B3: colunas ["Assets", <data1>, <data2>, ...]
 ):
+
     df_fechamento_b3 = pd.read_csv("df_preco_de_ajuste_atual.csv")
     df_fechamento_b3 = df_fechamento_b3.replace('\.', '', regex=True)
     df_fechamento_b3 = df_fechamento_b3.replace({',': '.'}, regex=True)
@@ -877,8 +911,6 @@ def atualizar_csv_fundos(
 
     ultimo_fechamento = df_fechamento_b3.columns[-1]
     dolar = df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'WDO1', ultimo_fechamento].values[0]
-
-    df_current.set_index("Fundos/Carteiras Adm", inplace=True)
 
     pl_dias = pd.read_csv("pl_fundos_teste.csv", index_col=0)
 
@@ -1567,6 +1599,8 @@ def main_page():
         
                 '''
             )
+            if "quantidade_inicial" not in st.session_state:
+                st.session_state.quantidade_inicial = quantidade_inicial
 
             data_compra_todos = data_compra_todos.strftime("%Y-%m-%d")
             precos_user = {}
@@ -1593,8 +1627,7 @@ def main_page():
             for ativo in assets:
                 data_compra[ativo] = data_compra_todos
 
-            df_port, key = checkar_portifolio(
-                assets, quantidade_nomes, precos_user, data_compra)
+
 
             # Valor do Portfólio (soma simples)
             vp = df_precos_ajustados['Valor Fechamento'] * abs(quantidade)
@@ -1851,6 +1884,7 @@ def main_page():
                     'Filtrar por Fundos/Carteiras Adm',
                     df_pl_processado["Fundos/Carteiras Adm"].unique()
                 )
+            
             filtered_df = df_pl_processado_input.copy()
             quantidade_nomes_original = quantidade_nomes.copy()
             for asset in assets:
@@ -1862,7 +1896,9 @@ def main_page():
                     lambda x: round(x)).sum()
 
                 if soma_atual == quantidade_nomes[asset]:
-                    continue
+                    filtered_df[f'Contratos {asset}'] = filtered_df[f'Contratos {asset}'].apply(
+                        lambda x: round(x))
+                    st.write(f"Quantidade de {asset} está correta.")
                 else:
                     # Calcula o número de contratos que faltam ou excedem
                     diferencas = quantidade_nomes[asset] - soma_atual
@@ -1898,13 +1934,12 @@ def main_page():
 
                     # Atualiza a coluna final com os contratos ajustados
                     filtered_df[f'Contratos {asset}'] = filtered_df['Contratos Inteiros']
-
                     # Remove colunas auxiliares
                     filtered_df.drop(columns=[
-                        'Peso Relativo', 'Contratos Proporcionais', 'Contratos Inteiros', 'Resíduo'], inplace=True)
+                       'Peso Relativo', 'Contratos Proporcionais', 'Contratos Inteiros', 'Resíduo'], inplace=True)
                     # Criar tabela editável
 
-            
+
             for asset in assets:
                 for idx, row in filtered_df.iterrows():
                     fundo = row['Fundos/Carteiras Adm']
@@ -1983,13 +2018,30 @@ def main_page():
                     num_rows="fixed",  # Impede adicionar ou remover linhas
                     key="data_editor",  
                     column_config=column_config) 
-            
+
+            quantidade_nova_assets = {}
+
             for idx, row in filtered_df.iterrows():
                 for asset in assets:
                     fundo = row['Fundos/Carteiras Adm']
                     filtered_df.at[idx, f'Contratos {asset}'] = df_editado.loc[fundo, f'Contratos {asset}']
+                    if asset not in quantidade_nova_assets:
+                        quantidade_nova_assets[asset] = 0
+
+                    quantidade_nova_assets[asset] += df_editado.loc[fundo, f'Contratos {asset}']
                     #Transformar linha em número
                     filtered_df.at[idx, f'Contratos {asset}'] = int(filtered_df.at[idx, f'Contratos {asset}'])
+
+            ###################### Atualização de quantidade_inicial ######################
+
+            ############################################## DEU ERRADO ##############################################
+
+            if quantidade_nova_assets:
+                st.session_state.quantidade_inicial.update(quantidade_nova_assets)
+
+            ############################################## DEU ERRADO ##############################################
+
+
             #Adicionar sumrow
             #Resetar indice para poder adicionar a linha de soma
             # Resetar índice para poder adicionar a linha de soma
@@ -2001,6 +2053,7 @@ def main_page():
 
             # Adicionando a linha de soma e atribuindo o nome 'Total' à coluna 'Fundos/Carteiras Adm'
             sum_row['Fundos/Carteiras Adm'] = 'Total'
+            sum_row['Adm'] = ''
 
             # Adicionando a linha de soma no final do DataFrame
             filtered_df = pd.concat([filtered_df, sum_row.to_frame().T], ignore_index=True)
@@ -2045,7 +2098,10 @@ def main_page():
                             </style>
                             '''
                 )
-                    
+            
+            df_port, key = checkar_portifolio(
+                assets, quantidade_nomes, precos_user, data_compra,filtered_df)
+
             if key == True:
                 atualizar_csv_fundos(
                     filtered_df, data_compra_todos, df_port)
@@ -2664,7 +2720,7 @@ def main_page():
             # --- Seletor de Tipo de Visão ---
 
             df_final, df_final_pl = analisar_dados_fundos()
-
+            
             df_final.columns = pd.to_datetime(df_final.columns)
             df_final_pl.columns = pd.to_datetime(df_final_pl.columns)
 
@@ -2701,6 +2757,7 @@ def main_page():
                 lista_fundos = lista_fundos.to_list()
                 lista_fundos = [i.split(' - ')[1] for i in lista_fundos]  # Extrai os nomes dos fundos
                 lista_fundos = list(set(lista_fundos))  # Remove duplicatas
+                lista_fundos.remove('Total')
                 lista_ativos = df_final.index
                 lista_ativos = lista_ativos.tolist()
                 lista_ativos = [i.split(' - ')[0] for i in lista_ativos]
@@ -2708,7 +2765,7 @@ def main_page():
 
                 col111,col222 = st.columns([5,5])
                 with col111:
-                    fundos_lista = st.multiselect("Escolha os fundos", lista_fundos)
+                    fundos_lista = st.multiselect("Escolha os fundos", lista_fundos,default=lista_fundos)
                 with col222:
                     ativos_lista = st.multiselect("Escolha os ativos", lista_ativos)
 
@@ -2717,6 +2774,12 @@ def main_page():
                     df_fundos = df_final.loc[df_final.index.str.contains('|'.join(fundos_lista))]
                     if ativos_lista:
                         df_fundos = df_fundos.loc[df_fundos.index.str.contains('|'.join(ativos_lista))]
+                    
+                    #Iterar por todos os fundos e calcular quanto cada um rendeu somando o rendimento de cada ativo
+                    #Extrair o nome do fundo (antes de "- P&L")
+                    df_fundos['Fundo'] = [i.split(' - ')[1] for i in df_fundos.index.to_list()]
+                    df_fundos = df_fundos.groupby('Fundo').sum()
+
 
                     df_fundos_copy = df_fundos.copy()
                     df_fundos_copy.loc['Total'] = df_fundos_copy.sum()
@@ -2727,7 +2790,8 @@ def main_page():
                     else:
                         for col in df_fundos_copy.columns:
                             df_fundos_copy[col] = df_fundos_copy[col].apply(lambda x: f"R${x:,.2f}")
-
+                    
+                    
                     st.table(df_fundos_copy)
                     
                     # Transforma o DataFrame de formato largo para longo
@@ -2770,7 +2834,7 @@ def main_page():
                  # Criação das colunas para seleção múltipla no Streamlit
                 col111, col222 = st.columns([5, 5])
                 with col111:
-                    estrategias_lista = st.multiselect("Escolha as estratégias", lista_estrategias.values())  # Estratégias selecionadas
+                    estrategias_lista = st.multiselect("Escolha as estratégias", lista_estrategias.values(), default = lista_estrategias.values())  # Estratégias selecionadas
                 with col222:
                     ativos_lista = st.multiselect("Escolha os ativos", lista_ativos)  # Ativos selecionados
 
@@ -2787,6 +2851,20 @@ def main_page():
                     else:
                         # Se não selecionar nenhum ativo, apenas filtra pela estratégia
                         df_estrategias = df_final.loc[df_final.index.str.contains('|'.join(estrategias_chaves))]
+                    # Agora, adicionar a coluna 'Estrategia' corretamente:
+                    lista_estrategias_atualizar = []
+                    for idx,row in df_estrategias.iterrows():
+                        if 'DI' in idx:
+                            lista_estrategias_atualizar.append('JUROS NOMINAIS BRASIL')
+                        elif 'DAP' in idx:
+                            lista_estrategias_atualizar.append('JUROS REAIS BRASIL')
+                        elif 'TREASURY' in idx:
+                            lista_estrategias_atualizar.append('JUROS US')
+                        elif 'WDO1' in idx:
+                            lista_estrategias_atualizar.append('MOEDAS')
+                    df_estrategias['Estrategia'] = lista_estrategias_atualizar
+                    df_estrategias = df_estrategias.groupby('Estrategia').sum()
+
                     df_estrategias_copy = df_estrategias.copy()
                     df_estrategias_copy.loc['Total'] = df_estrategias_copy.sum()
                     if bps_reais:
@@ -2834,11 +2912,16 @@ def main_page():
                 lista_ativos = list(set(lista_ativos))
 
                 # Criação das colunas para seleção múltipla no Streamlit
-                ativos_lista = st.multiselect("Escolha os ativos", lista_ativos)
+                ativos_lista = st.multiselect("Escolha os ativos", lista_ativos, default=lista_ativos)
 
                 if ativos_lista:
                     # Filtra o df_final com base nos ativos escolhidos
-                    df_ativos = df_final.loc[df_final.index.str.contains('|'.join(ativos_lista))]
+                    df_ativos = df_final
+                    df_ativos['Ativo'] = [i.split(' - ')[0] for i in df_final.index.to_list()]
+                    df_ativos = df_ativos.loc[df_ativos['Ativo'].isin(ativos_lista)]
+                    df_ativos = df_ativos.groupby('Ativo').sum()
+
+
                     df_ativos_copy = df_ativos.copy()
                     df_ativos_copy.loc['Total'] = df_ativos_copy.sum()
                     if bps_reais:

@@ -2732,7 +2732,6 @@ def main_page():
             # Pegar as colunas que começam com 'Contratos' e remover os espaços
             col_contratos = [
                 col for col in filtered_df.columns if col.startswith('Contratos')]
-            st.table(df_contratos)
             for col in col_contratos:
                 filtered_df[col] = df_contratos[col.replace('Contratos ', '')]
             if columns:

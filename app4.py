@@ -48,6 +48,7 @@ def load_and_process_excel(df_excel, assets_sel):
     return df_precos, df
 
 
+
 def load_and_process_divone(file_bbg, df_excel):
     df_divone = pd.read_excel(file_bbg, sheet_name='DIV01',
                               skiprows=1, usecols='E:F', nrows=21)
@@ -109,6 +110,8 @@ def calculate_contracts_per_fund(df_pl, df_precos):
             df_pl['PL_atualizado'] /
             df_pl['PL_atualizado'].sum()
         ) * df_precos.iloc[i]['Valor Total']
+
+
     return df_pl
 
 
@@ -138,6 +141,7 @@ def calculate_portfolio_values(df_precos, df_pl_processado, var_bps):
     df_precos['Valor Total'] = df_precos['Santander'] + df_precos['BTG']
     for col in df_precos.columns:
         df_precos[col] = df_precos[col].apply(lambda x: round(x, 0))
+
     return df_precos.abs()
 
 
@@ -546,6 +550,7 @@ def calcular_metricas_de_port(assets, quantidades, df_contratos):
     # #####################################################################################
     ######################################################################################
     ######## var bps e var limite são fixos, mas podem ser dinâmicos no futuro ########################
+
     var_bps = 1.0
     var_bps = var_bps / 10000
 
@@ -567,6 +572,7 @@ def calcular_metricas_de_port(assets, quantidades, df_contratos):
 
     cvar = df_retorno[df_retorno['Portifolio'] < var_not_parametric(
         df_returns_portifolio['Portifolio'])]['Portifolio'].mean()
+    
 
     df_divone, dolar, treasury = load_and_process_divone(
         'BBG - ECO DASH.xlsx', df)
@@ -611,7 +617,7 @@ def calcular_metricas_de_port(assets, quantidades, df_contratos):
     stress_test_juros_interno_Nominais_percent = stress_test_juros_interno_Nominais / \
         soma_pl_sem_pesos * 10000
 
-    stress_test_juros_interno_Reais = df_divone_juros_real * 100
+    stress_test_juros_interno_Reais = df_divone_juros_real * 50
     stress_test_juros_interno_Reais_percent = stress_test_juros_interno_Reais / \
         soma_pl_sem_pesos * 10000
 
@@ -681,12 +687,13 @@ def calcular_metricas_de_port(assets, quantidades, df_contratos):
         df_precos_ajustados, df_pl_processado, var_bps)
     df_pl_processado = calculate_contracts_per_fund(
         df_pl_processado, df_precos_ajustados)
+    
 
     # --- Layout ---
     st.write("## Dados do Portifólio")
     st.write(f"**PL: R$ {soma_pl_sem_pesos:,.0f}**")
 
-    var_limite_comparativo = soma_pl_sem_pesos * var_bps * var_limite
+    var_limite_comparativo = soma_pl * var_bps * var_limite
     st.write(
         f"**VaR Limite** (Peso de {var_limite:.1%}): R${var_limite_comparativo:,.0f}"
     )
@@ -1678,7 +1685,6 @@ def main_page():
             # Valor do Portfólio (soma simples)
             vp = df_precos_ajustados['Valor Fechamento'] * abs(quantidade)
             vp_soma = vp.sum()
-
             # Pesos (p/ cálculo de VaR, etc.)
             pesos = quantidade * \
                 df_precos_ajustados['Valor Fechamento'] / vp_soma
@@ -1758,7 +1764,7 @@ def main_page():
             stress_test_juros_interno_Nominais_percent = stress_test_juros_interno_Nominais / \
                 soma_pl_sem_pesos * 10000
 
-            stress_test_juros_interno_Reais = df_divone_juros_real * 100
+            stress_test_juros_interno_Reais = df_divone_juros_real * 50
             stress_test_juros_interno_Reais_percent = stress_test_juros_interno_Reais / \
                 soma_pl_sem_pesos * 10000
 
@@ -1818,6 +1824,7 @@ def main_page():
 
             df_precos_ajustados = calculate_portfolio_values(
                 df_precos_ajustados, df_pl_processado, var_bps)
+
             df_pl_processado = calculate_contracts_per_fund(
                 df_pl_processado, df_precos_ajustados)
 
@@ -2212,6 +2219,13 @@ def main_page():
         df_portifolio_default_copy['Rendimento'] = df_portifolio_default_copy['Rendimento'].apply(
             lambda x: f"R${x:,.2f}")
 
+        df_portifolio_default_copy = df_portifolio_default_copy.rename(columns={
+            'Quantidade': 'Quantidade Total',
+            'Preço de Compra': 'Preço de Compra Médio',
+            'Preço de Ajuste Atual': 'Preço de Ajuste Atual Médio',
+            'Rendimento': 'P&L'
+        })
+
         st.table(df_portifolio_default_copy)
         st.write("OBS: O preço de compra é o preço médio de compra do ativo.")
         st.write("---")
@@ -2353,7 +2367,7 @@ def main_page():
             stress_test_juros_interno_Nominais_percent = stress_test_juros_interno_Nominais / \
                 soma_pl_sem_pesos * 10000
 
-            stress_test_juros_interno_Reais = df_divone_juros_real * 100
+            stress_test_juros_interno_Reais = df_divone_juros_real * 50
             stress_test_juros_interno_Reais_percent = stress_test_juros_interno_Reais / \
                 soma_pl_sem_pesos * 10000
 
@@ -2418,7 +2432,6 @@ def main_page():
                 'Stress (bps)': [f"{abs(stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent + stress_dolar_percent):,.2f}bps" if lista_juros_externo else f"{abs(stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL'] + stress_test_juros_interno_Reais_percent['FUT_TICK_VAL'] + stress_test_juros_externo_percent['FUT_TICK_VAL'] + stress_dolar_percent):,.2f}bps"]
             }, index=['Total'])
             df_stress_div01 = pd.concat([df_stress_div01, sum_row])
-
             df_precos_ajustados = calculate_portfolio_values(
                 df_precos_ajustados, df_pl_processado, var_bps)
             df_pl_processado = calculate_contracts_per_fund(

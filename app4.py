@@ -48,7 +48,6 @@ def load_and_process_excel(df_excel, assets_sel):
     return df_precos, df
 
 
-
 def load_and_process_divone(file_bbg, df_excel):
     df_divone = pd.read_excel(file_bbg, sheet_name='DIV01',
                               skiprows=1, usecols='E:F', nrows=21)
@@ -110,7 +109,6 @@ def calculate_contracts_per_fund(df_pl, df_precos):
             df_pl['PL_atualizado'] /
             df_pl['PL_atualizado'].sum()
         ) * df_precos.iloc[i]['Valor Total']
-
 
     return df_pl
 
@@ -571,7 +569,6 @@ def calcular_metricas_de_port(assets, quantidades, df_contratos):
 
     cvar = df_retorno[df_retorno['Portifolio'] < var_not_parametric(
         df_returns_portifolio['Portifolio'])]['Portifolio'].mean()
-    
 
     df_divone, dolar, treasury = load_and_process_divone(
         'BBG - ECO DASH.xlsx', df)
@@ -697,7 +694,6 @@ def calcular_metricas_de_port(assets, quantidades, df_contratos):
         df_precos_ajustados, df_pl_processado, var_bps)
     df_pl_processado = calculate_contracts_per_fund(
         df_pl_processado, df_precos_ajustados)
-    
 
     # --- Layout ---
     st.write("## Dados do Portifólio")
@@ -2468,7 +2464,7 @@ def main_page():
                     st.write(f"**VaR Limite**: **R${var_lim_din:,.0f}**")
                     var_limite_comparativo = var_lim_din
                 else:
-                    var_limite_comparativo = soma_pl_sem_pesos * var_bps * var_limite
+                    var_limite_comparativo = soma_pl * var_bps * var_limite
                     st.write(
                         f"**VaR Limite** (Peso de {var_limite:.1%}): R${var_limite_comparativo:,.0f}"
                     )

@@ -238,7 +238,6 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
     ])
 
     # Mudar para a ultima data de fechamento disponivel
-
     ultimo_fechamento = df_b3_fechamento.columns[-1]
     dolar = df_b3_fechamento.loc[df_b3_fechamento['Assets']
                                  == 'WDO1', ultimo_fechamento].values[0]
@@ -624,7 +623,13 @@ def calcular_metricas_de_port(assets, quantidades, df_contratos):
     df_divone_juros_externo_certo = df_divone_juros_externo
 
     if lista_juros_externo:
-        df_divone_juros_externo = df_retorno['TREASURY'].min()
+        valor_acumulado_treasury = (1+df_retorno['TREASURY']).cumprod()
+        pico_max_treasury = valor_acumulado_treasury.max()
+        drawndown_treasury = (valor_acumulado_treasury - pico_max_treasury) / \
+            pico_max_treasury
+        drawndown_treasury = drawndown_treasury.min()
+        drawndown_treasury = df_retorno['TREASURY'].min()
+        df_divone_juros_externo = drawndown_treasury
         df_divone_juros_externo = abs(
             df_divone_juros_externo) * treasury * dolar / 10000
         df_divone_juros_externo = df_divone_juros_externo * \
@@ -641,7 +646,12 @@ def calcular_metricas_de_port(assets, quantidades, df_contratos):
     if lista_dolar:
         quantidade_dolar = quantidade_nomes[lista_dolar[0]]
         stress_dolar = quantidade_dolar * dolar * 0.02
-        df_divone_dolar = df_retorno['WDO1'].min()
+        valor_acumulado = (1+df_retorno['WDO1']).cumprod()
+        pico_max = valor_acumulado.max()
+        drawndown_dolar = (valor_acumulado - pico_max) / pico_max
+        drawndown_dolar = drawndown_dolar.min()
+        drawndown_dolar = df_retorno['WDO1'].min()
+        df_divone_dolar = drawndown_dolar
         df_divone_dolar = df_divone_dolar * quantidade_dolar
         df_divone_dolar = abs(df_divone_dolar) * dolar
         stress_dolar = df_divone_dolar
@@ -1640,7 +1650,7 @@ def main_page():
                 ultimo_dia_dados_b3, "%Y-%m-%d")
 
             data_compra_todos = st.sidebar.date_input(
-                "Dia de Compra dos Ativos:", value=ultimo_dia_dados_b3)
+                "Dia de Compra dos Ativos:", value=ultimo_dia_dados_b3, max_value=ultimo_dia_dados_b3)
             st.html(
                 '''
                 <style>

@@ -52,7 +52,7 @@ try:
     time.sleep(5)
 
     # Defina o intervalo de datas
-    start_date = datetime(2025, 1, 30)  # 1º de janeiro de 2025
+    start_date = datetime(2025, 2, 8)  # 1º de janeiro de 2025
     end_date = datetime.today()        # Data de hoje
 
     # Localize o campo de data pelo ID
@@ -61,7 +61,7 @@ try:
     # Itere sobre todas as datas no intervalo
     current_date = start_date
 
-        # Dados fornecidos
+    # Dados fornecidos
     fundos_data = [
             ("AF DEB INCENTIVADAS", "R$ 11.660.312,30"),
             ("AF INVEST GERAES PREV", "--"),
@@ -159,7 +159,7 @@ try:
         #Criar uma coluna com a data mais recente com dados de cada fundO
 
         # Criar a nova coluna com o último valor
-        df_todos['Último Valor'] = df.apply(get_last_value, axis=1)
+        df_todos['Último Valor'] = df.apply(get_last_value(), axis=1)
         df_todos.to_csv("pl_fundos_teste.csv")
     except Exception as e:
         print(f"Erro ao salvar o DataFrame em um arquivo CSV: {e}")

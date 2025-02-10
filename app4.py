@@ -960,6 +960,7 @@ def atualizar_csv_fundos(
     pl_dias = pl_dias.replace('\.', '', regex=True)
     pl_dias = pl_dias.replace({',': '.'}, regex=True)
     for col in pl_dias.columns:
+        pl_dias[col] = pl_dias[col].astype(str)
         if col != 'Fundos/Carteiras Adm':
             pl_dias[col] = pl_dias[col].str.replace('R$', '')
             pl_dias[col] = pl_dias[col].replace('--', np.nan)

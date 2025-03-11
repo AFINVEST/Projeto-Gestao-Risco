@@ -3294,13 +3294,64 @@ def main_page():
             "Preço de Ajuste Atual": "mean",  # Exemplo, calcula a média
             "Rendimento": "sum"  # Soma os rendimentos
         }).reset_index()
+        df_portifolio_default2 = df_portifolio_default.copy()
+        st.subheader("Resumo do Portfólio Atual")   
+        df_portifolio_default = df_portifolio_default2.copy()
+
+        # 1. Define a função de média ponderada para “Preço de Compra”
+        def weighted_avg_preco_compra(subdf):
+            total_q = subdf["Quantidade"].sum()
+            if total_q == 0:
+                # Retorna 0 ou np.nan, a seu critério.
+                # Se quiser visualizar como 0, retorne 0.
+                return 0
+            else:
+                return (subdf["Preço de Compra"] * subdf["Quantidade"]).sum() / total_q
+
+        # 2. Faz o groupby usando a função de média ponderada acima
+        # 3. Caso haja necessidade de garantir que todos os ativos apareçam
+        # mesmo que tenham quantidade zero (e não sumam nada na tabela),
+        # podemos fazer um reindex usando os ativos únicos do DataFrame original:
+        unique_assets = portifolio_default["Ativo"].unique()
+        df_portifolio_default = df_portifolio_default.set_index("Ativo").reindex(unique_assets, fill_value=0).reset_index()
+
+        # 4. Adiciona a linha de soma total
+        sum_row = df_portifolio_default.select_dtypes(include='number').sum()
+        sum_row["Ativo"] = "Total"
+
+        df_portifolio_default = pd.concat(
+            [df_portifolio_default, sum_row.to_frame().T],
+            ignore_index=True
+        ).set_index("Ativo")
+
+        # 5. Formatação das colunas (exemplo seguindo seu código)
+        df_portifolio_default_copy = df_portifolio_default.copy()
+
+        df_portifolio_default_copy["Quantidade"] = df_portifolio_default_copy["Quantidade"].apply(lambda x: f"{x:.0f}")
+        df_portifolio_default_copy["Preço de Compra"] = df_portifolio_default_copy["Preço de Compra"].apply(lambda x: f"R${x:,.2f}")
+        df_portifolio_default_copy["Preço de Ajuste Atual"] = df_portifolio_default_copy["Preço de Ajuste Atual"].apply(lambda x: f"R${x:,.2f}")
+        df_portifolio_default_copy["Rendimento"] = df_portifolio_default_copy["Rendimento"].apply(lambda x: f"R${x:,.2f}")
+
+        df_portifolio_default_copy = df_portifolio_default_copy.rename(columns={
+            "Quantidade": "Quantidade Total",
+            "Preço de Compra": "Preço de Compra Médio",
+            "Preço de Ajuste Atual": "Preço de Ajuste Atual Médio",
+            "Rendimento": "P&L"
+        })
+
+        # 6. Exibição (exemplo usando st.table no Streamlit)
+        # st.subheader("Resumo do Portfólio Atual")
+        st.table(df_portifolio_default_copy)
+        st.write("OBS: O preço de compra é o preço médio de compra do ativo.")
+        st.write("---")
+        df_portifolio_default = df_portifolio_default2.copy()
         # Adicionar linha de soma
         sum_row = df_portifolio_default.select_dtypes(include='number').sum()
         sum_row['Ativo'] = 'Total'
         df_portifolio_default = pd.concat(
             [df_portifolio_default, sum_row.to_frame().T], ignore_index=True)
         df_portifolio_default.set_index('Ativo', inplace=True)
-        st.subheader("Resumo do Portfólio Atual")
+   
         df_portifolio_default_copy = df_portifolio_default.copy()
         # formatar
         df_portifolio_default_copy['Quantidade'] = df_portifolio_default_copy['Quantidade'].apply(
@@ -3318,12 +3369,8 @@ def main_page():
             'Preço de Ajuste Atual': 'Preço de Ajuste Atual Médio',
             'Rendimento': 'P&L'
         })
-
-        st.table(df_portifolio_default_copy)
-        st.write("OBS: O preço de compra é o preço médio de compra do ativo.")
-        st.write("---")
+        #print(df_portifolio_default_copy)
         quantidade = []
-
         df_contratos = read_atual_contratos()
 
         file_pl = "pl_fundos.csv"
@@ -3360,8 +3407,12 @@ def main_page():
             df_pl, Weights)
         for asset in default_assets:
             quantidade.append(quantidade_inicial[asset])
-
-        if default_assets:
+        #Ver se todos os elementos da lista quantidade são zeros
+        if all(elem == 0 for elem in quantidade):
+            sta = False
+        else:
+            sta = True
+        if default_assets and sta:
             df_precos, df_completo = load_and_process_excel(df, default_assets)
             df_retorno = process_returns(df_completo, default_assets)
             var_ativos = var_not_parametric(df_retorno).abs()

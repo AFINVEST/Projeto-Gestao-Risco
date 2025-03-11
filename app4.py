@@ -521,7 +521,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                     <style>
                         .divider-vertical-line {
                             border-left: 2px solid rgba(49, 51, 63, 0.2);
-                            height: 110vh;
+                            height: 80vh;
                             margin: auto;
                         }
                         @media (max-width: 768px) {

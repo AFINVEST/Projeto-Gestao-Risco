@@ -2013,6 +2013,7 @@ def atualizar_csv_fundos(
         df_fundo.to_csv(nome_arquivo_csv, index=False, encoding="utf-8")
         table_name = nome_arquivo_csv.replace(".csv", "")
         table_name = table_name.replace("BaseFundos\\", "")
+        st.write(table_name)
         add_data_2(df_fundo,table_name)
         print(f"[{fundo}] -> CSV atualizado: {nome_arquivo_csv}")
 
@@ -3323,7 +3324,6 @@ def main_page():
         quantidade = []
 
         df_contratos = read_atual_contratos()
-        st.write(df_contratos)
 
         file_pl = "pl_fundos.csv"
         df_pl = pd.read_csv(file_pl, index_col=0)

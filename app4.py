@@ -46,6 +46,7 @@ def process_portfolio(df_pl, Weights):
     df_pl['PL_atualizado'] = df_pl['PL'] * df_pl['Weights']
     df_pl['Adm'] = ['SANTANDER', 'BTG', 'SANTANDER',
                     'SANTANDER', 'BTG', 'BTG', 'BTG', 'BTG', 'BTG']
+    
     return df_pl, df_pl['PL_atualizado'].sum(), soma_sem_pesos
 
 def process_portfolio_especifico(df_pl, Weights,fundo):
@@ -467,7 +468,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
             else:
                 fundo = idx
                 check = 0
-                for asset in assets:
+                for asset in assets_atual:
                     if int(row[f'Contratos {asset}']) != 0:
                         check = 1
                 if check == 0:
@@ -3322,6 +3323,7 @@ def main_page():
         quantidade = []
 
         df_contratos = read_atual_contratos()
+        st.write(df_contratos)
 
         file_pl = "pl_fundos.csv"
         df_pl = pd.read_csv(file_pl, index_col=0)
@@ -3450,7 +3452,6 @@ def main_page():
 
             df_divone_juros_externo = df_divone_juros_externo * \
                 np.array(lista_quantidade)
-
             df_divone_juros_externo = df_divone_juros_externo.sum(axis=1)
             stress_test_juros_interno_Nominais = df_divone_juros_nominais * 100
             stress_test_juros_interno_Nominais_percent = stress_test_juros_interno_Nominais / \

@@ -465,6 +465,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
     with cool2:
         if fundos:
             st.write("## Novo Portfólio")
+            st.write(df_contratos)
             soma_pl_sem_pesos2_novo = calcular_metricas_de_fundo(
                 assets_teste, quantidades_teste, df_contratos,fundos,op1,op2)
         # Botão para concatenar os DataFrames
@@ -2677,6 +2678,7 @@ def main_page():
                 float)
             df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns !=
                                  'Assets'] = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns != 'Assets'] * 1000
+            
             df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', df_b3_fechamento.columns !=
                                  'Assets'] = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', df_b3_fechamento.columns != 'Assets'] * 10
             ultimo_dia_dados_b3 = df_b3_fechamento.columns[-1]

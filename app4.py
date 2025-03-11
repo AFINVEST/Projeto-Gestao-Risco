@@ -413,36 +413,70 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
 
     df_contratos.drop(['Adm', 'PL', 'PL_atualizado',
                       'Weights'], axis=1, inplace=True)
-    
-    col_pp1, col_pp3, col_pp2 = st.columns([4.9, 0.2, 4.9])
-    with col_pp1:
-        st.write("## Portfólio Atual")
-        soma_pl_sem_pesos = calcular_metricas_de_port(
-            assets_atual, quantidades_atual, df_contratos_2)
-        
-    with col_pp2:
-        st.write("## Novo Portfólio")
-        soma_pl_sem_pesos_novo = calcular_metricas_de_port(
-            assets_teste, quantidades_teste, df_contratos)
-    with col_pp3:
-        st.html(
-            '''
-                    <div class="divider-vertical-line"></div>
-                    <style>
-                        .divider-vertical-line {
-                            border-left: 2px solid rgba(49, 51, 63, 0.2);
-                            height: 110vh;
-                            margin: auto;
-                        }
-                        @media (max-width: 768px) {
+    opp = st.sidebar.checkbox("Verificar visão do portifólio", value = False)
+    if opp:
+        col_pp1, col_pp3, col_pp2 = st.columns([4.9, 0.2, 4.9])
+        with col_pp1:
+            st.write("## Portfólio Atual")
+            soma_pl_sem_pesos = calcular_metricas_de_port(
+                assets_atual, quantidades_atual, df_contratos_2)
+            
+        with col_pp2:
+            st.write("## Novo Portfólio")
+            soma_pl_sem_pesos_novo = calcular_metricas_de_port(
+                assets_teste, quantidades_teste, df_contratos)
+        with col_pp3:
+            st.html(
+                '''
+                        <div class="divider-vertical-line"></div>
+                        <style>
                             .divider-vertical-line {
-                                display: none;
+                                border-left: 2px solid rgba(49, 51, 63, 0.2);
+                                height: 110vh;
+                                margin: auto;
                             }
-                        }
-                    </style>
-                    '''
-        )
-    st.write("---")
+                            @media (max-width: 768px) {
+                                .divider-vertical-line {
+                                    display: none;
+                                }
+                            }
+                        </style>
+                        '''
+            )
+        st.write("---")
+    else:
+        file_pl = "pl_fundos.csv"
+        df_pl = pd.read_csv(file_pl, index_col=0)
+        file_bbg = "BBG - ECO DASH.xlsx"
+        # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
+        dict_pesos = {
+                'GLOBAL BONDS': 4,
+                'HORIZONTE': 1,
+                'JERA2026': 1,
+                'REAL FIM': 1,
+                'BH FIRF INFRA': 1,
+                'BORDEAUX INFRA': 1,
+                'TOPAZIO INFRA': 1,
+                'MANACA INFRA FIRF': 1,
+                'AF DEB INCENTIVADAS': 3
+            }
+        # Zerar os pesos de fundos que não tem contratos
+        for idx, row in df_contratos_2.iterrows():
+            if idx == 'Total':
+                continue
+            else:
+                fundo = idx
+                check = 0
+                for asset in assets:
+                    if int(row[f'Contratos {asset}']) != 0:
+                        check = 1
+                if check == 0:
+                    dict_pesos[fundo] = 0
+
+        Weights = list(dict_pesos.values())
+        df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(
+            df_pl, Weights)
+
     st.write("## Analise por Fundo") 
     st.write("### Selecione os filtros")
     lista_fundos = df_contratos.index.tolist()
@@ -495,6 +529,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                                 display: none;
                             }
                         }
+
                     </style>
                     '''
         )
@@ -1032,72 +1067,76 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos,op1,op2
         tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(lambda x: float(x) if isinstance(x, str) and x != '0' else 0)
 
         # Somar as colunas específicas para obter o total
-        tabela_dados_fundos_p2['Total'] = tabela_dados_fundos_p2[['Juros Nominais Brasil', 'Juros Reais Brasil', 'Moedas', 'Juros US']].sum(axis=1).round(2)  # Soma por linha (axis=1)
+        try:
+            tabela_dados_fundos_p2['Total'] = tabela_dados_fundos_p2[['Juros Nominais Brasil', 'Juros Reais Brasil', 'Moedas', 'Juros US']].sum(axis=1).round(2)  # Soma por linha (axis=1)
 
-        # Concatenar a informação de 'Total' nas duas tabelas (tabela_dados_fundos_p1 e tabela_dados_fundos_p2)
-        tabela_dados_fundos_p1['Total'] = tabela_dados_fundos_p1['Total'].astype(str) + 'bps / ' + tabela_dados_fundos_p2['Total'].astype(str) + 'bps'
+            # Concatenar a informação de 'Total' nas duas tabelas (tabela_dados_fundos_p1 e tabela_dados_fundos_p2)
+            tabela_dados_fundos_p1['Total'] = tabela_dados_fundos_p1['Total'].astype(str) + 'bps / ' + tabela_dados_fundos_p2['Total'].astype(str) + 'bps'
 
-        # Copiar a coluna 'Total' para a tabela final
-        tabela_dados_fundos['Total'] = tabela_dados_fundos_p1['Total']
-        #Preciso juntar as colunas que sejam Juros Nominais Brasil, Juros Reais Brasil, Moedas e Juros US
-        # Identificar categorias por colunas
-        mapeamento_categorias = {
-            "Juros Nominais Brasil": [col for col in tabela_dados_riscos.columns if "DI" in col],
-            "Juros Reais Brasil": [col for col in tabela_dados_riscos.columns if "DAP" in col],
-            "Juros US": ["TREASURY"],
-            "Moedas": ["WDO1"]
-        }
-        # Criar novo DataFrame com as categorias
-        # Criar novo DataFrame com as categorias
-        nova_tabela = pd.DataFrame()
-        nova_tabela["Fundos"] = tabela_dados_riscos.index
+            # Copiar a coluna 'Total' para a tabela final
+            tabela_dados_fundos['Total'] = tabela_dados_fundos_p1['Total']
+            #Preciso juntar as colunas que sejam Juros Nominais Brasil, Juros Reais Brasil, Moedas e Juros US
+            # Identificar categorias por colunas
+            mapeamento_categorias = {
+                "Juros Nominais Brasil": [col for col in tabela_dados_riscos.columns if "DI" in col],
+                "Juros Reais Brasil": [col for col in tabela_dados_riscos.columns if "DAP" in col],
+                "Juros US": ["TREASURY"],
+                "Moedas": ["WDO1"]
+            }
+            # Criar novo DataFrame com as categorias
+            # Criar novo DataFrame com as categorias
+            nova_tabela = pd.DataFrame()
+            nova_tabela["Fundos"] = tabela_dados_riscos.index
 
-        # Dicionário para armazenar valores da soma total
-        soma_total_antes = []
-        soma_total_depois = []
+            # Dicionário para armazenar valores da soma total
+            soma_total_antes = []
+            soma_total_depois = []
 
-        for categoria, colunas in mapeamento_categorias.items():
-            valores_antes = []
-            valores_depois = []
-            
-            for _, row in tabela_dados_riscos.iterrows():
-                soma_antes = 0
-                soma_depois = 0
+            for categoria, colunas in mapeamento_categorias.items():
+                valores_antes = []
+                valores_depois = []
                 
-                for col in colunas:
-                    if col in tabela_dados_riscos.columns:
-                        partes = row[col].split(" / ")
-                        soma_antes += float(partes[0].replace("%", ""))
-                        soma_depois += float(partes[1].replace("%", ""))
+                for _, row in tabela_dados_riscos.iterrows():
+                    soma_antes = 0
+                    soma_depois = 0
+                    
+                    for col in colunas:
+                        if col in tabela_dados_riscos.columns:
+                            partes = row[col].split(" / ")
+                            soma_antes += float(partes[0].replace("%", ""))
+                            soma_depois += float(partes[1].replace("%", ""))
+                    
+                    valores_antes.append(soma_antes)
+                    valores_depois.append(soma_depois)
                 
-                valores_antes.append(soma_antes)
-                valores_depois.append(soma_depois)
-            
-            # Adicionar ao DataFrame
-            nova_tabela[categoria] = [f"{antes:.2f}% / {depois:.2f}%" for antes, depois in zip(valores_antes, valores_depois)]
+                # Adicionar ao DataFrame
+                nova_tabela[categoria] = [f"{antes:.2f}% / {depois:.2f}%" for antes, depois in zip(valores_antes, valores_depois)]
 
-            # Acumulando valores para a coluna Total
-            if not soma_total_antes:
-                soma_total_antes = valores_antes
-                soma_total_depois = valores_depois
-            else:
-                soma_total_antes = [x + y for x, y in zip(soma_total_antes, valores_antes)]
-                soma_total_depois = [x + y for x, y in zip(soma_total_depois, valores_depois)]
+                # Acumulando valores para a coluna Total
+                if not soma_total_antes:
+                    soma_total_antes = valores_antes
+                    soma_total_depois = valores_depois
+                else:
+                    soma_total_antes = [x + y for x, y in zip(soma_total_antes, valores_antes)]
+                    soma_total_depois = [x + y for x, y in zip(soma_total_depois, valores_depois)]
 
-        # Criar coluna Total
-        nova_tabela["Total"] = [f"{antes:.2f}% / {depois:.2f}%" for antes, depois in zip(soma_total_antes, soma_total_depois)]
-        nova_tabela.set_index("Fundos", inplace=True)
-        # Exibir tabela reorganizada
-        if op1:
-            st.write("### Analise Risco por Categoria")
-            st.table(nova_tabela)
-            st.markdown("<p style='font-size: 13px; font-style: italic;'>(CoVaR bps / % Risco Total)</p>", unsafe_allow_html=True)
+            # Criar coluna Total
+            nova_tabela["Total"] = [f"{antes:.2f}% / {depois:.2f}%" for antes, depois in zip(soma_total_antes, soma_total_depois)]
+            nova_tabela.set_index("Fundos", inplace=True)
+            # Exibir tabela reorganizada
+            if op1:
+                st.write("### Analise Risco por Categoria")
+                st.table(nova_tabela)
+                st.markdown("<p style='font-size: 13px; font-style: italic;'>(CoVaR bps / % Risco Total)</p>", unsafe_allow_html=True)
 
-        if op2:
-            st.write("### Analise Estratégias")
-            st.table(tabela_dados_fundos)
-            st.markdown("<p style='font-size: 13px; font-style: italic;'>(Div01 bps / Stress bps)</p>", unsafe_allow_html=True)
-        return
+            if op2:
+                st.write("### Analise Estratégias")
+                st.table(tabela_dados_fundos)
+                st.markdown("<p style='font-size: 13px; font-style: italic;'>(Div01 bps / Stress bps)</p>", unsafe_allow_html=True)
+            return
+        except:
+            st.write("Nenhum fundo selecionado / Nenhum contrato cadastrado")
+            return
     else:
         st.write("Nenhum fundo selecionado / Nenhum contrato cadastrado")
         return
@@ -3413,7 +3452,6 @@ def main_page():
                 np.array(lista_quantidade)
 
             df_divone_juros_externo = df_divone_juros_externo.sum(axis=1)
-
             stress_test_juros_interno_Nominais = df_divone_juros_nominais * 100
             stress_test_juros_interno_Nominais_percent = stress_test_juros_interno_Nominais / \
                 soma_pl_sem_pesos * 10000

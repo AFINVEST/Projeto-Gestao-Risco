@@ -136,7 +136,11 @@ driver = webdriver.Chrome()
 
 # Configurar a data inicial
 # data_inicial = datetime(2024, 1, 16)  # 16/01/2024
+<<<<<<< HEAD
 data_inicial = datetime(2025, 3, 5)  # 16/01/2024
+=======
+data_inicial = datetime(2025, 2, 10)  # 16/01/2024
+>>>>>>> origin/main
 dias_uteis = obter_dias_uteis(data_inicial)
 
 

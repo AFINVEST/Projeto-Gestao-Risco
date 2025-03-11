@@ -52,7 +52,7 @@ try:
     time.sleep(5)
 
     # Defina o intervalo de datas
-    start_date = datetime(2025, 2, 8)  # 1º de janeiro de 2025
+    start_date = datetime(2025, 1, 1)  # 1º de janeiro de 2025
     end_date = datetime.today()        # Data de hoje
 
     # Localize o campo de data pelo ID

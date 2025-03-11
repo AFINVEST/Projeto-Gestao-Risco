@@ -11,11 +11,12 @@ import os
 from datetime import datetime, timedelta
 
 def get_last_value(row, date_columns):
+    """Encontra o último valor não nulo/não vazio em uma linha"""
     for date in reversed(date_columns):
-        value = row.get(date, '--')
-        if value not in ["--", "", None]:
+        value = row.get(date, "--")
+        if pd.notna(value) and value != "--":
             return value
-    return '--'
+    return "--"
 
 def main():
     # Configurações iniciais
@@ -55,7 +56,7 @@ def main():
         # Verificar se o arquivo existe
         if os.path.exists(csv_path):
             df_todos = pd.read_csv(csv_path)
-            existing_dates = [col for col in df_todos.columns if col not in ["Fundos/Carteiras Adm", "Último Valor"]]
+            existing_dates = [col for col in df_todos.columns if col not in ["Fundos/Carteiras Adm", "Último Valor","Unnamed: 0"]]
             last_date = max([datetime.strptime(d, "%Y-%m-%d") for d in existing_dates]) if existing_dates else None
         else:
             df_todos = pd.DataFrame(fundos_base, columns=["Fundos/Carteiras Adm", "Valor"])
@@ -63,23 +64,25 @@ def main():
             last_date = None
 
         # Definir datas de coleta
-        start_date = last_date + timedelta(days=1) if last_date else datetime(2025, 2, 7)
+        start_date = last_date + timedelta(days=1) if last_date else datetime(2025, 1, 1)
         end_date = datetime.today()
 
         if start_date > end_date:
             print("Nenhuma nova data para coletar.")
             return
-
+        
         # Login
         driver.get("https://afinvest.com.br/login/interno")
+        time.sleep(2)  # Espera para renderização
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "atributo"))).send_keys("emanuel.cabral@afinvest.com.br")
         driver.find_element(By.ID, "passwordLogin").send_keys("Afs@2024")
         driver.find_element(By.ID, "loginInterno").click()
 
         # Navegação
         driver.get("https://afinvest.com.br/interno/relatorios/patrimonios")
+        time.sleep(3)  # Espera para renderização
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "button.btn.btn-outline-primary[data-type='custom']"))).click()
-        
+        time.sleep(3)  # Espera para renderização
         date_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "date_patrimony_table_fundo")))
 
         # Coleta de dados
@@ -87,6 +90,7 @@ def main():
         while current_date <= end_date:
             formatted_date = current_date.strftime("%d/%m/%Y")
             date_input.clear()
+            date_input.send_keys(formatted_date + Keys.RETURN)
             date_input.send_keys(formatted_date + Keys.RETURN)
             
             WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "table_patrimony")))
@@ -106,10 +110,10 @@ def main():
             
             current_date += timedelta(days=1)
 
-        # Atualizar último valor
-        date_columns = [col for col in df_todos.columns if col.startswith("202")]
-        df_todos["Último Valor"] = df_todos.apply(lambda row: get_last_value(row, sorted(date_columns)), axis=1)
-        
+        # Na seção de atualização do DataFrame:
+        date_columns = sorted([col for col in df_todos.columns if col.startswith("202")], reverse=True)
+        df_todos["Último Valor"] = df_todos.apply(lambda row: get_last_value(row, date_columns), axis=1)
+
         # Ordenar colunas
         columns_order = ["Fundos/Carteiras Adm"] + sorted(date_columns) + ["Último Valor"]
         df_todos = df_todos[columns_order]

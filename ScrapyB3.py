@@ -136,7 +136,7 @@ driver = webdriver.Chrome()
 
 # Configurar a data inicial
 # data_inicial = datetime(2024, 1, 16)  # 16/01/2024
-data_inicial = datetime(2025, 2, 7)  # 16/01/2024
+data_inicial = datetime(2025, 3, 5)  # 16/01/2024
 dias_uteis = obter_dias_uteis(data_inicial)
 
 
@@ -210,19 +210,23 @@ try:
                     preco_ajuste_atual = data[3]
                     variacao = data[4]
                     valor_ajuste_contrato = data[5]
+                    ano = vencimento[-2:]
+                    ano = int(ano)
                     if mercadoria == 'DI1 - DI de 1 dia':
                         # Se o vencimento conter a letra F é pra ser adicionado
                         if 'F' in vencimento:
                             processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
                                                    preco_ajuste_atual, variacao, valor_ajuste_contrato])
-                    elif mercadoria == 'DAP - Cupom de DI x IPCA':
-                        if 'Q' in vencimento:
-                            processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
+                    elif mercadoria == 'DAP - Cupom de DI x IPCA': # Ano impar pegar K, Ano par será Q
+                        if ano % 2 != 0:
+                            if 'K' in vencimento:
+                                processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
                                                    preco_ajuste_atual, variacao, valor_ajuste_contrato])
-                        if 'K' in vencimento:
-                            processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
+                        else:
+                            if 'Q' in vencimento: 
+                                processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
                                                    preco_ajuste_atual, variacao, valor_ajuste_contrato])
-
+                        
                     elif mercadoria == 'DOL - Dólar comercial' or mercadoria == 'T10 - US T-Note 10 anos':
                         processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
                                                preco_ajuste_atual, variacao, valor_ajuste_contrato])
@@ -234,17 +238,21 @@ try:
                     preco_ajuste_atual = data[2]
                     variacao = data[3]
                     valor_ajuste_contrato = data[4]
+                    ano = vencimento[-2:]
+                    ano = int(ano)
                     if mercadoria == 'DI1 - DI de 1 dia':
                         # Se o vencimento conter a letra F é pra ser adicionado
                         if 'F' in vencimento:
                             processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
                                                    preco_ajuste_atual, variacao, valor_ajuste_contrato])
                     elif mercadoria == 'DAP - Cupom de DI x IPCA':
-                        if 'Q' in vencimento:
-                            processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
+                        if ano % 2 != 0:
+                            if 'K' in vencimento:
+                                processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
                                                    preco_ajuste_atual, variacao, valor_ajuste_contrato])
-                        if 'K' in vencimento:
-                            processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
+                        else:
+                            if 'Q' in vencimento:
+                                processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
                                                    preco_ajuste_atual, variacao, valor_ajuste_contrato])
                 # Adicionar os dados processados à lista
             # mudar o dia para o formato YYYY-MM-DD
@@ -262,7 +270,6 @@ try:
     except Exception as e:
         print(f"Erro: {e}")
 
-    # Adapte aqui para inserir todos as datas que sejam dia de semana desde 16/01/2024 no seguinte elemento "<input type="text" name="dData1" id="dData1" placeholder="dd/mm/aaaa" class="datepicker hasDatepicker" onkeypress="javascript:mask_data('2','0',true,frmBD);" value="01/08/2024" maxlength="10">" E depois clique em <button type="submit" class="button expand">OK</button>
     driver.quit()
 
 except Exception as e:

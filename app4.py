@@ -581,12 +581,12 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos,op1,op2
         dict_pesos = {
             'GLOBAL BONDS': 4,
             'HORIZONTE': 1,
-            'JERA2026': 2,
-            'REAL FIM': 2,
-            'BH FIRF INFRA': 2,
-            'BORDEAUX INFRA': 2,
-            'TOPAZIO INFRA': 2,
-            'MANACA INFRA FIRF': 2,
+            'JERA2026': 1,
+            'REAL FIM': 1,
+            'BH FIRF INFRA': 1,
+            'BORDEAUX INFRA': 1,
+            'TOPAZIO INFRA': 1,
+            'MANACA INFRA FIRF': 1,
             'AF DEB INCENTIVADAS': 3
         }
         # Zerar os pesos de fundos que não tem contratos
@@ -1111,16 +1111,16 @@ def calcular_metricas_de_port(assets, quantidades, df_contratos):
     file_bbg = "BBG - ECO DASH.xlsx"
     # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
     dict_pesos = {
-        'GLOBAL BONDS': 4,
-        'HORIZONTE': 1,
-        'JERA2026': 2,
-        'REAL FIM': 2,
-        'BH FIRF INFRA': 2,
-        'BORDEAUX INFRA': 2,
-        'TOPAZIO INFRA': 2,
-        'MANACA INFRA FIRF': 2,
-        'AF DEB INCENTIVADAS': 3
-    }
+            'GLOBAL BONDS': 4,
+            'HORIZONTE': 1,
+            'JERA2026': 1,
+            'REAL FIM': 1,
+            'BH FIRF INFRA': 1,
+            'BORDEAUX INFRA': 1,
+            'TOPAZIO INFRA': 1,
+            'MANACA INFRA FIRF': 1,
+            'AF DEB INCENTIVADAS': 3
+        }
     # Zerar os pesos de fundos que não tem contratos
     for idx, row in df_contratos.iterrows():
         if idx == 'Total':
@@ -2599,16 +2599,16 @@ def main_page():
 
     # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
     dict_pesos = {
-        'Global Bonds': 4,
-        'HORIZONTE': 1,
-        'JERA2026': 2,
-        'REAL FIM': 2,
-        'BH FIRF INFRA': 2,
-        'BORDEAUX INFRA': 2,
-        'TOPAZIO': 2,
-        'MANACA INFRA FIRF': 2,
-        'AF DEB INCENTIVADA': 3
-    }
+            'GLOBAL BONDS': 4,
+            'HORIZONTE': 1,
+            'JERA2026': 1,
+            'REAL FIM': 1,
+            'BH FIRF INFRA': 1,
+            'BORDEAUX INFRA': 1,
+            'TOPAZIO INFRA': 1,
+            'MANACA INFRA FIRF': 1,
+            'AF DEB INCENTIVADAS': 3
+        }
     Weights = list(dict_pesos.values())
 
     st.sidebar.write("## Pesos dos Fundos")
@@ -3292,12 +3292,12 @@ def main_page():
         dict_pesos = {
             'GLOBAL BONDS': 4,
             'HORIZONTE': 1,
-            'JERA2026': 2,
-            'REAL FIM': 2,
-            'BH FIRF INFRA': 2,
-            'BORDEAUX INFRA': 2,
-            'TOPAZIO INFRA': 2,
-            'MANACA INFRA FIRF': 2,
+            'JERA2026': 1,
+            'REAL FIM': 1,
+            'BH FIRF INFRA': 1,
+            'BORDEAUX INFRA': 1,
+            'TOPAZIO INFRA': 1,
+            'MANACA INFRA FIRF': 1,
             'AF DEB INCENTIVADAS': 3
         }
         # Zerar os pesos de fundos que não tem contratos

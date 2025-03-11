@@ -5,3 +5,4 @@ matplotlib
 seaborn
 openpyxl
 psycopg2-binary
+supabase 

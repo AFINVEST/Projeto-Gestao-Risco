@@ -1,6 +1,7 @@
-Ativo,Preco_Fechamento_Atual
-DAP35,47184.98
-DI_28,68169.93
-DI_31,45002.02
-DI_35,26124.49
-DAP40,32756.67
+Ativo,Preco_Fechamento_Atual,2025-01-14 - PL,2025-01-14 - Preco_Fechamento,2025-01-14 - Preco_Compra,2025-01-14 - Quantidade,2025-01-14 - Rendimento
+DAP35,47644.44,45567048.19,47323.51,0.0,1.0,47323.51
+DI_28,68169.93,,,,,
+DI_31,45002.02,,,,,
+DI_35,26124.49,,,,,
+DAP40,32756.67,,,,,
+WDO1,58350.3,,,,,

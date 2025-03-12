@@ -2733,6 +2733,15 @@ def main_page():
 
             data_compra_todos = st.sidebar.date_input(
                 "Dia de Compra dos Ativos:", value=ultimo_dia_dados_b3, max_value=ultimo_dia_dados_b3)
+            
+            #Conferir se a data escolhida esta dentre as colunas do df_b3_fechamento
+            data_compra_todos2 = str(data_compra_todos)
+            if data_compra_todos2 not in df_b3_fechamento.columns:
+                st.sidebar.error(
+                    f"Data de compra inválida! Possível final de semana ou feriado.")
+                st.stop()
+            # Converter datas disponíveis para lista
+            # Criar o selectbox
             st.html(
                 '''
                 <style>

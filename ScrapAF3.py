@@ -18,10 +18,6 @@ def get_last_value(row, date_columns):
         if pd.notna(value) and value != "--":
             return value
     return "--"
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/main
 
 def main():
     # Configurações iniciais
@@ -61,15 +57,8 @@ def main():
         # Verificar se o arquivo existe
         if os.path.exists(csv_path):
             df_todos = pd.read_csv(csv_path)
-<<<<<<< HEAD
             existing_dates = [col for col in df_todos.columns if col not in ["Fundos/Carteiras Adm", "Último Valor","Unnamed: 0"]]
             last_date = max([datetime.strptime(d, "%Y-%m-%d") for d in existing_dates]) if existing_dates else None
-=======
-            existing_dates = [col for col in df_todos.columns if col not in [
-                "Fundos/Carteiras Adm", "Último Valor", "Unnamed: 0"]]
-            last_date = max([datetime.strptime(d, "%Y-%m-%d")
-                            for d in existing_dates]) if existing_dates else None
->>>>>>> origin/main
         else:
             df_todos = pd.DataFrame(fundos_base, columns=[
                                     "Fundos/Carteiras Adm", "Valor"])
@@ -77,12 +66,7 @@ def main():
             last_date = None
 
         # Definir datas de coleta
-<<<<<<< HEAD
         start_date = last_date + timedelta(days=1) if last_date else datetime(2025, 1, 1)
-=======
-        start_date = last_date + \
-            timedelta(days=1) if last_date else datetime(2025, 1, 1)
->>>>>>> origin/main
         end_date = datetime.today()
 
         if start_date > end_date:
@@ -92,29 +76,16 @@ def main():
         # Login
         driver.get("https://afinvest.com.br/login/interno")
         time.sleep(2)  # Espera para renderização
-<<<<<<< HEAD
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "atributo"))).send_keys("emanuel.cabral@afinvest.com.br")
-=======
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located(
-            (By.ID, "atributo"))).send_keys("emanuel.cabral@afinvest.com.br")
->>>>>>> origin/main
         driver.find_element(By.ID, "passwordLogin").send_keys("Afs@2024")
         driver.find_element(By.ID, "loginInterno").click()
 
         # Navegação
         driver.get("https://afinvest.com.br/interno/relatorios/patrimonios")
         time.sleep(3)  # Espera para renderização
-<<<<<<< HEAD
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "button.btn.btn-outline-primary[data-type='custom']"))).click()
         time.sleep(3)  # Espera para renderização
         date_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "date_patrimony_table_fundo")))
-=======
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR, "button.btn.btn-outline-primary[data-type='custom']"))).click()
-        time.sleep(3)  # Espera para renderização
-        date_input = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "date_patrimony_table_fundo")))
->>>>>>> origin/main
 
         # Coleta de dados
         current_date = start_date
@@ -122,15 +93,9 @@ def main():
             formatted_date = current_date.strftime("%d/%m/%Y")
             date_input.clear()
             date_input.send_keys(formatted_date + Keys.RETURN)
-<<<<<<< HEAD
             date_input.send_keys(formatted_date + Keys.RETURN)
             
             WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "table_patrimony")))
-=======
-
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.ID, "table_patrimony")))
->>>>>>> origin/main
             time.sleep(2)  # Espera para renderização
 
             # Coletar dados da tabela
@@ -150,15 +115,8 @@ def main():
             current_date += timedelta(days=1)
 
         # Na seção de atualização do DataFrame:
-<<<<<<< HEAD
         date_columns = sorted([col for col in df_todos.columns if col.startswith("202")], reverse=True)
         df_todos["Último Valor"] = df_todos.apply(lambda row: get_last_value(row, date_columns), axis=1)
-=======
-        date_columns = sorted(
-            [col for col in df_todos.columns if col.startswith("202")], reverse=True)
-        df_todos["Último Valor"] = df_todos.apply(
-            lambda row: get_last_value(row, date_columns), axis=1)
->>>>>>> origin/main
 
         # Ordenar colunas
         columns_order = ["Fundos/Carteiras Adm"] + \

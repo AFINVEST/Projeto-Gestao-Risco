@@ -150,7 +150,6 @@ def calculate_contracts_per_fund_input(df_pl, df_precos):
             df_pl['PL_atualizado'] /
             df_pl['PL_atualizado'].sum()
         ) * df_precos.iloc[i]['Quantidade']
-
         # df_pl[f'Contratos {df_precos.index[i]}'] = df_pl[f'Contratos {df_precos.index[i]}'].apply(
         #    lambda x: round(x, 0))
     return df_pl

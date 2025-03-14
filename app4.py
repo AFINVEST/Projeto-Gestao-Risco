@@ -578,6 +578,9 @@ def read_atual_contratos():
 
 def att_portifosições():
     df_fechamento_b3 = processar_b3_portifolio()
+    dolar = df_fechamento_b3.loc[df_fechamento_b3['Assets']
+                                 == 'WDO1', df_fechamento_b3.columns[-1]].values[0]
+    
     df_portifolio = pd.read_csv('portifolio_posições.csv')
     for ativo in df_portifolio['Ativo']:
         if ativo in df_fechamento_b3['Assets'].values:
@@ -587,6 +590,26 @@ def att_portifosições():
                               ativo, 'Preço de Ajuste Atual'] = preco_atual
 
     df_portifolio.to_csv('portifolio_posições.csv', index=False)
+    #Atualizar o calculo de rendimento
+    for ativo in df_portifolio['Ativo']:
+        preco_compra = df_portifolio.loc[df_portifolio['Ativo']
+                                         == ativo, 'Preço de Compra'].values[0]
+        preco_de_ajuste = df_portifolio.loc[df_portifolio['Ativo']
+                                         == ativo, 'Preço de Ajuste Atual'].values[0]
+        quantidade = df_portifolio.loc[df_portifolio['Ativo']
+                                         == ativo, 'Quantidade'].values[0]
+        if ativo == 'TREASURY':
+            rendimento = quantidade * \
+                (preco_de_ajuste - preco_compra) * (dolar / 10000)
+        else:
+            rendimento = quantidade * \
+                (preco_de_ajuste - preco_compra)
+        df_portifolio.loc[df_portifolio['Ativo'] ==
+                            ativo, 'Rendimento'] = rendimento
+    df_portifolio.to_csv('portifolio_posições.csv', index=False)
+
+    #Chamar a função add_data(data) para atualizar portifolio_posições no banco de dados
+    add_data(df_portifolio.to_dict(orient="records"))
     return
 
 
@@ -1685,13 +1708,13 @@ def calcular_metricas_de_fundo_analise(assets, quantidades, df_contratos, fundos
                 with colu2:
                     st.write("### Analise Risco por Categoria")
                     st.table(nova_tabela)
-                    st.markdown("<p style='font-size: 13px; font-style: italic;'>(CoVaR bps / % Risco Total)</p>", unsafe_allow_html=True)
+                    st.markdown("<p style='font-size: 18px; font-style: italic;'>(CoVaR bps / % Risco Total)</p>", unsafe_allow_html=True)
 
             if op2:
                 with colu2:
                     st.write("### Analise Estratégias")
                     st.table(tabela_dados_fundos)
-                    st.markdown("<p style='font-size: 13px; font-style: italic;'>(Div01 bps / Stress bps)</p>", unsafe_allow_html=True)
+                    st.markdown("<p style='font-size: 18px; font-style: italic;'>(Div01 bps / Stress bps)</p>", unsafe_allow_html=True)
             with colu3:
                 st.html(
                     '''
@@ -3035,6 +3058,7 @@ def analisar_dados_fundos():
 
                 # Obtém o preço de compra correspondente
                 preco_compra = row[col.replace('Quantidade', 'Preco_Compra')]
+
                 soma_pl = row[col.replace('Quantidade', 'PL')]
                 # Extrai a data da coluna
                 data_operacao = col.split(' ')[0]

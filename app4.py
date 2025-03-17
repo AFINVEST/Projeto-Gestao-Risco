@@ -4764,10 +4764,9 @@ def main_page():
                                         # Convertendo a coluna 'date' para datetime
                     df_fundos_long['date'] = pd.to_datetime(
                         df_fundos_long['date'])
-
                     # Remover a parte da hora
-                    if tipo_filtro == "Diario":
-                        pass
+                    if tipo_filtro == "Diário":
+                        df_fundos_long['date'] = df_fundos_long['date'].dt.strftime('%d %b %Y')
 
                     elif tipo_filtro == "Semanal":
                         df_fundos_long['date'] = df_fundos_long['date'].dt.strftime('%d %b %Y')
@@ -4912,8 +4911,8 @@ def main_page():
                     df_final22['Rendimento_diario'] = df_resultado['Retorno_sobre_PL']
 
                     # Remover a parte da hora
-                    if tipo_filtro == "Diario":
-                        df_estrategias_long['date'] = df_estrategias_long['date'].dt.strftime('%d %b')
+                    if tipo_filtro == "Diário":
+                        df_estrategias_long['date'] = df_estrategias_long['date'].dt.strftime('%d %b %Y')
 
                     elif tipo_filtro == "Semanal":
                         df_estrategias_long['date'] = df_estrategias_long['date'].dt.strftime('%d %b %Y')

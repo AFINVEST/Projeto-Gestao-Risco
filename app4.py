@@ -3159,7 +3159,6 @@ def pl_dia(df, tipo_agrupamento="Semanal"):
     # 3) Extrair nome do fundo do índice de df
     #    Se o índice estiver assim: "DAP35 - BH FIRF INFRA - P&L"
     #    vamos pegar só a parte do meio (fundo).
-    
     def extrair_fundo(nome_index):
         # exemplo de split: "DAP35 - BH FIRF INFRA - P&L" => ["DAP35", "BH FIRF INFRA", "P&L"]
         partes = nome_index.split(" - ")

@@ -2493,10 +2493,11 @@ def atualizar_csv_fundos(
     pl_dias = pl_dias.set_index("Fundos/Carteiras Adm")
     pl_dias_vetor =[]
     # Criar uma barra de progresso
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    count = 0
-    tam = len(df_current)
+    # Placeholder para exibir os elementos carregados na mesma linha
+    status_container = st.empty()
+    # Mensagem inicial
+    mensagens = ["⏳ Aguarde até o Total ser concluído..."]
+    status_container.markdown(" | ".join(mensagens))  # Exibe a mensagem inicial
     for fundo, row_fundo in df_current.iterrows():
         # Caminho do CSV do Fundo
         nome_arquivo_csv = os.path.join("BaseFundos", f"{fundo}.csv")
@@ -2620,11 +2621,9 @@ def atualizar_csv_fundos(
         table_name = nome_arquivo_csv.replace(".csv", "")
         #table_name = table_name.replace("BaseFundos\\", "")
         table_name = table_name.replace("BaseFundos/", "")
-        progress_bar.progress((count + 1) / tam)
-        count = count + 1
         # Exibe o nome do elemento que foi carregado
-        status_text.write(f"✅ {table_name} carregado!"),
-        st.write(f"✅ {table_name} carregado!")
+        mensagens.append(f"✅ {table_name} carregado!")
+        status_container.markdown(" | ".join(mensagens))
         add_data_2(df_fundo,table_name)
         print(f"[{fundo}] -> CSV atualizado: {nome_arquivo_csv}")
 

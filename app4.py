@@ -505,6 +505,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
             soma_pl_sem_pesos2_novo = calcular_metricas_de_fundo(
                 assets_teste, quantidades_teste, df_contratos,fundos1,op1,op2)
         # Botão para concatenar os DataFrames
+        st.write(df_portifolio_salvo, novo_portifolio)
         if st.button("Salvar novo portfólio"):
             df_portifolio_salvo = pd.concat(
                 [df_portifolio_salvo, novo_portifolio], ignore_index=True)
@@ -576,37 +577,38 @@ def read_atual_contratos():
     return df_contratos
 
 
+import pandas as pd
+
 def att_portifosições():
     df_fechamento_b3 = processar_b3_portifolio()
-    dolar = df_fechamento_b3.loc[df_fechamento_b3['Assets']
-                                 == 'WDO1', df_fechamento_b3.columns[-1]].values[0]
     
-    df_portifolio = pd.read_csv('portifolio_posições.csv')
-    for ativo in df_portifolio['Ativo']:
-        if ativo in df_fechamento_b3['Assets'].values:
-            preco_atual = df_fechamento_b3.loc[df_fechamento_b3['Assets']
-                                               == ativo, df_fechamento_b3.columns[-1]].values[0]
-            df_portifolio.loc[df_portifolio['Ativo'] ==
-                              ativo, 'Preço de Ajuste Atual'] = preco_atual
+    # Obtendo o valor do dólar para conversão do Treasury
+    dolar = df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'WDO1', df_fechamento_b3.columns[-1]].values[0]
 
-    df_portifolio.to_csv('portifolio_posições.csv', index=False)
-    #Atualizar o calculo de rendimento
-    for ativo in df_portifolio['Ativo']:
-        preco_compra = df_portifolio.loc[df_portifolio['Ativo']
-                                         == ativo, 'Preço de Compra'].values[0]
-        preco_de_ajuste = df_portifolio.loc[df_portifolio['Ativo']
-                                         == ativo, 'Preço de Ajuste Atual'].values[0]
-        quantidade = df_portifolio.loc[df_portifolio['Ativo']
-                                         == ativo, 'Quantidade'].values[0]
-        if ativo == 'TREASURY':
-            rendimento = quantidade * \
-                (preco_de_ajuste - preco_compra) * (dolar / 10000)
+    df_portifolio = pd.read_csv('portifolio_posições.csv')
+
+    # Criar dicionário com os preços de fechamento por ativo
+    fechamento_dict = df_fechamento_b3.set_index('Assets')[df_fechamento_b3.columns[-1]].to_dict()
+
+    # Atualizar preço de ajuste considerando múltiplas ocorrências de ativos
+    df_portifolio['Preço de Ajuste Atual'] = df_portifolio['Ativo'].map(fechamento_dict)
+
+    # Atualizar cálculo de rendimento
+    def calcular_rendimento(row):
+        preco_compra = row['Preço de Compra']
+        preco_de_ajuste = row['Preço de Ajuste Atual']
+        quantidade = row['Quantidade']
+
+        if row['Ativo'] == 'TREASURY':
+            return quantidade * (preco_de_ajuste - preco_compra) * (dolar / 10000)
         else:
-            rendimento = quantidade * \
-                (preco_de_ajuste - preco_compra)
-        df_portifolio.loc[df_portifolio['Ativo'] ==
-                            ativo, 'Rendimento'] = rendimento
+            return quantidade * (preco_de_ajuste - preco_compra)
+
+    df_portifolio['Rendimento'] = df_portifolio.apply(calcular_rendimento, axis=1)
+
+    # Salvar CSV atualizado
     df_portifolio.to_csv('portifolio_posições.csv', index=False)
+
 
     #Chamar a função add_data(data) para atualizar portifolio_posições no banco de dados
     add_data(df_portifolio.to_dict(orient="records"))
@@ -4178,7 +4180,6 @@ def main_page():
 
         # 5. Formatação das colunas (exemplo seguindo seu código)
         df_portifolio_default_copy = df_portifolio_default.copy()
-
         df_portifolio_default_copy["Quantidade"] = df_portifolio_default_copy["Quantidade"].apply(lambda x: f"{x:.0f}")
         df_portifolio_default_copy["Preço de Compra"] = df_portifolio_default_copy["Preço de Compra"].apply(lambda x: f"R${x:,.2f}")
         df_portifolio_default_copy["Preço de Ajuste Atual"] = df_portifolio_default_copy["Preço de Ajuste Atual"].apply(lambda x: f"R${x:,.2f}")

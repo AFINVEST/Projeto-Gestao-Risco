@@ -23,7 +23,7 @@ def main():
     # Configurações iniciais
     service = Service()
     driver = webdriver.Chrome(service=service)
-    csv_path = "pl_fundos_teste.csv"
+    parquet_path = "pl_fundos_teste.parquet"
     fundos_base = [
         ("AF DEB INCENTIVADAS", "R$ 11.660.312,30"),
         ("AF INVEST GERAES PREV", "--"),
@@ -55,8 +55,8 @@ def main():
 
     try:
         # Verificar se o arquivo existe
-        if os.path.exists(csv_path):
-            df_todos = pd.read_csv(csv_path)
+        if os.path.exists(parquet_path):
+            df_todos = pd.read_parquet(parquet_path)
             existing_dates = [col for col in df_todos.columns if col not in ["Fundos/Carteiras Adm", "Último Valor","Unnamed: 0"]]
             last_date = max([datetime.strptime(d, "%Y-%m-%d") for d in existing_dates]) if existing_dates else None
         else:
@@ -124,7 +124,7 @@ def main():
         df_todos = df_todos[columns_order]
 
         # Salvar arquivo
-        df_todos.to_csv(csv_path, index=False)
+        df_todos.to_parquet(parquet_path, index=False)
         print("Dados atualizados com sucesso!")
 
     except Exception as e:

@@ -65,9 +65,9 @@ def processar_dados(processed_data, hoje_str):
     # hoje_str = datetime.now().strftime('%Y-%m-%d')
 
     # 2) Carregar (ou criar) df_preco_de_ajuste_atual
-    nome_arquivo_preco_ajuste = 'df_preco_de_ajuste_atual.csv'
+    nome_arquivo_preco_ajuste = 'df_preco_de_ajuste_atual.parquet'
     if os.path.exists(nome_arquivo_preco_ajuste):
-        df_preco_de_ajuste_atual = pd.read_csv(
+        df_preco_de_ajuste_atual = pd.read_parquet(
             nome_arquivo_preco_ajuste, index_col=0)
     else:
         df_preco_de_ajuste_atual = pd.DataFrame()
@@ -84,15 +84,15 @@ def processar_dados(processed_data, hoje_str):
     # 4) Se a coluna (data) não existir, cria; se existir e você quiser atualizar, basta sobrescrever
     df_preco_de_ajuste_atual[hoje_str] = serie_preco_ajuste
 
-    # 5) Salvar em CSV
-    df_preco_de_ajuste_atual.to_csv(nome_arquivo_preco_ajuste)
+    # 5) Salvar em parquet
+    df_preco_de_ajuste_atual.to_parquet(nome_arquivo_preco_ajuste)
 
     # # ------------------------------------------
     # #  Mesma lógica para df_variacao
     # # ------------------------------------------
-    # nome_arquivo_variacao = 'df_variacao.csv'
+    # nome_arquivo_variacao = 'df_variacao.parquet'
     # if os.path.exists(nome_arquivo_variacao):
-    #     df_variacao_atual = pd.read_csv(nome_arquivo_variacao, index_col=0)
+    #     df_variacao_atual = pd.read_parquet(nome_arquivo_variacao, index_col=0)
     # else:
     #     df_variacao_atual = pd.DataFrame()
 
@@ -105,12 +105,12 @@ def processar_dados(processed_data, hoje_str):
     # # Cria/atualiza a coluna de hoje
     # df_variacao_atual[hoje_str] = serie_variacao
 
-    # # Salva em CSV
-    # df_variacao_atual.to_csv(nome_arquivo_variacao)
+    # # Salva em parquet
+    # df_variacao_atual.to_parquet(nome_arquivo_variacao)
 
-    # nome_arquivo_variacao = 'df_variacao.csv'
+    # nome_arquivo_variacao = 'df_variacao.parquet'
     # if os.path.exists(nome_arquivo_variacao):
-    #     df_variacao_atual = pd.read_csv(nome_arquivo_variacao, index_col=0)
+    #     df_variacao_atual = pd.read_parquet(nome_arquivo_variacao, index_col=0)
     # else:
     #     df_variacao_atual = pd.DataFrame()
     print("Processamento concluído!")

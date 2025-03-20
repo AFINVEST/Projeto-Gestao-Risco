@@ -80,16 +80,7 @@ def load_and_process_excel(df_excel, assets_sel):
 
 
 def load_and_process_divone(file_bbg, df_excel):
-    df_divone = pd.read_excel(file_bbg, sheet_name='DIV01',
-                              skiprows=1, usecols='E:F', nrows=21)
-    df_divone = df_divone.T
-    columns = [
-        'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
-        'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP25', 'DAP26', 'DAP27',
-        'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY', 'IBOV', 'S&P'
-    ]
-    df_divone.columns = columns
-    df_divone = df_divone.drop(df_divone.index[0])
+    df_divone = pd.read_parquet('df_divone.parquet')
 
     df_pe = df_excel.copy()
     df_pe = df_pe.tail(1)
@@ -175,11 +166,11 @@ def calculate_portfolio_values(df_precos, df_pl_processado, var_bps):
 
 def processar_b3_portifolio():
     """
-    Exemplo de função que carrega dois dataframes de CSV:
-     - df_preco_de_ajuste_atual.csv : preços de fechamento (colunas de datas)
-     - df_variacao.csv : variação diária dos ativos (colunas de datas)
+    Exemplo de função que carrega dois dataframes de parquet:
+     - df_preco_de_ajuste_atual_completo.parquet : preços de fechamento (colunas de datas)
+     - df_variacao.parquet : variação diária dos ativos (colunas de datas)
     """
-    df_b3_fechamento = pd.read_csv("df_preco_de_ajuste_atual.csv")
+    df_b3_fechamento = pd.read_parquet("df_preco_de_ajuste_atual_completo.parquet")
     # df_b3_fechamento possui colunas: ['Ativo', '17/01/2025', '18/01/2025', ...]
 
     # df_b3_variacao possui colunas: ['Ativo', '17/01/2025', '18/01/2025', ...]
@@ -203,7 +194,7 @@ def processar_b3_portifolio():
 
 ################ DEIXAR ESSA FUNÇÃO ATUALIZADA COM A LISTA DE ASSETS DEFAUTL DO PORTIFÓLIO E SUAS QUANTIDADES ################
 def processar_dados_port():
-    df_assets = pd.read_csv("portifolio_posições.csv")
+    df_assets = pd.read_parquet("portifolio_posições.parquet")
     df_assets.rename(columns={'Unnamed: 0': 'Ativo'}, inplace=True)
     df_portifolio_default = df_assets.copy()
     # Agrupar por ativo e somar as quantidades
@@ -232,19 +223,19 @@ def processar_dados_port():
 
 def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_contratos):
     """
-    Verifica ou cria um CSV de portfólio. Exibe dois DataFrames:
-      1) Posição atual salva no CSV.
+    Verifica ou cria um parquet de portfólio. Exibe dois DataFrames:
+      1) Posição atual salva no parquet.
       2) Novo DataFrame com os ativos e dados recebidos como input.
     Permite concatenar o novo DataFrame ao existente.
     """
     st.write('---')
     st.title("Gestão de Portfólio")
-    nome_arquivo_portifolio = 'portifolio_posições.csv'
+    nome_arquivo_portifolio = 'portifolio_posições.parquet'
     df_b3_fechamento = processar_b3_portifolio()
 
     # Carregar o portfólio existente
     if os.path.exists(nome_arquivo_portifolio):
-        df_portifolio_salvo = pd.read_csv(nome_arquivo_portifolio)
+        df_portifolio_salvo = pd.read_parquet(nome_arquivo_portifolio)
     else:
         df_portifolio_salvo = pd.DataFrame(columns=[
             'Ativo',
@@ -277,7 +268,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
 
     # Conferir se dia de compra já foi lançado no portifólio alguma vez
     if os.path.exists(nome_arquivo_portifolio):
-        df_portifolio_salvo = pd.read_csv(nome_arquivo_portifolio)
+        df_portifolio_salvo = pd.read_parquet(nome_arquivo_portifolio)
 
         # Verificar se `dia_compra` é um dicionário
     if isinstance(dia_compra, dict):
@@ -446,8 +437,9 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
         st.write("---")
 
     else:
-        file_pl = "pl_fundos.csv"
-        df_pl = pd.read_csv(file_pl, index_col=0)
+        file_pl = "pl_fundos.parquet"
+        df_pl = pd.read_parquet(file_pl)
+        df_pl = df_pl.set_index(df_pl.columns[0])
         file_bbg = "BBG - ECO DASH.xlsx"
         # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
         dict_pesos = {
@@ -508,7 +500,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
         if st.button("Salvar novo portfólio"):
             df_portifolio_salvo = pd.concat(
                 [df_portifolio_salvo, novo_portifolio], ignore_index=True)
-            df_portifolio_salvo.to_csv(nome_arquivo_portifolio, index=False)
+            df_portifolio_salvo.to_parquet(nome_arquivo_portifolio, index=False)
             add_data(df_portifolio_salvo.to_dict(orient="records"))
             st.success("Novo portfólio salvo com sucesso!")
             st.dataframe(df_portifolio_salvo)
@@ -543,7 +535,7 @@ def read_atual_contratos():
     df_fundos = pd.DataFrame()
     lista_files = []
     for file in files:
-        df_fundos = pd.concat([df_fundos, pd.read_csv(f'BaseFundos/{file}')])
+        df_fundos = pd.concat([df_fundos, pd.read_parquet(f'BaseFundos/{file}')])
         # Adiciona o nome do arquivo como uma linha da coluna Fundo
         contagem = df_fundos['Ativo'].unique()
         contagem = len(contagem)
@@ -576,15 +568,13 @@ def read_atual_contratos():
     return df_contratos
 
 
-import pandas as pd
-
 def att_portifosições():
     df_fechamento_b3 = processar_b3_portifolio()
     
     # Obtendo o valor do dólar para conversão do Treasury
     dolar = df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'WDO1', df_fechamento_b3.columns[-1]].values[0]
 
-    df_portifolio = pd.read_csv('portifolio_posições.csv')
+    df_portifolio = pd.read_parquet('portifolio_posições.parquet')
 
     # Criar dicionário com os preços de fechamento por ativo
     fechamento_dict = df_fechamento_b3.set_index('Assets')[df_fechamento_b3.columns[-1]].to_dict()
@@ -605,8 +595,8 @@ def att_portifosições():
 
     df_portifolio['Rendimento'] = df_portifolio.apply(calcular_rendimento, axis=1)
 
-    # Salvar CSV atualizado
-    df_portifolio.to_csv('portifolio_posições.csv', index=False)
+    # Salvar parquet atualizado
+    df_portifolio.to_parquet('portifolio_posições.parquet', index=False)
 
 
     #Chamar a função add_data(data) para atualizar portifolio_posições no banco de dados
@@ -633,8 +623,9 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos,op1,op2
         fundos.remove(fundo)
     if fundos:
         #st.write(df_contratos)
-        file_pl = "pl_fundos.csv"
-        df_pl = pd.read_csv(file_pl, index_col=0)
+        file_pl = "pl_fundos.parquet"
+        df_pl = pd.read_parquet(file_pl)
+        df_pl = df_pl.set_index(df_pl.columns[0])
         file_bbg = "BBG - ECO DASH.xlsx"
 
         # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
@@ -666,21 +657,7 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos,op1,op2
         df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(
             df_pl, Weights)
 
-        df = pd.read_excel(file_bbg, sheet_name='BZ RATES',
-                        skiprows=1, thousands='.', decimal=',')
-        df.drop(['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2',
-                'Unnamed: 3', 'Unnamed: 26'], axis=1, inplace=True)
-        df.columns.values[0] = 'Date'
-        df = df.drop([0])  # Remove a primeira linha
-        df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y')
-        df.drop(['WSP1 Index'], axis=1, inplace=True)
-        df.columns = [
-            'Date', 'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
-            'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP25', 'DAP26', 'DAP27',
-            'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY', 'IBOV',
-            'TREASURY_AJUSTADA', 'S&P'
-        ]
-        df.drop(['IBOV', 'S&P', 'TREASURY_AJUSTADA'], axis=1, inplace=True)
+        df = pd.read_parquet('df_inicial.parquet')
         df_precos, df_completo = load_and_process_excel(df, assets)
         df_retorno = process_returns(df_completo, assets)
         var_ativos = var_not_parametric(df_retorno).abs()
@@ -758,7 +735,7 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos,op1,op2
                 df_divone_juros_nominais = df_divone_juros_nominais.sum(axis=1)
 
                 lista_juros_interno_real = [
-                    asset for asset in assets if 'DAP' in asset]
+                    asset for asset in assets if 'DAP' or 'NTNB' in asset]
 
                 df_divone_juros_real = df_divone[lista_juros_interno_real]
 
@@ -1104,7 +1081,7 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos,op1,op2
             # Identificar categorias por colunas
             mapeamento_categorias = {
                 "Juros Nominais Brasil": [col for col in tabela_dados_riscos.columns if "DI" in col],
-                "Juros Reais Brasil": [col for col in tabela_dados_riscos.columns if "DAP" in col],
+                "Juros Reais Brasil": [col for col in tabela_dados_riscos.columns if "DAP"  in col],
                 "Juros US": ["TREASURY"],
                 "Moedas": ["WDO1"]
             }
@@ -1187,8 +1164,9 @@ def calcular_metricas_de_fundo_analise(assets, quantidades, df_contratos, fundos
         fundos.remove(fundo)
     if fundos:
         #st.write(df_contratos)
-        file_pl = "pl_fundos.csv"
-        df_pl = pd.read_csv(file_pl, index_col=0)
+        file_pl = "pl_fundos.parquet"
+        df_pl = pd.read_parquet(file_pl)
+        df_pl = df_pl.set_index(df_pl.columns[0])
         file_bbg = "BBG - ECO DASH.xlsx"
 
         # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
@@ -1220,21 +1198,8 @@ def calcular_metricas_de_fundo_analise(assets, quantidades, df_contratos, fundos
         df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(
             df_pl, Weights)
 
-        df = pd.read_excel(file_bbg, sheet_name='BZ RATES',
-                        skiprows=1, thousands='.', decimal=',')
-        df.drop(['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2',
-                'Unnamed: 3', 'Unnamed: 26'], axis=1, inplace=True)
-        df.columns.values[0] = 'Date'
-        df = df.drop([0])  # Remove a primeira linha
-        df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y')
-        df.drop(['WSP1 Index'], axis=1, inplace=True)
-        df.columns = [
-            'Date', 'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
-            'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP25', 'DAP26', 'DAP27',
-            'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY', 'IBOV',
-            'TREASURY_AJUSTADA', 'S&P'
-        ]
-        df.drop(['IBOV', 'S&P', 'TREASURY_AJUSTADA'], axis=1, inplace=True)
+        df = pd.read_parquet('df_inicial.parquet')
+
         df_precos, df_completo = load_and_process_excel(df, assets)
         df_retorno = process_returns(df_completo, assets)
         var_ativos = var_not_parametric(df_retorno).abs()
@@ -1312,7 +1277,7 @@ def calcular_metricas_de_fundo_analise(assets, quantidades, df_contratos, fundos
                 df_divone_juros_nominais = df_divone_juros_nominais.sum(axis=1)
 
                 lista_juros_interno_real = [
-                    asset for asset in assets if 'DAP' in asset]
+                    asset for asset in assets if 'DAP' or 'NTNB'  in asset]
 
                 df_divone_juros_real = df_divone[lista_juros_interno_real]
 
@@ -1657,7 +1622,7 @@ def calcular_metricas_de_fundo_analise(assets, quantidades, df_contratos, fundos
             # Identificar categorias por colunas
             mapeamento_categorias = {
                 "Juros Nominais Brasil": [col for col in tabela_dados_riscos.columns if "DI" in col],
-                "Juros Reais Brasil": [col for col in tabela_dados_riscos.columns if "DAP" in col],
+                "Juros Reais Brasil": [col for col in tabela_dados_riscos.columns if "DAP"  in col],
                 "Juros US": ["TREASURY"],
                 "Moedas": ["WDO1"]
             }
@@ -1747,8 +1712,9 @@ def calcular_metricas_de_fundo_analise(assets, quantidades, df_contratos, fundos
 
 
 def calcular_metricas_de_port(assets, quantidades, df_contratos):
-    file_pl = "pl_fundos.csv"
-    df_pl = pd.read_csv(file_pl, index_col=0)
+    file_pl = "pl_fundos.parquet"
+    df_pl = pd.read_parquet(file_pl)
+    df_pl = df_pl.set_index(df_pl.columns[0])
     file_bbg = "BBG - ECO DASH.xlsx"
     # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
     dict_pesos = {
@@ -1779,21 +1745,8 @@ def calcular_metricas_de_port(assets, quantidades, df_contratos):
     df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(
         df_pl, Weights)
 
-    df = pd.read_excel(file_bbg, sheet_name='BZ RATES',
-                       skiprows=1, thousands='.', decimal=',')
-    df.drop(['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2',
-            'Unnamed: 3', 'Unnamed: 26'], axis=1, inplace=True)
-    df.columns.values[0] = 'Date'
-    df = df.drop([0])  # Remove a primeira linha
-    df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y')
-    df.drop(['WSP1 Index'], axis=1, inplace=True)
-    df.columns = [
-        'Date', 'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
-        'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP25', 'DAP26', 'DAP27',
-        'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY', 'IBOV',
-        'TREASURY_AJUSTADA', 'S&P'
-    ]
-    df.drop(['IBOV', 'S&P', 'TREASURY_AJUSTADA'], axis=1, inplace=True)
+    df = pd.read_parquet('df_inicial.parquet')
+
     df_precos, df_completo = load_and_process_excel(df, assets)
     df_retorno = process_returns(df_completo, assets)
     var_ativos = var_not_parametric(df_retorno).abs()
@@ -1865,7 +1818,7 @@ def calcular_metricas_de_port(assets, quantidades, df_contratos):
     df_divone_juros_nominais = df_divone_juros_nominais.sum(axis=1)
 
     lista_juros_interno_real = [
-        asset for asset in assets if 'DAP' in asset]
+        asset for asset in assets if 'DAP' or 'NTNB' in asset]
 
     df_divone_juros_real = df_divone[lista_juros_interno_real]
 
@@ -2082,17 +2035,17 @@ def checkar2_portifolio(assets,
                         dia_compra,
                         ):
     """
-    Verifica (ou cria) um CSV de portfólio e atualiza as posições de acordo com:
+    Verifica (ou cria) um parquet de portfólio e atualiza as posições de acordo com:
       1) Lista de ativos (assets) e suas quantidades (quantidades).
       2) Dicionário de compra_especifica (caso o usuário tenha quantidades específicas para algum ativo).
       3) Dia de compra, que pode ser um único valor ou um dicionário.
       4) Atualiza Preço de Compra, Preço de Ajuste Atual, Variação e Rendimento.
     """
-    nome_arquivo_portifolio = 'portifolio_posições.csv'
+    nome_arquivo_portifolio = 'portifolio_posições.parquet'
     df_b3_fechamento = processar_b3_portifolio()
     # 1) Carrega portfólio existente (se existir)
     if os.path.exists(nome_arquivo_portifolio):
-        df_portifolio = pd.read_csv(nome_arquivo_portifolio, index_col=0)
+        df_portifolio = pd.read_parquet(nome_arquivo_portifolio, index_col=0)
 
     else:
         # Podemos criar um DataFrame com colunas definidas para evitar problemas de colunas inexistentes
@@ -2142,8 +2095,8 @@ def checkar2_portifolio(assets,
     #    - Variação de Taxa (com base em df_b3_variacao na data de compra ou acumulada, depende da necessidade)
     #    - Rendimento (Quantidade * (Preço de Ajuste Atual - Preço de Compra)) ou vice-versa
 
-    # Monta a string da data de hoje no mesmo formato das colunas do CSV
-    # As colunas do CSV podem estar em formato "dd/mm/yyyy" ou "yyyy-mm-dd", dependendo de como foi salvo
+    # Monta a string da data de hoje no mesmo formato das colunas do parquet
+    # As colunas do parquet podem estar em formato "dd/mm/yyyy" ou "yyyy-mm-dd", dependendo de como foi salvo
     # Ajuste conforme a forma em que foram salvas:
 
     ############################## ---- PROBLEMA ---- ##############################
@@ -2154,7 +2107,7 @@ def checkar2_portifolio(assets,
         try:
             # Dia de compra que foi salvo
             dia_compra_ativo = df_portifolio.loc[asset, 'Dia de Compra']
-            # (Opcional) se for "yyyy-mm-dd", converter para "dd/mm/yyyy" para casar com o CSV
+            # (Opcional) se for "yyyy-mm-dd", converter para "dd/mm/yyyy" para casar com o parquet
             # Caso já esteja no formato correto, você pode pular esta conversão.
             # Exemplo (caso precise):
             # dia_compra_dt = datetime.datetime.strptime(dia_compra_ativo, '%Y-%m-%d')
@@ -2200,8 +2153,8 @@ def checkar2_portifolio(assets,
             # Caso alguma coluna não seja encontrada ou dê erro, você pode tratar aqui
             print(f"[*] Erro ao calcular valores para o ativo {asset}: {e}")
 
-    # 5) Salva o DataFrame atualizado de volta no CSV
-    df_portifolio.to_csv(nome_arquivo_portifolio)
+    # 5) Salva o DataFrame atualizado de volta no parquet
+    df_portifolio.to_parquet(nome_arquivo_portifolio)
 
     return df_portifolio
 
@@ -2294,14 +2247,14 @@ def update_base_fundos(ativo_escolhido, dia_compra_escolhido):
 
         # Processar cada arquivo/tabela
         for arquivo in os.listdir(pasta_base_fundos):
-            if arquivo.endswith(".csv"):
+            if arquivo.endswith(".parquet"):
                 try:
                     table_name = os.path.splitext(arquivo)[0]
                     caminho_arquivo = os.path.join(pasta_base_fundos, arquivo)
                     modificado = False
                     
-                    # 1. Processar arquivo CSV
-                    df = pd.read_csv(caminho_arquivo)
+                    # 1. Processar arquivo parquet
+                    df = pd.read_parquet(caminho_arquivo)
                     
                     if 'Ativo' in df.columns:
                         # Verificar se o ativo existe neste arquivo
@@ -2313,7 +2266,7 @@ def update_base_fundos(ativo_escolhido, dia_compra_escolhido):
                             
                             if colunas_para_remover:
                                 df.drop(columns=colunas_para_remover, inplace=True, errors='ignore')
-                                df.to_csv(caminho_arquivo, index=False)
+                                df.to_parquet(caminho_arquivo, index=False)
                                 resultados["arquivos_modificados"].append(arquivo)
                                 modificado = True
 
@@ -2413,14 +2366,14 @@ def add_data(data):
     
 
 # Função para atualizar o registro local com o Supabase
-def att_csv_supabase():
+def att_parquet_supabase():
     df_supabase = load_data()
     if not df_supabase:
         df = pd.DataFrame(columns=["Ativo", "Quantidade", "Dia de Compra", "Preço de Compra", "Preço de Ajuste Atual", "Rendimento"])
-        df.to_csv("portifolio_posições.csv", index=False)
+        df.to_parquet("portifolio_posições.parquet", index=False)
         return
     df = pd.DataFrame(df_supabase)
-    df.to_csv("portifolio_posições.csv", index=False)
+    df.to_parquet("portifolio_posições.parquet", index=False)
 
 def update_data(data):
     try:
@@ -2437,7 +2390,7 @@ def update_data(data):
         )
 
         print("Resposta do Supabase:", response)  
-        att_csv_supabase()
+        att_parquet_supabase()
         return response.data
 
     except Exception as e:
@@ -2453,7 +2406,7 @@ def delete_data(ativo, dia_compra):
         print("Erro ao remover ativo:", e)
 
 
-def atualizar_csv_fundos(
+def atualizar_parquet_fundos(
     df_current,         # DataFrame do dia atual (1 linha por Fundo)
     dia_operacao,       # Exemplo: "2025-01-20"
     # DF de transações: [Ativo, Quantidade, Dia de Compra, Preço de Compra, ...]
@@ -2461,7 +2414,7 @@ def atualizar_csv_fundos(
     # DF de preços de fechamento B3: colunas ["Assets", <data1>, <data2>, ...]
 ):
 
-    df_fechamento_b3 = pd.read_csv("df_preco_de_ajuste_atual.csv")
+    df_fechamento_b3 = pd.read_parquet("df_preco_de_ajuste_atual_completo.parquet")
     df_fechamento_b3 = df_fechamento_b3.replace('\.', '', regex=True)
     df_fechamento_b3 = df_fechamento_b3.replace({',': '.'}, regex=True)
     # Converter para float todas as colunas menos a primeira
@@ -2479,7 +2432,7 @@ def atualizar_csv_fundos(
     dolar = df_fechamento_b3.loc[df_fechamento_b3['Assets']
                                  == 'WDO1', ultimo_fechamento].values[0]
 
-    pl_dias = pd.read_csv("pl_fundos_teste.csv")
+    pl_dias = pd.read_parquet("pl_fundos_teste.parquet")
     pl_dias = pl_dias.replace('\.', '', regex=True)
     pl_dias = pl_dias.replace({',': '.'}, regex=True)
     for col in pl_dias.columns:
@@ -2499,11 +2452,11 @@ def atualizar_csv_fundos(
     mensagens = ["⏳ Aguarde até o Total ser concluído..."]
     status_container.markdown(" | ".join(mensagens))  # Exibe a mensagem inicial
     for fundo, row_fundo in df_current.iterrows():
-        # Caminho do CSV do Fundo
-        nome_arquivo_csv = os.path.join("BaseFundos", f"{fundo}.csv")
+        # Caminho do parquet do Fundo
+        nome_arquivo_parquet = os.path.join("BaseFundos", f"{fundo}.parquet")
         # 2.1) Carregar (ou criar) o DataFrame histórico do Fundo (df_fundo)
-        if os.path.exists(nome_arquivo_csv):
-            df_fundo = pd.read_csv(nome_arquivo_csv, index_col=None)
+        if os.path.exists(nome_arquivo_parquet):
+            df_fundo = pd.read_parquet(nome_arquivo_parquet, index_col=None)
             # Conferir se já existem dados para o dia de operação
             if df_fundo.columns.str.startswith(dia_operacao).any():
                 df_fundo = df_fundo.drop(
@@ -2617,15 +2570,15 @@ def atualizar_csv_fundos(
 
         # Pegar o Preco de compra de cada ativo
         df_fundo.reset_index(drop=True, inplace=True)
-        df_fundo.to_csv(nome_arquivo_csv, index=False, encoding="utf-8")
-        table_name = nome_arquivo_csv.replace(".csv", "")
+        df_fundo.to_parquet(nome_arquivo_parquet, index=False, encoding="utf-8")
+        table_name = nome_arquivo_parquet.replace(".parquet", "")
         #table_name = table_name.replace("BaseFundos\\", "")
         table_name = table_name.replace("BaseFundos/", "")
         # Exibe o nome do elemento que foi carregado
         mensagens.append(f"✅ {table_name} carregado!")
         status_container.markdown(" | ".join(mensagens))
         add_data_2(df_fundo,table_name)
-        print(f"[{fundo}] -> CSV atualizado: {nome_arquivo_csv}")
+        print(f"[{fundo}] -> parquet atualizado: {nome_arquivo_parquet}")
 
 def analisar_performance_fundos(
     data_inicial,
@@ -2634,7 +2587,7 @@ def analisar_performance_fundos(
     lista_ativos
 ):
     """
-    Lê todos os arquivos CSV na pasta 'BaseFundos', extrai colunas diárias
+    Lê todos os arquivos parquet na pasta 'BaseFundos', extrai colunas diárias
     de Rendimento (ex: "YYYY-MM-DD - Rendimento"), monta um DataFrame 'long'
     com colunas [date, fundo, Ativo, Rendimento_diario], faz mapeamento
     de Estratégia e filtra o intervalo [data_inicial, data_final].
@@ -2662,16 +2615,16 @@ def analisar_performance_fundos(
         raise FileNotFoundError(f"Pasta '{pasta_fundos}' não encontrada.")
 
     arquivos = [arq for arq in os.listdir(
-        pasta_fundos) if arq.endswith(".csv")]
+        pasta_fundos) if arq.endswith(".parquet")]
 
     registros = []
     # Cada elemento em 'registros' será um dict:
     # { "date": dt_col, "fundo": nome_fundo, "Ativo": ativo, "Rendimento_diario": rend_val }
 
-    for arquivo_csv in arquivos:
-        caminho_csv = os.path.join(pasta_fundos, arquivo_csv)
-        nome_fundo = arquivo_csv.replace(".csv", "")
-        df_fundo = pd.read_csv(caminho_csv)
+    for arquivo_parquet in arquivos:
+        caminho_parquet = os.path.join(pasta_fundos, arquivo_parquet)
+        nome_fundo = arquivo_parquet.replace(".parquet", "")
+        df_fundo = pd.read_parquet(caminho_parquet)
         if "Ativo" not in df_fundo.columns:
             continue  # ignora se não tiver coluna 'Ativo'
 
@@ -2757,20 +2710,20 @@ def atualizar_base_fundos():
         raise FileNotFoundError(f"Pasta '{pasta_fundos}' não encontrada.")
 
     arquivos = [arq for arq in os.listdir(
-        pasta_fundos) if arq.endswith(".csv")]
+        pasta_fundos) if arq.endswith(".parquet")]
 
     registros = []
     # Cada elemento em 'registros' será um dict:
     # { "date": dt_col, "fundo": nome_fundo, "Ativo": ativo, "Rendimento_diario": rend_val }
 
-    for arquivo_csv in arquivos:
-        #Tirar CSV do nome
-        arquivo_nome = arquivo_csv.replace(".csv", "")
-        df_salvo = pd.read_csv(f"{pasta_fundos}/{arquivo_csv}")
+    for arquivo_parquet in arquivos:
+        #Tirar parquet do nome
+        arquivo_nome = arquivo_parquet.replace(".parquet", "")
+        df_salvo = pd.read_parquet(f"{pasta_fundos}/{arquivo_parquet}")
         df_novo = load_data_base(arquivo_nome)
         if not df_salvo.equals(df_novo):
             df_salvo = df_novo.copy()
-            df_salvo.to_csv(f"{pasta_fundos}/{arquivo_csv}", index=False)
+            df_salvo.to_parquet(f"{pasta_fundos}/{arquivo_parquet}", index=False)
 
 
 def add_data_2(df, table_name):
@@ -2902,7 +2855,7 @@ def load_data_base(table_name):
 
 def apagar_dados_data(data_apag):
     """
-    Apaga os dados de um dia específico de todos os arquivos CSV na pasta 'BaseFundos'.
+    Apaga os dados de um dia específico de todos os arquivos parquet na pasta 'BaseFundos'.
     """
 
     pasta_fundos = "BaseFundos"
@@ -2911,13 +2864,13 @@ def apagar_dados_data(data_apag):
         raise FileNotFoundError(f"Pasta '{pasta_fundos}' não encontrada.")
 
     arquivos = [arq for arq in os.listdir(
-        pasta_fundos) if arq.endswith(".csv")]
+        pasta_fundos) if arq.endswith(".parquet")]
 
-    for arquivo_csv in arquivos:
-        caminho_csv = os.path.join(pasta_fundos, arquivo_csv)
-        nome_fundo = arquivo_csv.replace(".csv", "")
+    for arquivo_parquet in arquivos:
+        caminho_parquet = os.path.join(pasta_fundos, arquivo_parquet)
+        nome_fundo = arquivo_parquet.replace(".parquet", "")
 
-        df_fundo = pd.read_csv(caminho_csv)
+        df_fundo = pd.read_parquet(caminho_parquet)
         # Todas as colunas do tipo "YYYY-MM-DD"
 
         colunas_selecionadas = [
@@ -2935,24 +2888,24 @@ def apagar_dados_data(data_apag):
 
         if df_teste.empty:
             # Excluir o arquivo
-            os.remove(caminho_csv)
+            os.remove(caminho_parquet)
         else:
-            df_fundo.to_csv(caminho_csv, index=False, encoding="utf-8")
+            df_fundo.to_parquet(caminho_parquet, index=False, encoding="utf-8")
 
-        print(f"[{nome_fundo}] -> CSV atualizado: {caminho_csv}")
+        print(f"[{nome_fundo}] -> parquet atualizado: {caminho_parquet}")
 
-    # Atualizar portifólio_posições.csv
-    nome_arquivo_portifolio = 'portifolio_posições.csv'
-    df_portifolio = pd.read_csv(nome_arquivo_portifolio, index_col=0)
+    # Atualizar portifólio_posições.parquet
+    nome_arquivo_portifolio = 'portifolio_posições.parquet'
+    df_portifolio = pd.read_parquet(nome_arquivo_portifolio, index_col=0)
     # Dropar todas as linhas que a coluna "Dia de Compra" SEJA igual a data_apag
     df_portifolio = df_portifolio[df_portifolio['Dia de Compra'] != data_apag]
-    df_portifolio.to_csv(nome_arquivo_portifolio)
-    print(f"[{nome_arquivo_portifolio}] -> CSV atualizado: {nome_arquivo_portifolio}")
+    df_portifolio.to_parquet(nome_arquivo_portifolio)
+    print(f"[{nome_arquivo_portifolio}] -> parquet atualizado: {nome_arquivo_portifolio}")
 
 
 def analisar_dados_fundos():
     files = os.listdir('BaseFundos')
-    df_b3_fechamento = pd.read_csv("df_preco_de_ajuste_atual.csv")
+    df_b3_fechamento = pd.read_parquet("df_preco_de_ajuste_atual_completo.parquet")
     df_b3_fechamento = df_b3_fechamento.replace('\.', '', regex=True)
     df_b3_fechamento = df_b3_fechamento.replace(',', '.', regex=True)
     df_b3_fechamento.iloc[:, 1:] = df_b3_fechamento.iloc[:, 1:].astype(float)
@@ -2969,8 +2922,8 @@ def analisar_dados_fundos():
     # Supõe-se que `files`, `df_b3_fechamento`, e `dia_atual` estão definidos
     
     for file in files:
-        # Lê o arquivo CSV
-        df_fundos = pd.read_csv(f'BaseFundos/{file}')
+        # Lê o arquivo parquet
+        df_fundos = pd.read_parquet(f'BaseFundos/{file}')
         file = file.split('.')[0]  # Remove a extensão do nome do arquivo
 
         # Configura o índice para a coluna 'Ativo'
@@ -3042,8 +2995,8 @@ def analisar_dados_fundos():
     
     # Supõe-se que `files`, `df_b3_fechamento`, e `dia_atual` estão definidos
     for file in files:
-        # Lê o arquivo CSV
-        df_fundos = pd.read_csv(f'BaseFundos/{file}')
+        # Lê o arquivo parquet
+        df_fundos = pd.read_parquet(f'BaseFundos/{file}')
         file = file.split('.')[0]  # Remove a extensão do nome do arquivo
 
         # Configura o índice para a coluna 'Ativo'
@@ -3118,7 +3071,7 @@ def analisar_dados_fundos():
 
 def pl_dia(df, tipo_agrupamento="Semanal"):
     # 1) Ler e limpar pl_dias
-    pl_dias = pd.read_csv("pl_fundos_teste.csv")
+    pl_dias = pd.read_parquet("pl_fundos_teste.parquet")
     # Se a planilha estiver em outro formato, ajuste `sep`, `decimal`, etc.
     pl_dias.set_index('Fundos/Carteiras Adm', inplace=True)
 
@@ -3221,13 +3174,13 @@ def pl_dia(df, tipo_agrupamento="Semanal"):
     return df_result
 
 
-def calcular_retorno_sobre_pl(df_fundos, df2, pl_csv_path="pl_fundos_teste.csv"):
+def calcular_retorno_sobre_pl(df_fundos, df2, pl_parquet_path="pl_fundos_teste.parquet"):
     """
     df_fundos: DataFrame que contém os fundos que você quer usar no cálculo.
                Pode ter pelo menos a coluna 'Fundo' ou então o index com o nome do fundo.
     df2:       DataFrame com as colunas ['date', 'estratégia', 'Rendimento_diario'].
                A coluna 'date' está em formato do tipo "19 Jan 2025".
-    pl_csv_path: caminho do CSV de PL (como no seu exemplo).
+    pl_parquet_path: caminho do parquet de PL (como no seu exemplo).
     
     Retorna: df2 com uma nova coluna 'Retorno_sobre_PL' = Rendimento_diario / soma_do_PL.
             Onde soma_do_PL é a soma do PL de todos os fundos do df_fundos, na data da linha.
@@ -3236,9 +3189,9 @@ def calcular_retorno_sobre_pl(df_fundos, df2, pl_csv_path="pl_fundos_teste.csv")
     # ------------------------------------------------------------------------------
     # 1) Ler e limpar pl_dias
     # ------------------------------------------------------------------------------
-    pl_dias = pd.read_csv(pl_csv_path)
+    pl_dias = pd.read_parquet(pl_parquet_path)
     
-    # Se no arquivo CSV existir a coluna 'Fundos/Carteiras Adm' com o nome do fundo:
+    # Se no arquivo parquet existir a coluna 'Fundos/Carteiras Adm' com o nome do fundo:
     if 'Fundos/Carteiras Adm' in pl_dias.columns:
         pl_dias.set_index('Fundos/Carteiras Adm', inplace=True)
 
@@ -3486,9 +3439,10 @@ def switch_to_main():
 def main_page():
     st.title("Dashboard de Análise de Risco de Portfólio")
     atualizar_base_fundos()
-    att_csv_supabase()
-    file_pl = "pl_fundos.csv"
-    df_pl = pd.read_csv(file_pl, index_col=0)
+    att_parquet_supabase()
+    file_pl = "pl_fundos.parquet"
+    df_pl = pd.read_parquet(file_pl)
+    df_pl = df_pl.set_index(df_pl.columns[0])
     file_bbg = "BBG - ECO DASH.xlsx"
 
     # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
@@ -3521,21 +3475,7 @@ def main_page():
     df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(
         df_pl, Weights)
 
-    df = pd.read_excel(file_bbg, sheet_name='BZ RATES',
-                       skiprows=1, thousands='.', decimal=',')
-    df.drop(['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2',
-            'Unnamed: 3', 'Unnamed: 26'], axis=1, inplace=True)
-    df.columns.values[0] = 'Date'
-    df = df.drop([0])  # Remove a primeira linha
-    df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y')
-    df.drop(['WSP1 Index'], axis=1, inplace=True)
-    df.columns = [
-        'Date', 'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
-        'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP25', 'DAP26', 'DAP27',
-        'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY', 'IBOV',
-        'TREASURY_AJUSTADA', 'S&P'
-    ]
-    df.drop(['IBOV', 'S&P', 'TREASURY_AJUSTADA'], axis=1, inplace=True)
+    df = pd.read_parquet('df_inicial.parquet')
 
     default_assets, quantidade_inicial, portifolio_default = processar_dados_port()
     st.sidebar.write("## OPÇÕES DO DASHBOARD")
@@ -3570,7 +3510,7 @@ def main_page():
             # Função para obter o último weekday
 
             last_weekday = get_last_weekday()
-            df_b3_fechamento = pd.read_csv("df_preco_de_ajuste_atual.csv")
+            df_b3_fechamento = pd.read_parquet("df_preco_de_ajuste_atual_completo.parquet")
             df_b3_fechamento = df_b3_fechamento.replace('\.', '', regex=True)
             df_b3_fechamento = df_b3_fechamento.replace(',', '.', regex=True)
             df_b3_fechamento.iloc[:, 1:] = df_b3_fechamento.iloc[:, 1:].astype(
@@ -3697,12 +3637,13 @@ def main_page():
             df_divone_juros_nominais = df_divone_juros_nominais.sum(axis=1)
 
             lista_juros_interno_real = [
-                asset for asset in assets if 'DAP' in asset]
+                asset for asset in assets if 'DAP' or 'NTNB' in asset]
             df_divone_juros_real = df_divone[lista_juros_interno_real]
             lista_quantidade = [quantidade_nomes[asset]
                                 for asset in lista_juros_interno_real]
             df_divone_juros_real = df_divone_juros_real * \
                 np.array(lista_quantidade)
+
             df_divone_juros_real = df_divone_juros_real.sum(axis=1)
 
             lista_juros_externo = [
@@ -4117,7 +4058,7 @@ def main_page():
                 assets, quantidade_nomes, precos_user, data_compra, filtered_df)
 
             if key == True:
-                atualizar_csv_fundos(
+                atualizar_parquet_fundos(
                     filtered_df, data_compra_todos, df_port)
             with cool3:
                 st.write("### Portfólio Atualizado")
@@ -4233,8 +4174,9 @@ def main_page():
         quantidade = []
         df_contratos = read_atual_contratos()
 
-        file_pl = "pl_fundos.csv"
-        df_pl = pd.read_csv(file_pl, index_col=0)
+        file_pl = "pl_fundos.parquet"
+        df_pl = pd.read_parquet(file_pl)
+        df_pl = df_pl.set_index(df_pl.columns[0])
         file_bbg = "BBG - ECO DASH.xlsx"
 
         # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
@@ -4533,13 +4475,15 @@ def main_page():
             lista_estrategias = {
                 'DI': 'Juros Nominais Brasil',
                 'DAP': 'Juros Reais Brasil',
+                'NTNB': 'Juros Reais Brasil',
                 'TREASURY': 'Juros US',
                 'WDO1': 'Moedas'
             }
             lista_ativos = [
                 'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
                 'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP25', 'DAP26', 'DAP27',
-                'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY'
+                'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY',
+                'NTNB25','NTNB26','NTNB27','NTNB28','NTNB30','NTNB32','NTNB35','NTNB40','NTNB45','NTNB50','NTNB55','NTNB60'
             ]
             st.write('---')
             st.title("Análise de Performance dos Fundos")
@@ -4550,7 +4494,7 @@ def main_page():
             tipo_filtro = st.sidebar.selectbox("Escolha o filtro de tempo", [
                                                "Diário", "Semanal", "Mensal"], index=1)
 
-            dados_portifolio_atual = pd.read_csv('portifolio_posições.csv')
+            dados_portifolio_atual = pd.read_parquet('portifolio_posições.parquet')
             ultimo_dia_dados = dados_portifolio_atual['Dia de Compra'].max()
             ultimo_dia_dados = datetime.datetime.strptime(
                 ultimo_dia_dados, "%Y-%m-%d")
@@ -4558,7 +4502,7 @@ def main_page():
             primeiro_dia_dados = datetime.datetime.strptime(
                 primeiro_dia_dados, "%Y-%m-%d")
 
-            df_b3_fechamento = pd.read_csv("df_preco_de_ajuste_atual.csv")
+            df_b3_fechamento = pd.read_parquet("df_preco_de_ajuste_atual_completo.parquet")
             df_b3_fechamento = df_b3_fechamento.replace('\.', '', regex=True)
             df_b3_fechamento = df_b3_fechamento.replace(',', '.', regex=True)
             df_b3_fechamento.iloc[:, 1:] = df_b3_fechamento.iloc[:, 1:].astype(
@@ -4831,6 +4775,7 @@ def main_page():
                 lista_estrategias = {
                     'DI': 'Juros Nominais Brasil',
                     'DAP': 'Juros Reais Brasil',
+                    'NTNB': 'Juros Reais Brasil',
                     'TREASURY': 'Juros US',
                     'WDO1': 'Moedas'
                 }
@@ -4875,7 +4820,7 @@ def main_page():
                         if 'DI' in idx:
                             lista_estrategias_atualizar.append(
                                 'JUROS NOMINAIS BRASIL')
-                        elif 'DAP' in idx:
+                        elif 'DAP'  in idx:
                             lista_estrategias_atualizar.append(
                                 'JUROS REAIS BRASIL')
                         elif 'TREASURY' in idx:
@@ -4971,7 +4916,7 @@ def main_page():
                         if 'DI' in idx:
                             lista_estrategias_atualizar.append(
                                 'JUROS NOMINAIS BRASIL')
-                        elif 'DAP' in idx:
+                        elif 'DAP'in idx:
                             lista_estrategias_atualizar.append(
                                 'JUROS REAIS BRASIL')
                         elif 'TREASURY' in idx:

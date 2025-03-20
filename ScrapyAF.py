@@ -85,8 +85,8 @@ try:
     print(df)
     df = df[df['Fundos/Carteiras Adm'] != 'CDI']
     
-    # Salvar o DataFrame em um arquivo CSV
-    df.to_csv("pl_fundos.csv")
+    # Salvar o DataFrame em um arquivo parquet
+    df.to_parquet("pl_fundos.parquet")
 
 except Exception as e:
     print(f"Ocorreu um erro: {e}")

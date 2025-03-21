@@ -68,7 +68,9 @@ def processar_dados(processed_data, hoje_str):
     nome_arquivo_preco_ajuste = 'df_preco_de_ajuste_atual.parquet'
     if os.path.exists(nome_arquivo_preco_ajuste):
         df_preco_de_ajuste_atual = pd.read_parquet(
-            nome_arquivo_preco_ajuste, index_col=0)
+            nome_arquivo_preco_ajuste)
+        #Colocar como index a primeira coluna
+        df_preco_de_ajuste_atual = df_preco_de_ajuste_atual.set_index(df_preco_de_ajuste_atual.columns[0])
     else:
         df_preco_de_ajuste_atual = pd.DataFrame()
 
@@ -85,6 +87,7 @@ def processar_dados(processed_data, hoje_str):
     df_preco_de_ajuste_atual[hoje_str] = serie_preco_ajuste
 
     # 5) Salvar em parquet
+    df_preco_de_ajuste_atual.reset_index(inplace=True)
     df_preco_de_ajuste_atual.to_parquet(nome_arquivo_preco_ajuste)
 
     # # ------------------------------------------
@@ -136,7 +139,7 @@ driver = webdriver.Chrome()
 
 # Configurar a data inicial
 # data_inicial = datetime(2024, 1, 16)  # 16/01/2024
-data_inicial = datetime(2025, 3, 19)  # 16/01/2024
+data_inicial = datetime(2025, 3, 13)  # 16/01/2024
 dias_uteis = obter_dias_uteis(data_inicial)
 
 

@@ -625,7 +625,6 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos,op1,op2
         #st.write(df_contratos)
         file_pl = "pl_fundos.parquet"
         df_pl = pd.read_parquet(file_pl)
-        df_pl = df_pl.set_index(df_pl.columns[0])
         file_bbg = "BBG - ECO DASH.xlsx"
 
         # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
@@ -1166,7 +1165,6 @@ def calcular_metricas_de_fundo_analise(assets, quantidades, df_contratos, fundos
         #st.write(df_contratos)
         file_pl = "pl_fundos.parquet"
         df_pl = pd.read_parquet(file_pl)
-        df_pl = df_pl.set_index(df_pl.columns[0])
         file_bbg = "BBG - ECO DASH.xlsx"
 
         # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
@@ -3442,7 +3440,6 @@ def main_page():
     att_parquet_supabase()
     file_pl = "pl_fundos.parquet"
     df_pl = pd.read_parquet(file_pl)
-    df_pl = df_pl.set_index(df_pl.columns[0])
     file_bbg = "BBG - ECO DASH.xlsx"
 
     # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
@@ -4176,7 +4173,6 @@ def main_page():
 
         file_pl = "pl_fundos.parquet"
         df_pl = pd.read_parquet(file_pl)
-        df_pl = df_pl.set_index(df_pl.columns[0])
         file_bbg = "BBG - ECO DASH.xlsx"
 
         # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)

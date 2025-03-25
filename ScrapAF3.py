@@ -122,6 +122,11 @@ def main():
         columns_order = ["Fundos/Carteiras Adm"] + \
             sorted(date_columns) + ["Último Valor"]
         df_todos = df_todos[columns_order]
+        for i in range(1, len(df_todos.columns)):  # Começa da segunda coluna em diante
+            coluna_atual = df_todos.columns[i]
+            coluna_anterior = df_todos.columns[i - 1]
+            if coluna_atual !='Fundos/Carteiras Adm' and coluna_atual !='2025-01-01': 
+                df_todos[coluna_atual] = df_todos[coluna_atual].mask(df_todos[coluna_atual] == "--", df_todos[coluna_anterior])
 
         # Salvar arquivo
         df_todos.to_parquet(parquet_path, index=False)

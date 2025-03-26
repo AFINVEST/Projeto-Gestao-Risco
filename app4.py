@@ -4516,9 +4516,10 @@ def main_page():
             # Múltiplas datas
             if tipo_filtro == "Diário":
                 # soamr 7 dias a data inicial
-                data_final = data_inicial + datetime.timedelta(days=8)
-                if data_final >= ultimo_dia_dados_b3.date():
-                    data_final = ultimo_dia_dados_b3.date()
+                #data_final = data_inicial + datetime.timedelta(days=8)
+                #if data_final >= ultimo_dia_dados_b3.date():
+                data_final = st.sidebar.date_input(
+                    "Data final",   value=ultimo_dia_dados_b3, min_value=primeiro_dia_dados)
 
             else:
                 data_final = st.sidebar.date_input(

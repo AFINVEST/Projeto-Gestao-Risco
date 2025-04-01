@@ -2568,7 +2568,7 @@ def atualizar_parquet_fundos(
 
         # Pegar o Preco de compra de cada ativo
         df_fundo.reset_index(drop=True, inplace=True)
-        df_fundo.to_parquet(nome_arquivo_parquet, index=False, encoding="utf-8")
+        df_fundo.to_parquet(nome_arquivo_parquet, index=False)
         table_name = nome_arquivo_parquet.replace(".parquet", "")
         #table_name = table_name.replace("BaseFundos\\", "")
         table_name = table_name.replace("BaseFundos/", "")

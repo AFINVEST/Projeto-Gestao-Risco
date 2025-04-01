@@ -4140,7 +4140,12 @@ def main_page():
         # 6. Exibição (exemplo usando st.table no Streamlit)
         # st.subheader("Resumo do Portfólio Atual")
         st.table(df_portifolio_default_copy)
-        st.write("OBS: O preço de compra é o preço médio de compra do ativo.")
+        df_b3_fechamento = pd.read_parquet("df_preco_de_ajuste_atual_completo.parquet")
+        ultimo_dia_dados_b3 = df_b3_fechamento.columns[-1]
+        ultimo_dia_dados_b3 = datetime.datetime.strptime(
+            ultimo_dia_dados_b3, "%Y-%m-%d")
+
+        st.write(f"OBS: O preço de compra é o preço médio de compra do ativo -- Atualizado em {ultimo_dia_dados_b3.strftime('%d/%m/%Y')}")
         st.write("---")
         df_portifolio_default = df_portifolio_default2.copy()
         # Adicionar linha de soma
@@ -5234,7 +5239,7 @@ def second_page():
         ['Dia de Compra'], axis=1, inplace=True)
     st.table(df_resumo_port)
     st.write(
-        "OBS: Os preços de compra são calculados pela média dos preços de cada ativo.")
+        f"OBS: Os preços de compra são calculados pela média dos preços de cada ativo.")
     # Botão Voltar (1 clique)
     st.button("Voltar ao Dashboard Principal",
               on_click=switch_to_main, key="back_main_ok")

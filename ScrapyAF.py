@@ -93,4 +93,5 @@ except Exception as e:
 
 finally:
     # Fechar o navegador
-    driver.quit()
+    #driver.quit()
+    print("Terminou a execução")

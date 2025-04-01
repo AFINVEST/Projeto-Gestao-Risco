@@ -2454,7 +2454,7 @@ def atualizar_parquet_fundos(
         nome_arquivo_parquet = os.path.join("BaseFundos", f"{fundo}.parquet")
         # 2.1) Carregar (ou criar) o DataFrame histórico do Fundo (df_fundo)
         if os.path.exists(nome_arquivo_parquet):
-            df_fundo = pd.read_parquet(nome_arquivo_parquet, index_col=None)
+            df_fundo = pd.read_parquet(nome_arquivo_parquet)
             # Conferir se já existem dados para o dia de operação
             if df_fundo.columns.str.startswith(dia_operacao).any():
                 df_fundo = df_fundo.drop(

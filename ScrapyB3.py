@@ -273,8 +273,8 @@ try:
     except Exception as e:
         print(f"Erro: {e}")
 
-    driver.quit()
+    #driver.quit()
 
 except Exception as e:
     print(e)
-    driver.quit()
+    #driver.quit()

@@ -2578,6 +2578,8 @@ def atualizar_parquet_fundos(
         add_data_2(df_fundo,table_name)
         print(f"[{fundo}] -> parquet atualizado: {nome_arquivo_parquet}")
 
+        
+
 def analisar_performance_fundos(
     data_inicial,
     data_final,

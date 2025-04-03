@@ -4950,6 +4950,7 @@ def main_page():
                 df_combinado = df_estrategias_grana + " / " + df_final22
                 df_combinado = df_combinado.drop('Total', axis=0)
                 df_combinado.drop(columns=['Total'], inplace=True)
+                #Teste
                 st.table(df_combinado)
                 st.pyplot(fig)
 

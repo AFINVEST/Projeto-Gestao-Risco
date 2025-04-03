@@ -4566,8 +4566,8 @@ def main_page():
                 data_inicial)) & (df_final_pl.columns <= pd.to_datetime(data_final))]
 
             # vOLTAR AS COLUNAS PARA O FORMATO ORIGINAL
-            df_final.columns = df_final.columns.strftime('%Y-%m-%d')
-            df_final_pl.columns = df_final_pl.columns.strftime('%Y-%m-%d')
+            df_final.columns = df_final.columns.strftime('%d-%b-%y')
+            df_final_pl.columns = df_final_pl.columns.strftime('%d-%b-%y')
 
             # Convertendo as colunas para datetime e ordenando
             df_final = df_final[sorted(df_final.columns, key=pd.to_datetime)]
@@ -4585,7 +4585,7 @@ def main_page():
                 df_final = df_semanal
                 # Removendo o horário das colunas
                 df_final.columns = pd.to_datetime(
-                    df_final.columns).strftime('%Y-%m-%d')
+                    df_final.columns).strftime('%d-%b-%y')
 
                 df_final_pl_T = df_final_pl.T  # Transpomos para ter datas como índice
                 df_final_pl_T.index = pd.to_datetime(
@@ -4597,7 +4597,7 @@ def main_page():
                 df_final_pl = df_semanal_pl
                 # Removendo o horário das colunas
                 df_final_pl.columns = pd.to_datetime(
-                    df_final_pl.columns).strftime('%Y-%m-%d')
+                    df_final_pl.columns).strftime('%d-%b-%y')
                 df_result = pl_dia(df_final)
                 
 
@@ -4611,7 +4611,7 @@ def main_page():
                 df_final = df_mensal
                 # Removendo o horário das colunas
                 df_final.columns = pd.to_datetime(
-                    df_final.columns).strftime('%Y-%m-%d')
+                    df_final.columns).strftime('%d-%b-%y')
 
                 df_final_pl_T = df_final_pl.T  # Transpomos para ter datas como índice
                 df_final_pl_T.index = pd.to_datetime(
@@ -4622,7 +4622,7 @@ def main_page():
                 df_final_pl = df_mensal_pl
                 # Removendo o horário das colunas
                 df_final_pl.columns = pd.to_datetime(
-                    df_final_pl.columns).strftime('%Y-%m-%d')
+                    df_final_pl.columns).strftime('%d-%b-%y')
 
             # ADICIONAR UMA COLUNA DE TOTAL PARA O DF_FINAL
             df_final['Total'] = df_final.sum(axis=1)
@@ -4943,9 +4943,9 @@ def main_page():
                 df_final22 = df_final22.pivot(index = 'Estrategia', columns = 'date', values = 'Rendimento_diario')
                 #Tirar o horário
                 df_final22.columns = pd.to_datetime(df_final22.columns)
-                df_final22.columns = df_final22.columns.strftime('%Y-%m-%d')
-                
+                df_final22.columns = df_final22.columns.strftime('%d-%b-%y')
 
+                
                 #st.write(df_estrategias_copy,df_estrategias_grana,df_final22)
                 df_combinado = df_estrategias_grana + " / " + df_final22
                 df_combinado = df_combinado.drop('Total', axis=0)

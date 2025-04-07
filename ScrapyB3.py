@@ -8,6 +8,8 @@ import pandas as pd
 from datetime import datetime, timedelta
 import time
 import os
+import pandas_market_calendars as mcal
+
 
 
 def processar_dados(processed_data, hoje_str):
@@ -88,6 +90,24 @@ def processar_dados(processed_data, hoje_str):
 
     # 5) Salvar em parquet
     df_preco_de_ajuste_atual.reset_index(inplace=True)
+    #Criar uma coluna com o proximo dia duplicando a coluna de hoje
+    # Obter o calendário da B3
+    b3 = mcal.get_calendar('B3')
+
+    # Data de hoje
+    hoje = datetime.today().date()
+
+    # Pegar os últimos e próximos dias úteis ao redor de hoje
+    datas_uteis = b3.schedule(start_date=hoje - timedelta(days=15), end_date=hoje + timedelta(days=10))
+    datas_uteis_index = datas_uteis.index.date
+
+    # Encontrar o último dia útil estritamente anterior a hoje
+    data_inicial = max([d for d in datas_uteis_index if d < hoje])
+
+    # Encontrar o próximo dia útil após a data inicial
+    proximo_dia = min([d for d in datas_uteis_index if d > data_inicial + timedelta(days=1)])
+
+    df_preco_de_ajuste_atual[f'{proximo_dia}'] = df_preco_de_ajuste_atual[hoje_str]
     df_preco_de_ajuste_atual.to_parquet(nome_arquivo_preco_ajuste)
 
     # # ------------------------------------------
@@ -139,9 +159,36 @@ driver = webdriver.Chrome()
 
 # Configurar a data inicial
 # data_inicial = datetime(2024, 1, 16)  # 16/01/2024
-data_inicial = datetime(2025, 4, 4)  # 16/01/2024
-dias_uteis = obter_dias_uteis(data_inicial)
+#Importar calendário da b3
+# Obter o calendário da B3
+b3 = mcal.get_calendar('B3')
 
+# Data de hoje
+hoje = datetime.today().date()
+
+# Pegar os últimos e próximos dias úteis ao redor de hoje
+datas_uteis = b3.schedule(start_date=hoje - timedelta(days=15), end_date=hoje + timedelta(days=10))
+datas_uteis_index = datas_uteis.index.date
+
+# Encontrar o último dia útil estritamente anterior a hoje
+data_inicial = max([d for d in datas_uteis_index if d < hoje])
+
+# Encontrar o próximo dia útil após a data inicial
+proximo_dia = min([d for d in datas_uteis_index if d > data_inicial])
+
+#Encontrar o último dia útil estritamente anterior a hoje
+dia_anterior = max([d for d in datas_uteis_index if d < data_inicial])
+
+#data_inicial = datetime(2025, 4, 4)  # 16/01/2024
+#dias_uteis = obter_dias_uteis(data_inicial)
+#Colocar dias uteis em uma lista
+datas_uteis = []
+datas_uteis.append(dia_anterior.strftime("%d/%m/%Y"))
+datas_uteis.append(data_inicial.strftime("%d/%m/%Y"))
+
+#datas_uteis.append(proximo_dia.strftime("%d/%m/%Y"))
+
+# Adicionar o dia atual à lista de dias úteis
 
 try:
     # Acessar o site de login
@@ -160,7 +207,7 @@ try:
 
         time.sleep(2)
 
-        for dia in dias_uteis:
+        for dia in datas_uteis:
             input_data = WebDriverWait(driver, 3).until(
                 EC.presence_of_element_located((By.ID, "dData1")))
             # Limpar o campo e inserir a data

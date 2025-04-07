@@ -4953,7 +4953,7 @@ def main_page():
                 #Teste
                 st.table(df_combinado)
                 st.pyplot(fig)
-
+ 
             elif visao == "Ativo":
                 lista_ativos = df_final.index
                 lista_ativos = lista_ativos.tolist()

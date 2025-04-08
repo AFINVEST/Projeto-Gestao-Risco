@@ -107,7 +107,7 @@ def processar_dados(processed_data, hoje_str):
 
     # Encontrar o próximo dia útil após a data inicial
     proximo_dia = min([d for d in datas_uteis_index if d >
-                      data_inicial + timedelta(days=1)])
+                      data_inicial])
 
     df_preco_de_ajuste_atual[f'{proximo_dia}'] = df_preco_de_ajuste_atual[hoje_str]
     df_preco_de_ajuste_atual.to_parquet(nome_arquivo_preco_ajuste)

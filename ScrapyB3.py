@@ -11,7 +11,6 @@ import os
 import pandas_market_calendars as mcal
 
 
-
 def processar_dados(processed_data, hoje_str):
 
     # Definindo as colunas de interesse
@@ -71,8 +70,9 @@ def processar_dados(processed_data, hoje_str):
     if os.path.exists(nome_arquivo_preco_ajuste):
         df_preco_de_ajuste_atual = pd.read_parquet(
             nome_arquivo_preco_ajuste)
-        #Colocar como index a primeira coluna
-        df_preco_de_ajuste_atual = df_preco_de_ajuste_atual.set_index(df_preco_de_ajuste_atual.columns[0])
+        # Colocar como index a primeira coluna
+        df_preco_de_ajuste_atual = df_preco_de_ajuste_atual.set_index(
+            df_preco_de_ajuste_atual.columns[0])
     else:
         df_preco_de_ajuste_atual = pd.DataFrame()
 
@@ -90,7 +90,7 @@ def processar_dados(processed_data, hoje_str):
 
     # 5) Salvar em parquet
     df_preco_de_ajuste_atual.reset_index(inplace=True)
-    #Criar uma coluna com o proximo dia duplicando a coluna de hoje
+    # Criar uma coluna com o proximo dia duplicando a coluna de hoje
     # Obter o calendário da B3
     b3 = mcal.get_calendar('B3')
 
@@ -98,14 +98,16 @@ def processar_dados(processed_data, hoje_str):
     hoje = datetime.today().date()
 
     # Pegar os últimos e próximos dias úteis ao redor de hoje
-    datas_uteis = b3.schedule(start_date=hoje - timedelta(days=15), end_date=hoje + timedelta(days=10))
+    datas_uteis = b3.schedule(
+        start_date=hoje - timedelta(days=15), end_date=hoje + timedelta(days=10))
     datas_uteis_index = datas_uteis.index.date
 
     # Encontrar o último dia útil estritamente anterior a hoje
     data_inicial = max([d for d in datas_uteis_index if d < hoje])
 
     # Encontrar o próximo dia útil após a data inicial
-    proximo_dia = min([d for d in datas_uteis_index if d > data_inicial + timedelta(days=1)])
+    proximo_dia = min([d for d in datas_uteis_index if d >
+                      data_inicial + timedelta(days=1)])
 
     df_preco_de_ajuste_atual[f'{proximo_dia}'] = df_preco_de_ajuste_atual[hoje_str]
     df_preco_de_ajuste_atual.to_parquet(nome_arquivo_preco_ajuste)
@@ -159,7 +161,7 @@ driver = webdriver.Chrome()
 
 # Configurar a data inicial
 # data_inicial = datetime(2024, 1, 16)  # 16/01/2024
-#Importar calendário da b3
+# Importar calendário da b3
 # Obter o calendário da B3
 b3 = mcal.get_calendar('B3')
 
@@ -167,7 +169,8 @@ b3 = mcal.get_calendar('B3')
 hoje = datetime.today().date()
 
 # Pegar os últimos e próximos dias úteis ao redor de hoje
-datas_uteis = b3.schedule(start_date=hoje - timedelta(days=15), end_date=hoje + timedelta(days=10))
+datas_uteis = b3.schedule(
+    start_date=hoje - timedelta(days=15), end_date=hoje + timedelta(days=10))
 datas_uteis_index = datas_uteis.index.date
 
 # Encontrar o último dia útil estritamente anterior a hoje
@@ -176,17 +179,18 @@ data_inicial = max([d for d in datas_uteis_index if d < hoje])
 # Encontrar o próximo dia útil após a data inicial
 proximo_dia = min([d for d in datas_uteis_index if d > data_inicial])
 
-#Encontrar o último dia útil estritamente anterior a hoje
+# Encontrar o último dia útil estritamente anterior a hoje
 dia_anterior = max([d for d in datas_uteis_index if d < data_inicial])
+print(data_inicial, proximo_dia, dia_anterior)
 
-#data_inicial = datetime(2025, 4, 4)  # 16/01/2024
-#dias_uteis = obter_dias_uteis(data_inicial)
-#Colocar dias uteis em uma lista
+# data_inicial = datetime(2025, 4, 4)  # 16/01/2024
+# dias_uteis = obter_dias_uteis(data_inicial)
+# Colocar dias uteis em uma lista
 datas_uteis = []
 datas_uteis.append(dia_anterior.strftime("%d/%m/%Y"))
 datas_uteis.append(data_inicial.strftime("%d/%m/%Y"))
 
-#datas_uteis.append(proximo_dia.strftime("%d/%m/%Y"))
+# datas_uteis.append(proximo_dia.strftime("%d/%m/%Y"))
 
 # Adicionar o dia atual à lista de dias úteis
 
@@ -267,16 +271,16 @@ try:
                         if 'F' in vencimento:
                             processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
                                                    preco_ajuste_atual, variacao, valor_ajuste_contrato])
-                    elif mercadoria == 'DAP - Cupom de DI x IPCA': # Ano impar pegar K, Ano par será Q
+                    elif mercadoria == 'DAP - Cupom de DI x IPCA':  # Ano impar pegar K, Ano par será Q
                         if ano % 2 != 0:
                             if 'K' in vencimento:
                                 processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
-                                                   preco_ajuste_atual, variacao, valor_ajuste_contrato])
+                                                       preco_ajuste_atual, variacao, valor_ajuste_contrato])
                         else:
-                            if 'Q' in vencimento: 
+                            if 'Q' in vencimento:
                                 processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
-                                                   preco_ajuste_atual, variacao, valor_ajuste_contrato])
-                        
+                                                       preco_ajuste_atual, variacao, valor_ajuste_contrato])
+
                     elif mercadoria == 'DOL - Dólar comercial' or mercadoria == 'T10 - US T-Note 10 anos':
                         processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
                                                preco_ajuste_atual, variacao, valor_ajuste_contrato])
@@ -299,11 +303,11 @@ try:
                         if ano % 2 != 0:
                             if 'K' in vencimento:
                                 processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
-                                                   preco_ajuste_atual, variacao, valor_ajuste_contrato])
+                                                       preco_ajuste_atual, variacao, valor_ajuste_contrato])
                         else:
                             if 'Q' in vencimento:
                                 processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
-                                                   preco_ajuste_atual, variacao, valor_ajuste_contrato])
+                                                       preco_ajuste_atual, variacao, valor_ajuste_contrato])
                 # Adicionar os dados processados à lista
             # mudar o dia para o formato YYYY-MM-DD
             dia = datetime.strptime(dia, "%d/%m/%Y").strftime("%Y-%m-%d")
@@ -320,8 +324,8 @@ try:
     except Exception as e:
         print(f"Erro: {e}")
 
-    #driver.quit()
+    # driver.quit()
 
 except Exception as e:
     print(e)
-    #driver.quit()
+    # driver.quit()

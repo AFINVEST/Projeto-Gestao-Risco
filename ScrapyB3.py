@@ -107,9 +107,11 @@ def processar_dados(processed_data, hoje_str):
 
     # Encontrar o próximo dia útil após a data inicial
     proximo_dia = min([d for d in datas_uteis_index if d >
-                      data_inicial])
+                     hoje])
+    hoje_data = datetime.strptime(hoje_str, '%Y-%m-%d').date()
+    if hoje_data == hoje:
+        df_preco_de_ajuste_atual[f'{proximo_dia}'] = df_preco_de_ajuste_atual[hoje_str]
 
-    df_preco_de_ajuste_atual[f'{proximo_dia}'] = df_preco_de_ajuste_atual[hoje_str]
     df_preco_de_ajuste_atual.to_parquet(nome_arquivo_preco_ajuste)
 
     # # ------------------------------------------
@@ -187,8 +189,8 @@ print(data_inicial, proximo_dia, dia_anterior)
 # dias_uteis = obter_dias_uteis(data_inicial)
 # Colocar dias uteis em uma lista
 datas_uteis = []
-datas_uteis.append(dia_anterior.strftime("%d/%m/%Y"))
 datas_uteis.append(data_inicial.strftime("%d/%m/%Y"))
+datas_uteis.append(proximo_dia.strftime("%d/%m/%Y"))
 
 # datas_uteis.append(proximo_dia.strftime("%d/%m/%Y"))
 

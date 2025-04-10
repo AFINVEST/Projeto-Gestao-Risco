@@ -2560,12 +2560,9 @@ def atualizar_parquet_fundos(
 
             # Calcular o rendimento
             if asset == 'TREASURY':
-                st.write(preco_fechamento_dia, preco_compra)
-
                 rendimento = preco_fechamento_dia - preco_compra
                 df_novo_dia.loc[asset, f'{dia_operacao} - Rendimento'] = quantidade * rendimento * dolar / 10000
             else:
-                st.write(preco_fechamento_dia, preco_compra)
                 rendimento = preco_fechamento_dia - preco_compra
                 df_novo_dia.loc[asset, f'{dia_operacao} - Rendimento'] = quantidade * rendimento
 
@@ -2576,7 +2573,7 @@ def atualizar_parquet_fundos(
             # podemos usar o `combine_first` para mesclar, mantendo os valores novos
             # caso existam e os antigos caso não sejam sobrescritos.
             if not df_existente_dia.empty:
-                df_dia_combinado = df_novo_dia.combine_first(df_existente_dia)
+                df_dia_combinado = df_novo_dia.add(df_existente_dia)
             else:
                 # Se não havia dados antigos, df_novo_dia já é o que precisamos
                 df_dia_combinado = df_novo_dia
@@ -2605,19 +2602,14 @@ def atualizar_parquet_fundos(
         df_fundo.reset_index(drop=True, inplace=True)
         st.write(df_fundo)
         df_fundo.to_parquet(nome_arquivo_parquet, index=False)
-        st.write(df_fundo)
         # Pegar o Preco de compra de cada ativo
         df_fundo.reset_index(drop=True, inplace=True)
         df_fundo.to_parquet(nome_arquivo_parquet, index=False)
-        st.write(df_fundo)
         table_name = nome_arquivo_parquet.replace(".parquet", "")
         #table_name = table_name.replace("BaseFundos\\", "")
         table_name = table_name.replace("BaseFundos/", "")
         # Exibe o nome do elemento que foi carregado
         mensagens.append(f"✅ {table_name} carregado!")
-        st.write('### Base de Dados Atualizada')
-        st.table(df_fundo)
-        st.write(f"{table_name} atualizado com sucesso!")
         status_container.markdown(" | ".join(mensagens))
         add_data_2(df_fundo,table_name)
         print(f"[{fundo}] -> parquet atualizado: {nome_arquivo_parquet}")

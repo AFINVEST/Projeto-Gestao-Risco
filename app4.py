@@ -2568,15 +2568,19 @@ def atualizar_parquet_fundos(
         df_fundo.reset_index(drop=True, inplace=True)
         st.write(df_fundo)
         df_fundo.to_parquet(nome_arquivo_parquet, index=False)
-
+        st.write(df_fundo)
         # Pegar o Preco de compra de cada ativo
         df_fundo.reset_index(drop=True, inplace=True)
         df_fundo.to_parquet(nome_arquivo_parquet, index=False)
+        st.write(df_fundo)
         table_name = nome_arquivo_parquet.replace(".parquet", "")
         #table_name = table_name.replace("BaseFundos\\", "")
         table_name = table_name.replace("BaseFundos/", "")
         # Exibe o nome do elemento que foi carregado
         mensagens.append(f"✅ {table_name} carregado!")
+        st.write('### Base de Dados Atualizada')
+        st.table(df_fundo)
+        st.write(f"{table_name} atualizado com sucesso!")
         status_container.markdown(" | ".join(mensagens))
         add_data_2(df_fundo,table_name)
         print(f"[{fundo}] -> parquet atualizado: {nome_arquivo_parquet}")
@@ -2763,6 +2767,8 @@ def add_data_2(df, table_name):
             port="6543"
         )
         cursor = conn.cursor()
+        st.write(f"Conectado ao banco de dados {conn.get_dsn_parameters()['dbname']}")
+        st.write(df)
 
         # --- PASSO 1: GERENCIAMENTO DE COLUNAS ---
         # Obter colunas existentes
@@ -2807,6 +2813,10 @@ def add_data_2(df, table_name):
 
         # --- PASSO 3: UPSERT DOS NOVOS REGISTROS ---
         for record in data:
+            st.write(record, "record")
+            st.write(record.keys(), "keys")
+            st.write(record.values(), "values")
+            
             columns = list(record.keys())
             values = list(record.values())
             
@@ -2845,7 +2855,7 @@ def add_data_2(df, table_name):
     except Exception as e:
         if 'conn' in locals(): 
             conn.rollback()
-        print(f"Erro detalhado: {e}")
+        st.write(f"Erro detalhado: {e}")
         return None
     
 def load_data_base(table_name):

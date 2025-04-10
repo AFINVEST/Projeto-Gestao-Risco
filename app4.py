@@ -226,14 +226,17 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
     Verifica ou cria um parquet de portfólio. Exibe dois DataFrames:
       1) Posição atual salva no parquet.
       2) Novo DataFrame com os ativos e dados recebidos como input.
-    Permite concatenar o novo DataFrame ao existente.
+    Permite concatenar o novo DataFrame ao existente e salvar uma versão compilada
+    (agrupada por Ativo + Dia, com soma da Quantidade e média ponderada do Preço).
     """
+
     st.write('---')
     st.title("Gestão de Portfólio")
-    nome_arquivo_portifolio = 'portifolio_posições.parquet'
-    df_b3_fechamento = processar_b3_portifolio()
 
-    # Carregar o portfólio existente
+    nome_arquivo_portifolio = 'portifolio_posições.parquet'
+    df_b3_fechamento = processar_b3_portifolio()  # <-- Sua função existente para pegar dados B3
+
+    # Carregar (ou criar) o portfólio existente
     if os.path.exists(nome_arquivo_portifolio):
         df_portifolio_salvo = pd.read_parquet(nome_arquivo_portifolio)
     else:
@@ -256,204 +259,225 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
         'Rendimento'
     ])
 
-    # Mudar para a ultima data de fechamento disponivel
+    # Última data de fechamento disponível
     ultimo_fechamento = df_b3_fechamento.columns[-1]
-    dolar = df_b3_fechamento.loc[df_b3_fechamento['Assets']
-                                 == 'WDO1', ultimo_fechamento].values[0]
+    dolar = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', ultimo_fechamento].values[0]
 
-    dia_compra = {k: v.strftime('%Y-%m-%d') if isinstance(v, datetime.date) else v for k, v in dia_compra.items()} \
-        if isinstance(dia_compra, dict) else \
-        dia_compra.strftime('%Y-%m-%d') if isinstance(dia_compra,
-                                                      datetime.date) else dia_compra
+    # Converter dia_compra para string 'YYYY-MM-DD'
+    dia_compra = (
+        {k: v.strftime('%Y-%m-%d') if isinstance(v, datetime.date) else v for k, v in dia_compra.items()}
+        if isinstance(dia_compra, dict)
+        else dia_compra.strftime('%Y-%m-%d') if isinstance(dia_compra, datetime.date)
+        else dia_compra
+    )
 
-    # Conferir se dia de compra já foi lançado no portifólio alguma vez
-    if os.path.exists(nome_arquivo_portifolio):
-        df_portifolio_salvo = pd.read_parquet(nome_arquivo_portifolio)
-
-        # Verificar se `dia_compra` é um dicionário
+    # Se for dict, pegamos o primeiro valor só para exibir, mas cada ativo usa seu dia
     if isinstance(dia_compra, dict):
-        # Pegar o primeiro valor do dicionário
         dia_compra_unico = next(iter(dia_compra.values()))
     else:
         dia_compra_unico = dia_compra
 
-    # Converter o dia de compra para o formato necessário
     dia_compra_unico = pd.to_datetime(dia_compra_unico).strftime('%Y-%m-%d')
 
-    # Conferir se o dia de compra único já existe no DataFrame
-    if os.path.exists(nome_arquivo_portifolio):
-        if dia_compra_unico in df_portifolio_salvo['Dia de Compra'].values:
-            # Dropar dados desse dia
-            df_portifolio_salvo = df_portifolio_salvo[
-                df_portifolio_salvo['Dia de Compra'] != dia_compra_unico
-            ]
-
+    # -----------------------------------------------------------------------
+    # Gerar o novo_portifolio (várias operações, inclusive para o mesmo dia e ativo)
+    # -----------------------------------------------------------------------
     for asset in assets:
-        # Conferir se o dia de compra único já existe no DataFrame
-        if os.path.exists(nome_arquivo_portifolio):
-            if dia_compra_unico in df_portifolio_salvo['Dia de Compra'].values:
-                        # Filtro combinado: dia E ativo
-                filtro = (
-                    (df_portifolio_salvo['Dia de Compra'] == dia_compra_unico) & 
-                    (df_portifolio_salvo['Ativo'] == asset))
-                
-                # Dropar dados desse dia e ativo específicos
-                df_portifolio_salvo = df_portifolio_salvo[~filtro]
-                st.write(df_portifolio_salvo)
-        
         qtd_final = quantidades[asset]
-        dia_de_compra_atual = dia_compra[asset] if isinstance(
-            dia_compra, dict) else dia_compra
-    
+        dia_de_compra_atual = dia_compra[asset] if isinstance(dia_compra, dict) else dia_compra_unico
+
         try:
             # Filtrar os dados no DataFrame de fechamento
             filtro_ativo = (df_b3_fechamento['Assets'] == asset)
-            if compra_especifica.get(asset) == None:
-                preco_compra = df_b3_fechamento.loc[filtro_ativo,
-                                                    dia_de_compra_atual].values[0]
+
+            # Se não houver preço especificado manualmente, usamos o do B3
+            if compra_especifica.get(asset) is None:
+                preco_compra = df_b3_fechamento.loc[filtro_ativo, dia_de_compra_atual].values[0]
             else:
                 preco_compra = compra_especifica[asset]
 
-            preco_fechamento_atual = df_b3_fechamento.loc[df_b3_fechamento["Assets"]
-                                                          == asset, ultimo_fechamento].values[0]
-            preco_fechamento_atual = pd.to_numeric(
-                preco_fechamento_atual, errors='coerce')
+            preco_fechamento_atual = df_b3_fechamento.loc[
+                df_b3_fechamento["Assets"] == asset,
+                ultimo_fechamento
+            ].values[0]
+            preco_fechamento_atual = pd.to_numeric(preco_fechamento_atual, errors='coerce')
 
+            # Calcular rendimento
             if asset == 'TREASURY':
-                rendimento = qtd_final * \
-                    (preco_fechamento_atual - preco_compra) * (dolar / 10000)
-
+                rendimento = qtd_final * (preco_fechamento_atual - preco_compra) * (dolar / 10000)
             else:
-
-                rendimento = qtd_final * \
-                    (preco_fechamento_atual - preco_compra)
+                rendimento = qtd_final * (preco_fechamento_atual - preco_compra)
 
             # Adicionar linha ao novo DataFrame
-            novo_portifolio = pd.concat([novo_portifolio, pd.DataFrame([{
+            nova_linha = {
                 'Ativo': asset,
                 'Quantidade': qtd_final,
                 'Dia de Compra': dia_de_compra_atual,
                 'Preço de Compra': preco_compra,
                 'Preço de Ajuste Atual': preco_fechamento_atual,
                 'Rendimento': rendimento
-            }])], ignore_index=True)
+            }
+            novo_portifolio = pd.concat([novo_portifolio, pd.DataFrame([nova_linha])], ignore_index=True)
 
         except Exception as e:
             st.error(f"Erro ao processar o ativo {asset}: {e}")
 
-    # Exibir os dois DataFrames
+    # -----------------------------------------------------------------------
+    # 1) Exibir o "Portfólio Atual" (linhas já salvas no parquet)
+    # 2) Exibir as "Novas Operações"
+    # 3) Exibir uma visualização "processada" (somada) mas ainda sem agrupar Ativo+Dia
+    # 4) Exibir a versão "compilada" (agrupada por Ativo+Dia), com média do preço
+    # -----------------------------------------------------------------------
     col_p1, col_p3, col_p2 = st.columns([4.9, 0.2, 4.9])
-    with col_p1:
-        st.subheader("Portfólio Atual")
-        st.table(df_portifolio_salvo.set_index('Ativo'))
-        df_atual = df_portifolio_salvo.copy()
-        df_atual = df_atual.groupby('Ativo').sum().reset_index()
-        df_atual.drop(['Dia de Compra', 'Preço de Compra',
-                       'Preço de Ajuste Atual'], axis=1, inplace=True)
 
+    with col_p1:
+        st.subheader("Portfólio Atual (já salvo)")
+        st.table(df_portifolio_salvo.set_index('Ativo'))
+
+        # Agrupar para ver quantidades consolidadas do portfólio atual
+        df_atual = df_portifolio_salvo.groupby('Ativo', as_index=False)['Quantidade'].sum()
         assets_atual = df_atual['Ativo'].tolist()
         quantidades_atual = df_atual['Quantidade'].tolist()
 
     with col_p3:
         st.html(
             '''
-                    <div class="divider-vertical-lines"></div>
-                    <style>
-                        .divider-vertical-lines {
-                            border-left: 2px solid rgba(49, 51, 63, 0.2);
-                            height: 40vh;
-                            margin: auto;
-                        }
-                        @media (max-width: 768px) {
-                            .divider-vertical-lines {
-                                display: none;
-                            }
-                        }
-                    </style>
-                    '''
+            <div class="divider-vertical-lines"></div>
+            <style>
+                .divider-vertical-lines {
+                    border-left: 2px solid rgba(49, 51, 63, 0.2);
+                    height: 40vh;
+                    margin: auto;
+                }
+                @media (max-width: 768px) {
+                    .divider-vertical-lines {
+                        display: none;
+                    }
+                }
+            </style>
+            '''
         )
 
     with col_p2:
-        st.subheader("Novas Operações")
+        st.subheader("Novas Operações (inseridas agora)")
         st.table(novo_portifolio.set_index('Ativo'))
 
-        df_teste = pd.concat(
-            [df_portifolio_salvo, novo_portifolio], ignore_index=True)
+        # "Portfólio processado" (bruto, apenas concat do atual + novo)
+        st.subheader("Portfólio processado (bruto, antes de agrupar)")
+        df_teste = pd.concat([df_portifolio_salvo, novo_portifolio], ignore_index=True)
+        st.table(df_teste.set_index('Ativo'))
+        df_teste['Dia de Compra'] = pd.to_datetime(df_teste['Dia de Compra'], format='%Y-%m-%d', errors='coerce')
 
-        df_teste = df_teste.groupby('Ativo').sum().reset_index()
-        df_teste.drop(['Dia de Compra', 'Preço de Compra',
-                       'Preço de Ajuste Atual'], axis=1, inplace=True)
-        # Separar uma lista de ativos e uma lista de quantidades
-        assets_teste = df_teste['Ativo'].tolist()
-        quantidades_teste = df_teste['Quantidade'].tolist()
-        st.subheader("Portfólio processado")
-        st.table(df_teste)
+        # 1) Ordenar por Dia de Compra, para garantir que a última linha tenha o dia mais recente
+        df_teste = df_teste.sort_values('Dia de Compra')
+
+        def agrupar_por_ativo(subdf):
+            # Quantidade total
+            qtd_total = subdf['Quantidade'].sum()
+            
+            # Média ponderada de Preço de Compra:
+            # (soma de [Quantidade_i * PreçoCompra_i]) / soma(Quantidade_i)
+            preco_medio_compra = (
+                (subdf['Quantidade'] * subdf['Preço de Compra']).sum() 
+                / qtd_total
+            )
+            
+            # Preço de Ajuste Atual mais recente (a linha final depois de sort)
+            preco_ajuste_atual = subdf.iloc[-1]['Preço de Ajuste Atual']
+
+            # Rendimento recalculado:
+            # (Preço Ajuste Atual - Preço Compra Médio) * Quantidade total
+            rendimento_final = (preco_ajuste_atual - preco_medio_compra) * qtd_total
+            
+            return pd.Series({
+                'Quantidade': qtd_total,
+                'Dia de Compra': subdf.iloc[-1]['Dia de Compra'],
+                'Preço de Compra Médio': preco_medio_compra,
+                'Preço de Ajuste Atual (Mais Recente)': preco_ajuste_atual,
+                'Rendimento': rendimento_final
+            })
+        
+
+        df_compilado = (
+            df_teste
+            .groupby('Ativo', as_index=False)
+            .apply(agrupar_por_ativo)
+        )
+
+
+        st.subheader("Portfólio processado (compilado por Dia + Ativo)")
+        st.table(df_compilado)
+
     st.write("---")
+
+    # --------------------------------------------------------------------
+    # Lógica para df_contratos etc.
+    # --------------------------------------------------------------------
     df_contratos_2 = read_atual_contratos()
     for col in df_contratos_2.columns:
         df_contratos_2.rename(columns={col: f'Contratos {col}'}, inplace=True)
-    # Somar as duas tabelas
-    # Garantir que todas as colunas que são relevantes para a soma sejam numéricas
-    # Coerce converte valores não numéricos para NaN
+
     df_contratos = df_contratos.apply(pd.to_numeric, errors='coerce')
-    df_contratos_2 = df_contratos_2.apply(
-        pd.to_numeric, errors='coerce')  # O mesmo para df_contratos_2
-
+    df_contratos_2 = df_contratos_2.apply(pd.to_numeric, errors='coerce')
     df_contratos = df_contratos.add(df_contratos_2, fill_value=0)
-    # Preciso somar os contratos e   m df_contratos_2 e df_contratos
 
-    df_contratos.drop(['Adm', 'PL', 'PL_atualizado',
-                      'Weights'], axis=1, inplace=True)
-    opp = st.sidebar.checkbox("Verificar visão do portifólio", value = False)
+    df_contratos.drop(['Adm', 'PL', 'PL_atualizado', 'Weights'], axis=1, inplace=True, errors='ignore')
+    df_teste['Dia de Compra'] = pd.to_datetime(df_teste['Dia de Compra'], format='%Y-%m-%d', errors='coerce')
+
+
+    opp = st.sidebar.checkbox("Verificar visão do portifólio", value=False)
     if opp:
         col_pp1, col_pp3, col_pp2 = st.columns([4.9, 0.2, 4.9])
         with col_pp1:
-            st.write("## Portfólio Atual")
-            soma_pl_sem_pesos = calcular_metricas_de_port(
-                assets_atual, quantidades_atual, df_contratos_2)
-            
+            st.write("## Portfólio Atual (visão consolidada)")
+            soma_pl_sem_pesos = calcular_metricas_de_port(assets_atual, quantidades_atual, df_contratos_2)
         with col_pp2:
-            st.write("## Novo Portfólio")
-            soma_pl_sem_pesos_novo = calcular_metricas_de_port(
-                assets_teste, quantidades_teste, df_contratos)
+            st.write("## Novo Portfólio (visão consolidada)")
+            # Vamos agrupar para exibir a soma final de df_compilado ou df_teste
+            # Para simplificar, usaremos os Ativos e Quantidades totais de df_compilado
+            # (agrupado, mas sem re-somar por dia).
+            st.write(df_compilado)
+            df_final_group = df_compilado.groupby('Ativo', as_index=False)['Quantidade'].sum()
+            assets_teste = df_final_group['Ativo'].tolist()
+            quantidades_teste = df_final_group['Quantidade'].tolist()
+
+            soma_pl_sem_pesos_novo = calcular_metricas_de_port(assets_teste, quantidades_teste, df_contratos)
         with col_pp3:
             st.html(
                 '''
-                        <div class="divider-vertical-line"></div>
-                        <style>
-                            .divider-vertical-line {
-                                border-left: 2px solid rgba(49, 51, 63, 0.2);
-                                height: 110vh;
-                                margin: auto;
-                            }
-                            @media (max-width: 768px) {
-                                .divider-vertical-line {
-                                    display: none;
-                                }
-                            }
-                        </style>
-                        '''
+                <div class="divider-vertical-line"></div>
+                <style>
+                    .divider-vertical-line {
+                        border-left: 2px solid rgba(49, 51, 63, 0.2);
+                        height: 110vh;
+                        margin: auto;
+                    }
+                    @media (max-width: 768px) {
+                        .divider-vertical-line {
+                            display: none;
+                        }
+                    }
+                </style>
+                '''
             )
         st.write("---")
-
     else:
+        # Sua lógica original de PL, etc.
         file_pl = "pl_fundos.parquet"
         df_pl = pd.read_parquet(file_pl)
         df_pl = df_pl.set_index(df_pl.columns[0])
         file_bbg = "BBG - ECO DASH.xlsx"
-        # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
         dict_pesos = {
-                'GLOBAL BONDS': 4,
-                'HORIZONTE': 1,
-                'JERA2026': 1,
-                'REAL FIM': 1,
-                'BH FIRF INFRA': 1,
-                'BORDEAUX INFRA': 1,
-                'TOPAZIO INFRA': 1,
-                'MANACA INFRA FIRF': 1,
-                'AF DEB INCENTIVADAS': 3
-            }
-        # Zerar os pesos de fundos que não tem contratos
+            'GLOBAL BONDS': 4,
+            'HORIZONTE': 1,
+            'JERA2026': 1,
+            'REAL FIM': 1,
+            'BH FIRF INFRA': 1,
+            'BORDEAUX INFRA': 1,
+            'TOPAZIO INFRA': 1,
+            'MANACA INFRA FIRF': 1,
+            'AF DEB INCENTIVADAS': 3
+        }
         for idx, row in df_contratos_2.iterrows():
             if idx == 'Total':
                 continue
@@ -461,14 +485,13 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                 fundo = idx
                 check = 0
                 for asset in assets_atual:
-                    if int(row[f'Contratos {asset}']) != 0:
+                    # Se ainda existe no df_contratos_2 com quantity != 0
+                    if int(row.get(f'Contratos {asset}', 0)) != 0:
                         check = 1
                 if check == 0:
                     dict_pesos[fundo] = 0
-
         Weights = list(dict_pesos.values())
-        df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(
-            df_pl, Weights)
+        df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(df_pl, Weights)
 
     st.write("## Analise por Fundo") 
     st.write("### Selecione os filtros")
@@ -477,8 +500,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
 
     colll1, colll2 = st.columns([4.9, 4.9])
     with colll1:
-        fundos = st.multiselect(
-            "Selecione os fundos que deseja analisar", lista_fundos, default=lista_fundos)
+        fundos = st.multiselect("Selecione os fundos que deseja analisar", lista_fundos, default=lista_fundos)
     with colll2:
         op1 = st.checkbox("CoVaR / % Risco Total", value=False)
         op2 = st.checkbox("Div01 / Stress", value=False)
@@ -487,65 +509,73 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
     with cool1:
         fundos0 = fundos.copy()
         if fundos0:
-            st.write("## Portfólio Atual")
+            st.write("## Portfólio Atual (original, consolidado)")
             soma_pl_sem_pesos2 = calcular_metricas_de_fundo(
-                assets_atual, quantidades_atual, df_contratos_2,fundos0,op1,op2)
+                assets_atual,
+                quantidades_atual,
+                df_contratos_2,
+                fundos0,
+                op1,
+                op2
+            )
     with cool2:
         fundos1 = fundos.copy()
+        #Tirar horas do df_teste
+        df_teste['Dia de Compra'] = pd.to_datetime(df_teste['Dia de Compra'], format='%Y-%m-%d', errors='coerce')
+
         if fundos1:
-            st.write("## Novo Portfólio")
+            st.write("## Novo Portfólio (após inserções)")
+            # Aqui podemos usar os ativos/quantidades do df_compilado (ou agrupar novamente)
+            df_final_group = df_compilado.groupby('Ativo', as_index=False)['Quantidade'].sum()
+            assets_teste = df_final_group['Ativo'].tolist()
+            quantidades_teste = df_final_group['Quantidade'].tolist()
+
             soma_pl_sem_pesos2_novo = calcular_metricas_de_fundo(
-                assets_teste, quantidades_teste, df_contratos,fundos1,op1,op2)
-        # Botão para concatenar os DataFrames
+                assets_teste,
+                quantidades_teste,
+                df_contratos,
+                fundos1,
+                op1,
+                op2
+            )
+
+        # Botão para salvar
+        st.write("### Salvar novo portfólio compilado")
         if st.button("Salvar novo portfólio"):
-            df_portifolio_salvo = pd.concat(
-                [df_portifolio_salvo, novo_portifolio], ignore_index=True)
-            max_id = df_portifolio_salvo['Id'].max()
-            # se estiver totalmente nula, defina como 0
-            if pd.isna(max_id):
-                max_id = 0
-
-            # contar quantos NaNs existem
-            num_missing = df_portifolio_salvo['Id'].isna().sum()
-
-            # criar novos IDs sequenciais a partir do max_id
-            new_ids = range(int(max_id) + 1, int(max_id) + 1 + num_missing)
-
-            # substituir os NaNs com esses novos valores
-            df_portifolio_salvo.loc[df_portifolio_salvo['Id'].isna(), 'Id'] = list(new_ids)
-
-            # garantir que a coluna seja inteira, se quiser
-            df_portifolio_salvo['Id'] = df_portifolio_salvo['Id'].astype(int)
+            # df_compilado contém a versão agrupara por (Ativo, Dia de Compra)
+            df_teste.to_parquet(nome_arquivo_portifolio, index=False)
             
-            df_portifolio_salvo.to_parquet(nome_arquivo_portifolio, index=False)
-            add_data(df_portifolio_salvo.to_dict(orient="records"))
-            st.success("Novo portfólio salvo com sucesso!")
-            st.dataframe(df_portifolio_salvo)
+            # Caso você deseje salvar a versão "bruta" também,
+            # troque "df_compilado" por "df_teste" ou junte ambos.
+            add_data(df_teste.to_dict(orient="records"))
+
+            st.success("Novo portfólio compilado salvo com sucesso!")
+            st.dataframe(df_teste)
             key = True
         else:
             key = False
+
     with cool3:
         st.html(
             '''
-                    <div class="divider-vertical-line"></div>
-                    <style>
-                        .divider-vertical-line {
-                            border-left: 2px solid rgba(49, 51, 63, 0.2);
-                            height: 80vh;
-                            margin: auto;
-                        }
-                        @media (max-width: 768px) {
-                            .divider-vertical-line {
-                                display: none;
-                            }
-                        }
-
-                    </style>
-                    '''
+            <div class="divider-vertical-line"></div>
+            <style>
+                .divider-vertical-line {
+                    border-left: 2px solid rgba(49, 51, 63, 0.2);
+                    height: 80vh;
+                    margin: auto;
+                }
+                @media (max-width: 768px) {
+                    .divider-vertical-line {
+                        display: none;
+                    }
+                }
+            </style>
+            '''
         )
     st.write("---")
-    return df_portifolio_salvo, key, soma_pl_sem_pesos
 
+    return df_portifolio_salvo, key, soma_pl_sem_pesos
 
 def read_atual_contratos():
     files = os.listdir('BaseFundos')
@@ -2556,7 +2586,6 @@ def atualizar_parquet_fundos(
             quantidade = row_fundo[f'Contratos {asset}']
             quantidade = pd.to_numeric(quantidade, errors='coerce')
             df_novo_dia.loc[asset, f'{dia_operacao} - Quantidade'] = quantidade
-            st.write(preco_fechamento_dia, preco_compra)
 
             # Calcular o rendimento
             if asset == 'TREASURY':
@@ -2600,7 +2629,6 @@ def atualizar_parquet_fundos(
         # --------------------------------------------------------------------
         # Redefine o índice antes de salvar, se for sua convenção
         df_fundo.reset_index(drop=True, inplace=True)
-        st.write(df_fundo)
         df_fundo.to_parquet(nome_arquivo_parquet, index=False)
         # Pegar o Preco de compra de cada ativo
         df_fundo.reset_index(drop=True, inplace=True)
@@ -2796,8 +2824,6 @@ def add_data_2(df, table_name):
             port="6543"
         )
         cursor = conn.cursor()
-        st.write(f"Conectado ao banco de dados {conn.get_dsn_parameters()['dbname']}")
-        st.write(df)
 
         # --- PASSO 1: GERENCIAMENTO DE COLUNAS ---
         # Obter colunas existentes
@@ -2842,10 +2868,6 @@ def add_data_2(df, table_name):
 
         # --- PASSO 3: UPSERT DOS NOVOS REGISTROS ---
         for record in data:
-            st.write(record, "record")
-            st.write(record.keys(), "keys")
-            st.write(record.values(), "values")
-            
             columns = list(record.keys())
             values = list(record.values())
             
@@ -2884,7 +2906,7 @@ def add_data_2(df, table_name):
     except Exception as e:
         if 'conn' in locals(): 
             conn.rollback()
-        st.write(f"Erro detalhado: {e}")
+        print(f"Erro detalhado: {e}")
         return None
     
 def load_data_base(table_name):

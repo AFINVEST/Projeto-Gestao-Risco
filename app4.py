@@ -320,7 +320,6 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                 preco_fechamento_atual, errors='coerce')
 
             if asset == 'TREASURY':
-
                 rendimento = qtd_final * \
                     (preco_fechamento_atual - preco_compra) * (dolar / 10000)
 
@@ -2557,12 +2556,16 @@ def atualizar_parquet_fundos(
             quantidade = row_fundo[f'Contratos {asset}']
             quantidade = pd.to_numeric(quantidade, errors='coerce')
             df_novo_dia.loc[asset, f'{dia_operacao} - Quantidade'] = quantidade
+            st.write(preco_fechamento_dia, preco_compra)
 
             # Calcular o rendimento
             if asset == 'TREASURY':
+                st.write(preco_fechamento_dia, preco_compra)
+
                 rendimento = preco_fechamento_dia - preco_compra
                 df_novo_dia.loc[asset, f'{dia_operacao} - Rendimento'] = quantidade * rendimento * dolar / 10000
             else:
+                st.write(preco_fechamento_dia, preco_compra)
                 rendimento = preco_fechamento_dia - preco_compra
                 df_novo_dia.loc[asset, f'{dia_operacao} - Rendimento'] = quantidade * rendimento
 
@@ -4124,7 +4127,6 @@ def main_page():
                 ['Quantidade', 'Valor Fechamento', 'Valor Fechamento Ajustado pelo Var'], axis=1
             )
             st.table(df_precos_plot)
-
             st.write("### Quantidade Máxima de Contratos por Fundo")
             st.table(df_pl_processado_print)
             st.write("---")

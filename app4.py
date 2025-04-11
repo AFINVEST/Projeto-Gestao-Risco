@@ -542,23 +542,23 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
         # Botão para salvar
         st.write("### Salvar novo portfólio compilado")
         if st.button("Salvar novo portfólio"):
-            max_id = df_portifolio_salvo['Id'].max()
+            max_id = df_teste['Id'].max()
             # se estiver totalmente nula, defina como 0
             if pd.isna(max_id):
                 max_id = 0
 
             # contar quantos NaNs existem
-            num_missing = df_portifolio_salvo['Id'].isna().sum()
+            num_missing = df_teste['Id'].isna().sum()
 
             # criar novos IDs sequenciais a partir do max_id
             new_ids = range(int(max_id) + 1, int(max_id) + 1 + num_missing)
 
             # substituir os NaNs com esses novos valores
-            df_portifolio_salvo.loc[df_portifolio_salvo['Id'].isna(), 'Id'] = list(new_ids)
+            df_teste.loc[df_teste['Id'].isna(), 'Id'] = list(new_ids)
 
             # garantir que a coluna seja inteira, se quiser
-            df_portifolio_salvo['Id'] = df_portifolio_salvo['Id'].astype(int)
-                        # df_compilado contém a versão agrupara por (Ativo, Dia de Compra)
+            df_teste['Id'] = df_teste['Id'].astype(int)
+            # df_compilado contém a versão agrupara por (Ativo, Dia de Compra)
             df_teste.to_parquet(nome_arquivo_portifolio, index=False)
             
             # Caso você deseje salvar a versão "bruta" também,
@@ -2528,7 +2528,6 @@ def atualizar_parquet_fundos(
     # Mensagem inicial
     mensagens = ["⏳ Aguarde até o Total ser concluído..."]
     status_container.markdown(" | ".join(mensagens))  # Exibe a mensagem inicial
-    st.write(df_current)
     for fundo, row_fundo in df_current.iterrows():
         # Caminho do parquet do Fundo
         nome_arquivo_parquet = os.path.join("BaseFundos", f"{fundo}.parquet")
@@ -2599,7 +2598,6 @@ def atualizar_parquet_fundos(
             ].values[0]
             preco_compra = pd.to_numeric(preco_compra, errors='coerce')
             df_novo_dia.loc[asset, f"{dia_operacao} - Preco_Compra"] = preco_compra
-            st.write(row_fundo,asset)
             quantidade = row_fundo[f'Contratos {asset}']
             quantidade = pd.to_numeric(quantidade, errors='coerce')
             df_novo_dia.loc[asset, f'{dia_operacao} - Quantidade'] = quantidade

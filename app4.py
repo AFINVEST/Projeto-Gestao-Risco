@@ -595,7 +595,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
         )
     st.write("---")
 
-    return df_portifolio_salvo, key, soma_pl_sem_pesos
+    return df_teste, key, soma_pl_sem_pesos
 
 def read_atual_contratos():
     files = os.listdir('BaseFundos')
@@ -2495,7 +2495,6 @@ def atualizar_parquet_fundos(
     df_info,
     # DF de preços de fechamento B3: colunas ["Assets", <data1>, <data2>, ...]
 ):
-    st.write(df_current,dia_operacao, df_info)
     df_fechamento_b3 = pd.read_parquet("df_preco_de_ajuste_atual_completo.parquet")
     df_fechamento_b3 = df_fechamento_b3.replace('\.', '', regex=True)
     df_fechamento_b3 = df_fechamento_b3.replace({',': '.'}, regex=True)
@@ -2555,7 +2554,6 @@ def atualizar_parquet_fundos(
             if "Ativo" in df_fundo.columns:
                 df_fundo.set_index("Ativo", inplace=True, drop=False)
             df_existente_dia = pd.DataFrame()  # sem dados do dia, pois não existe ainda
-        st.write(cols_dia, df_existente_dia)
         # --------------------------------------------------------------------
         # 4) Construir um DataFrame temporário para os dados novos do dia
         #    (em vez de editar df_fundo diretamente, para depois combinarmos)
@@ -2650,8 +2648,6 @@ def atualizar_parquet_fundos(
         # --------------------------------------------------------------------
         # Redefine o índice antes de salvar, se for sua convenção
         df_fundo.reset_index(drop=True, inplace=True)
-        st.write(f"### {fundo} - {dia_operacao}")
-        st.write(df_fundo)
         df_fundo.to_parquet(nome_arquivo_parquet, index=False)
         # Pegar o Preco de compra de cada ativo
         df_fundo.reset_index(drop=True, inplace=True)
@@ -4143,7 +4139,6 @@ def main_page():
 
             df_port, key, soma_pl_sem_pesos = checkar_portifolio(
                 assets, quantidade_nomes, precos_user, data_compra, filtered_df)
-
             if key == True:
                 atualizar_parquet_fundos(
                     filtered_df, data_compra_todos, df_port)

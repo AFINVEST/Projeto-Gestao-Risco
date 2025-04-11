@@ -388,7 +388,6 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
             # Rendimento recalculado:
             # (Preço Ajuste Atual - Preço Compra Médio) * Quantidade total
             rendimento_final = (preco_ajuste_atual - preco_medio_compra) * qtd_total
-            
             return pd.Series({
                 'Quantidade': qtd_total,
                 'Dia de Compra': subdf.iloc[-1]['Dia de Compra'],

@@ -2495,6 +2495,7 @@ def atualizar_parquet_fundos(
     df_info,
     # DF de preços de fechamento B3: colunas ["Assets", <data1>, <data2>, ...]
 ):
+
     df_fechamento_b3 = pd.read_parquet("df_preco_de_ajuste_atual_completo.parquet")
     df_fechamento_b3 = df_fechamento_b3.replace('\.', '', regex=True)
     df_fechamento_b3 = df_fechamento_b3.replace({',': '.'}, regex=True)
@@ -2532,6 +2533,10 @@ def atualizar_parquet_fundos(
     # Mensagem inicial
     mensagens = ["⏳ Aguarde até o Total ser concluído..."]
     status_container.markdown(" | ".join(mensagens))  # Exibe a mensagem inicial
+    #Lista de ativos
+    lista_assets = df_info["Ativo"].unique()
+    #Teste de analise de perf
+
     for fundo, row_fundo in df_current.iterrows():
         nome_arquivo_parquet = os.path.join("BaseFundos", f"{fundo}.parquet")
         
@@ -2553,8 +2558,6 @@ def atualizar_parquet_fundos(
 
         # Se houver ativos novos (que não estavam em df_fundo), adicionaremos também
         subset = df_info[df_info["Dia de Compra"] == dia_operacao]
-        lista_assets = subset["Ativo"].unique()
-
         for asset in lista_assets:
             # Se não existe, cria uma linha vazia
             if asset not in df_novo_dia.index:
@@ -2599,7 +2602,6 @@ def atualizar_parquet_fundos(
             else:
                 rendimento = (preco_fechamento_dia - preco_compra)
             df_novo_dia.loc[asset, f'{dia_operacao} - Rendimento'] = quantidade * rendimento
-
 
         # --------------------------------------------------------------------
         # 7) Salvar ao final

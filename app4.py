@@ -2536,7 +2536,6 @@ def atualizar_parquet_fundos(
     #Lista de ativos
     lista_assets = df_info["Ativo"].unique()
     #Teste de analise de perf
-
     for fundo, row_fundo in df_current.iterrows():
         nome_arquivo_parquet = os.path.join("BaseFundos", f"{fundo}.parquet")
         
@@ -2586,21 +2585,32 @@ def atualizar_parquet_fundos(
             preco_fechamento_dia = pd.to_numeric(preco_fechamento_dia, errors='coerce')
             df_novo_dia.loc[asset, f"{dia_operacao} - Preco_Fechamento"] = preco_fechamento_dia
 
-            preco_compra = df_info.loc[
-                (df_info["Ativo"] == asset) & (df_info["Dia de Compra"] == dia_operacao),
-                "Preço de Compra"
-            ].values[0]
+            try:
+                preco_compra = df_info.loc[
+                    (df_info["Ativo"] == asset) & (df_info["Dia de Compra"] == dia_operacao),
+                    "Preço de Compra"
+                ].values[0]
+            except:
+                preco_compra = np.nan
             preco_compra = pd.to_numeric(preco_compra, errors='coerce')
             df_novo_dia.loc[asset, f"{dia_operacao} - Preco_Compra"] = preco_compra
-
-            quantidade = row_fundo[f'Contratos {asset}']
+            try:
+                quantidade = row_fundo[f'Contratos {asset}']
+            except:
+                quantidade = np.nan
             quantidade = pd.to_numeric(quantidade, errors='coerce')
             df_novo_dia.loc[asset, f"{dia_operacao} - Quantidade"] = quantidade
 
             if asset == 'TREASURY':
-                rendimento = (preco_fechamento_dia - preco_compra) * dolar / 10000
+                try:
+                    rendimento = (preco_fechamento_dia - preco_compra) * dolar / 10000
+                except:
+                    rendimento = np.nan
             else:
-                rendimento = (preco_fechamento_dia - preco_compra)
+                try:
+                    rendimento = (preco_fechamento_dia - preco_compra) * quantidade
+                except:
+                    rendimento = np.nan
             df_novo_dia.loc[asset, f'{dia_operacao} - Rendimento'] = quantidade * rendimento
 
         # ---------------------------------------------------------------------

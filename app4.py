@@ -2555,7 +2555,7 @@ def atualizar_parquet_fundos(
             if "Ativo" in df_fundo.columns:
                 df_fundo.set_index("Ativo", inplace=True, drop=False)
             df_existente_dia = pd.DataFrame()  # sem dados do dia, pois não existe ainda
-
+        st.write(cols_dia, df_existente_dia)
         # --------------------------------------------------------------------
         # 4) Construir um DataFrame temporário para os dados novos do dia
         #    (em vez de editar df_fundo diretamente, para depois combinarmos)
@@ -2621,6 +2621,7 @@ def atualizar_parquet_fundos(
             # Se não havia colunas de dia, df_existente_dia estará vazio; se havia,
             # podemos usar o `combine_first` para mesclar, mantendo os valores novos
             # caso existam e os antigos caso não sejam sobrescritos.
+            st.write(df_novo_dia, df_existente_dia)
             if not df_existente_dia.empty:
                 df_dia_combinado = df_novo_dia.add(df_existente_dia)
             else:

@@ -545,7 +545,8 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
         if st.button("Salvar novo portfólio"):
             #Tirar horas do df_teste
             df_teste['Dia de Compra'] = pd.to_datetime(df_teste['Dia de Compra'], format='%Y-%m-%d', errors='coerce')
-            
+            df_teste['Dia de Compra'] = df_teste['Dia de Compra'].astype(str)
+
             max_id = df_teste['Id'].max()
             # se estiver totalmente nula, defina como 0
             if pd.isna(max_id):

@@ -2648,6 +2648,8 @@ def atualizar_parquet_fundos(
         # --------------------------------------------------------------------
         # Redefine o índice antes de salvar, se for sua convenção
         df_fundo.reset_index(drop=True, inplace=True)
+        st.write(f"### {fundo} - {dia_operacao}")
+        st.write(df_fundo)
         df_fundo.to_parquet(nome_arquivo_parquet, index=False)
         # Pegar o Preco de compra de cada ativo
         df_fundo.reset_index(drop=True, inplace=True)
@@ -2832,7 +2834,7 @@ def add_data_2(df, table_name):
     # Remover colunas do DataFrame
     df = df.drop(columns=columns_to_drop)
     data = df.to_dict(orient='records')
-
+    st.write(data)
     try:        
         # Conexão com o PostgreSQL
         conn = psycopg2.connect(

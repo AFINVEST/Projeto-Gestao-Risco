@@ -2533,67 +2533,55 @@ def atualizar_parquet_fundos(
     mensagens = ["⏳ Aguarde até o Total ser concluído..."]
     status_container.markdown(" | ".join(mensagens))  # Exibe a mensagem inicial
     for fundo, row_fundo in df_current.iterrows():
-        # Caminho do parquet do Fundo
         nome_arquivo_parquet = os.path.join("BaseFundos", f"{fundo}.parquet")
-        # --------------------------------------------------------------------
-        # 1) Carregar (ou criar) o DataFrame histórico do Fundo (df_fundo)
-        # --------------------------------------------------------------------
+        
+        # Carrega ou cria o df_fundo
         if os.path.exists(nome_arquivo_parquet):
             df_fundo = pd.read_parquet(nome_arquivo_parquet)
-            
-            # 2) Garante que "Ativo" seja índice (mas mantendo a coluna)
             if "Ativo" in df_fundo.columns:
                 df_fundo.set_index("Ativo", inplace=True, drop=False)
-            
-            # 3) Se já existem colunas para o dia_operacao, guardar para depois
+            # Coleta dados antigos do dia, se existirem
             cols_dia = df_fundo.columns[df_fundo.columns.str.startswith(dia_operacao)]
             df_existente_dia = df_fundo[cols_dia].copy() if len(cols_dia) > 0 else pd.DataFrame()
         else:
-            # Se não existe o parquet, cria df_fundo vazio com as colunas básicas.
-            df_fundo = pd.DataFrame(columns=["Ativo", "Preco_Fechamento_Atual"])
-            if "Ativo" in df_fundo.columns:
-                df_fundo.set_index("Ativo", inplace=True, drop=False)
-            df_existente_dia = pd.DataFrame()  # sem dados do dia, pois não existe ainda
-        # --------------------------------------------------------------------
-        # 4) Construir um DataFrame temporário para os dados novos do dia
-        #    (em vez de editar df_fundo diretamente, para depois combinarmos)
-        # --------------------------------------------------------------------
-        # Vamos criar um DF temporário que terá o mesmo índice do df_fundo
-        # para facilitar a mesclagem.
+            df_fundo = pd.DataFrame(columns=["Ativo","Preco_Fechamento_Atual"])
+            df_fundo.set_index("Ativo", inplace=True, drop=False)
+            df_existente_dia = pd.DataFrame()
+
+        # Cria df_novo_dia em branco (mesmo índice do df_fundo)
         df_novo_dia = pd.DataFrame(index=df_fundo.index)
 
-        # 4.1) Se houver ativos novos (que não estavam em df_fundo), adicionamos depois.
+        # Se houver ativos novos (que não estavam em df_fundo), adicionaremos também
         subset = df_info[df_info["Dia de Compra"] == dia_operacao]
         lista_assets = subset["Ativo"].unique()
 
         for asset in lista_assets:
-            # Se o ativo ainda não existe no df_fundo, precisamos garantir que ele
-            # apareça no índice do df_novo_dia. (Podemos anexar uma linha vazia.)
+            # Se não existe, cria uma linha vazia
             if asset not in df_novo_dia.index:
-                df_novo_dia.loc[asset, :] = pd.NA  # insere uma linha vazia
-            
-            # Prepara as colunas específicas (criamos ou sobrescrevemos):
+                df_novo_dia.loc[asset, :] = pd.NA
+
+            # -------------------------
+            # Preenche as colunas novas
+            # -------------------------
             if fundo == "Total":
-                pl_valor = sum(pl_dias_vetor)  # Exemplo de soma (ajuste conforme sua lógica)
+                pl_valor = sum(pl_dias_vetor)
             else:
                 pl_valor = pl_dias.loc[fundo, dia_operacao]
                 pl_dias_vetor.append(pl_valor)
 
             df_novo_dia.loc[asset, f"{dia_operacao} - PL"] = pl_valor
-            
-            # Garantir que o valor seja numérico
+
             preco_fechamento_atual = df_fechamento_b3.loc[
                 df_fechamento_b3["Assets"] == asset, ultimo_fechamento
             ].values[0]
             preco_fechamento_atual = pd.to_numeric(preco_fechamento_atual, errors='coerce')
-            
+            df_fundo.loc[asset, "Preco_Fechamento_Atual"] = preco_fechamento_atual
+
             preco_fechamento_dia = df_fechamento_b3.loc[
                 df_fechamento_b3["Assets"] == asset, dia_operacao
             ].values[0]
             preco_fechamento_dia = pd.to_numeric(preco_fechamento_dia, errors='coerce')
-            
             df_novo_dia.loc[asset, f"{dia_operacao} - Preco_Fechamento"] = preco_fechamento_dia
-            df_fundo.loc[asset, "Preco_Fechamento_Atual"] = preco_fechamento_atual
 
             preco_compra = df_info.loc[
                 (df_info["Ativo"] == asset) & (df_info["Dia de Compra"] == dia_operacao),
@@ -2601,47 +2589,17 @@ def atualizar_parquet_fundos(
             ].values[0]
             preco_compra = pd.to_numeric(preco_compra, errors='coerce')
             df_novo_dia.loc[asset, f"{dia_operacao} - Preco_Compra"] = preco_compra
+
             quantidade = row_fundo[f'Contratos {asset}']
             quantidade = pd.to_numeric(quantidade, errors='coerce')
-            df_novo_dia.loc[asset, f'{dia_operacao} - Quantidade'] = quantidade
+            df_novo_dia.loc[asset, f"{dia_operacao} - Quantidade"] = quantidade
 
-            # Calcular o rendimento
             if asset == 'TREASURY':
-                rendimento = preco_fechamento_dia - preco_compra
-                df_novo_dia.loc[asset, f'{dia_operacao} - Rendimento'] = quantidade * rendimento * dolar / 10000
+                rendimento = (preco_fechamento_dia - preco_compra) * dolar / 10000
             else:
-                rendimento = preco_fechamento_dia - preco_compra
-                df_novo_dia.loc[asset, f'{dia_operacao} - Rendimento'] = quantidade * rendimento
+                rendimento = (preco_fechamento_dia - preco_compra)
+            df_novo_dia.loc[asset, f'{dia_operacao} - Rendimento'] = quantidade * rendimento
 
-            # --------------------------------------------------------------------
-            # 5) Combinar dados existentes do dia (df_existente_dia) com os novos (df_novo_dia)
-            # --------------------------------------------------------------------
-            # Se não havia colunas de dia, df_existente_dia estará vazio; se havia,
-            # podemos usar o `combine_first` para mesclar, mantendo os valores novos
-            # caso existam e os antigos caso não sejam sobrescritos.
-            st.write(df_novo_dia, df_existente_dia)
-            if not df_existente_dia.empty:
-                df_dia_combinado = df_novo_dia.add(df_existente_dia)
-            else:
-                # Se não havia dados antigos, df_novo_dia já é o que precisamos
-                df_dia_combinado = df_novo_dia
-
-            # --------------------------------------------------------------------
-            # 6) Agora removemos as colunas antigas do dia (se ainda existirem em df_fundo)
-            #    e inserimos as colunas combinadas no df_fundo
-            # --------------------------------------------------------------------
-            cols_dia_fundo = df_fundo.columns[df_fundo.columns.str.startswith(dia_operacao)]
-            if len(cols_dia_fundo) > 0:
-                df_fundo.drop(columns=cols_dia_fundo, inplace=True)
-
-            # Juntamos o df_dia_combinado (apenas colunas do dia) no df_fundo
-            # Usamos concat no eixo das colunas
-            df_fundo = pd.concat([df_fundo, df_dia_combinado], axis=1)
-
-            # Se houver ativos novos que não estavam em df_fundo, eles podem ter
-            # aparecido apenas em df_dia_combinado, então ficamos consistentes.
-            # (A concat acima já deve trazer as linhas novas, mas se quiser garantir índice:)
-            df_fundo = df_fundo.sort_index()
 
         # --------------------------------------------------------------------
         # 7) Salvar ao final

@@ -2495,6 +2495,7 @@ def atualizar_parquet_fundos(
     df_info,
     # DF de preços de fechamento B3: colunas ["Assets", <data1>, <data2>, ...]
 ):
+    st.write(df_current,dia_operacao, df_info)
     df_fechamento_b3 = pd.read_parquet("df_preco_de_ajuste_atual_completo.parquet")
     df_fechamento_b3 = df_fechamento_b3.replace('\.', '', regex=True)
     df_fechamento_b3 = df_fechamento_b3.replace({',': '.'}, regex=True)
@@ -2834,7 +2835,7 @@ def add_data_2(df, table_name):
     # Remover colunas do DataFrame
     df = df.drop(columns=columns_to_drop)
     data = df.to_dict(orient='records')
-    st.write(data)
+
     try:        
         # Conexão com o PostgreSQL
         conn = psycopg2.connect(

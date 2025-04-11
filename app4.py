@@ -2603,7 +2603,7 @@ def atualizar_parquet_fundos(
                 rendimento = (preco_fechamento_dia - preco_compra)
             df_novo_dia.loc[asset, f'{dia_operacao} - Rendimento'] = quantidade * rendimento
 
-        # --------------------------------------------------------------------
+        # ---------------------------------------------------------------------
         # 7) Salvar ao final
         # ---------------------------------------------------------------------
         # Redefine o índice antes de salvar, se for sua convenção

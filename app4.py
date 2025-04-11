@@ -2679,7 +2679,7 @@ def atualizar_parquet_fundos(
                 rendimento_new = quantidade_new * rendimento_unit
                 df_fundo.loc[asset, col_Rend] = old_rend + rendimento_new
                 st.write(df_fundo)
-        # 4.4) Salvar ao final, como no fluxo original
+        # 4.4) Salvar ao final, como no fluxo original##
         df_fundo.reset_index(drop=True, inplace=True)
         df_fundo.to_parquet(nome_arquivo_parquet, index=False)
         table_name = nome_arquivo_parquet.replace(".parquet", "")

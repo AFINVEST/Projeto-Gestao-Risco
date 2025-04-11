@@ -2605,7 +2605,7 @@ def atualizar_parquet_fundos(
 
         # --------------------------------------------------------------------
         # 7) Salvar ao final
-        # --------------------------------------------------------------------
+        # ---------------------------------------------------------------------
         # Redefine o índice antes de salvar, se for sua convenção
         df_fundo.reset_index(drop=True, inplace=True)
         df_fundo.to_parquet(nome_arquivo_parquet, index=False)

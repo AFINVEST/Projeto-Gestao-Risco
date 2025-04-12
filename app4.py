@@ -5308,53 +5308,6 @@ def main_page():
 # ==========================================================
 
 
-def second_page():
-    st.title("Tela de Input de Preços (Compra/Venda)")
-    if "posicoes" not in st.session_state or "ativos_selecionados" not in st.session_state:
-        st.error(
-            "Nenhuma posição encontrada. Volte à página anterior e selecione os ativos.")
-        st.button("Voltar ao Dashboard Principal",
-                  on_click=switch_to_main, key="back_main_no_data")
-        return
-
-    ativos = st.session_state["ativos_selecionados"]
-    posicoes = st.session_state["posicoes"]
-
-    st.sidebar.header("Insira o Preço de Compra/Venda")
-    precos_user = {}
-    data_compra = {}
-    for ativo in ativos:
-        precos_user[ativo] = st.sidebar.number_input(
-            f"Preço de {ativo}:", min_value=0.0, value=None, step=0.5
-        )
-        data_compra[ativo] = st.sidebar.date_input(
-            f"Dia de Compra de {ativo}:",
-            value=datetime.date.today()
-        )
-
-    for ativo in ativos:
-        data_compra[ativo] = data_compra[ativo].strftime("%Y-%m-%d")
-        data_compra[ativo] = '2025-01-17'
-
-    df_port, df = checkar_portifolio(
-        ativos, posicoes, precos_user, data_compra)
-
-    st.write("## Resumo das posições com preços informados:")
-    df_resumo_port = df_port.copy()
-    # Agrupar por Ativo, Quantidade e Rendimento
-    df_resumo_port = df_resumo_port.groupby('Ativo').sum()
-    df_resumo_port['Preço de Compra'] = df_resumo_port['Preço de Compra'] / \
-        df_resumo_port['Quantidade']
-    df_resumo_port.drop(
-        ['Dia de Compra'], axis=1, inplace=True)
-    st.table(df_resumo_port)
-    st.write(
-        f"OBS: Os preços de compra são calculados pela média dos preços de cada ativo.")
-    # Botão Voltar (1 clique)
-    st.button("Voltar ao Dashboard Principal",
-              on_click=switch_to_main, key="back_main_ok")
-
-
 # ==========================================================
 #   LÓGICA DE ROTEAMENTO DAS "PÁGINAS"
 # ==========================================================
@@ -5372,6 +5325,5 @@ if "current_page" not in st.session_state:
 if st.session_state["current_page"] == "main":
     main_page()
 else:
-    second_page()
-
+    main_page()
 # --------------------------------------------------------

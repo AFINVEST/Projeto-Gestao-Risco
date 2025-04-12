@@ -2555,7 +2555,6 @@ def atualizar_parquet_fundos(
         # 4.2) Filtra as transações do dia para encontrar os ativos
         subset = df_info[df_info["Dia de Compra"] == dia_operacao]
         lista_assets = subset["Ativo"].unique()
-        st.write(lista_assets)
         # 4.3) Para cada Ativo, atualizar ou inserir
         for asset in lista_assets:
 
@@ -2612,7 +2611,6 @@ def atualizar_parquet_fundos(
                 else:
                     rendimento = (preco_fechamento_dia - preco_compra)
                 df_fundo.loc[asset, col_Rend] = quantidade * rendimento
-                st.write(df_fundo)
 
             else:
                 # Se o ativo já existe, precisamos mesclar valores antigos e novos
@@ -2678,7 +2676,6 @@ def atualizar_parquet_fundos(
 
                 rendimento_new = quantidade_new * rendimento_unit
                 df_fundo.loc[asset, col_Rend] = old_rend + rendimento_new
-                st.write(df_fundo)
         # 4.4) Salvar ao final, como no fluxo original##
         df_fundo.reset_index(drop=True, inplace=True)
         df_fundo.to_parquet(nome_arquivo_parquet, index=False)

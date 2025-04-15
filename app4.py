@@ -305,6 +305,47 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
             # Calcular rendimento
             if asset == 'TREASURY':
                 rendimento = qtd_final * (preco_fechamento_atual - preco_compra) * (dolar / 10000)
+
+            elif 'DAP' in asset:
+                df_ajuste = pd.read_parquet('df_valor_ajuste_contrato.parquet')
+                
+                # Selecionar apenas as colunas de data (ignorando a primeira, que é "Assets")
+                colunas_datas_originais = df_ajuste.columns[1:]
+                df_ajuste[colunas_datas_originais] = (
+                    df_ajuste[colunas_datas_originais]
+                    .replace('\.', '', regex=True)
+                    .replace(',', '.', regex=True)
+                    .astype(float)
+                )
+
+                # Renomear as colunas de data para string no formato 'YYYY-MM-DD'
+                novos_nomes_colunas = [
+                    pd.to_datetime(col, errors='coerce').strftime('%Y-%m-%d') for col in colunas_datas_originais
+                ]
+                renomear_colunas = dict(zip(colunas_datas_originais, novos_nomes_colunas))
+                df_ajuste.rename(columns=renomear_colunas, inplace=True)
+
+                # Obter a data da compra específica do ativo
+                data_compra_raw = dia_compra.get(asset)
+
+                if data_compra_raw is None:
+                    st.error(f"Data de compra não encontrada para o ativo {asset}")
+                else:
+                    coluna_dia_compra_str = pd.to_datetime(data_compra_raw).strftime('%Y-%m-%d')
+
+                    # Verificar se a coluna existe no DataFrame antes de tentar acessar
+                    if coluna_dia_compra_str not in df_ajuste.columns:
+                        st.error(f"Coluna de data '{coluna_dia_compra_str}' não encontrada no DataFrame.")
+                    else:
+                        filtro = df_ajuste['Assets'] == asset
+                        if filtro.any():
+                            valor_ajuste = df_ajuste.loc[filtro, coluna_dia_compra_str].values[0]
+
+                            # Calcular o rendimento
+                            rendimento = valor_ajuste * qtd_final
+                        else:
+                            st.error(f"Ativo {asset} não encontrado no DataFrame.")
+
             else:
                 rendimento = qtd_final * (preco_fechamento_atual - preco_compra)
 
@@ -387,7 +428,51 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
 
             # Rendimento recalculado:
             # (Preço Ajuste Atual - Preço Compra Médio) * Quantidade total
-            rendimento_final = (preco_ajuste_atual - preco_medio_compra) * qtd_total
+            # Rendimento por ativo DAP
+            if 'DAP' in subdf['Ativo'].iloc[0]:
+                df_ajuste = pd.read_parquet('df_valor_ajuste_contrato.parquet')
+
+                # Corrigir formatação
+                colunas_datas = df_ajuste.columns[1:]
+                df_ajuste[colunas_datas] = df_ajuste[colunas_datas].replace('\.', '', regex=True).replace(',', '.', regex=True)
+                df_ajuste[colunas_datas] = df_ajuste[colunas_datas].astype(float)
+
+                # Converter nomes de colunas (datas) para datetime
+                datas_convertidas = pd.to_datetime(colunas_datas, errors='coerce')
+                colunas_datas_validas = [col for col, data in zip(df_ajuste.columns[1:], datas_convertidas) if pd.notnull(data)]
+
+                # Garantir que vamos usar apenas datas válidas
+                df_ajuste = df_ajuste[['Assets'] + colunas_datas_validas]
+
+                # Pegar o nome do ativo (assumindo que todas as linhas do subdf têm o mesmo ativo)
+                ativo = subdf['Ativo'].iloc[0]
+
+                # DataFrame de ajustes do ativo
+                linha_ajuste = df_ajuste[df_ajuste['Assets'] == ativo].drop(columns='Assets')
+
+                # Converter colunas novamente para datetime para indexar
+                datas_ajuste = pd.to_datetime(linha_ajuste.columns)
+
+                # Agora iterar sobre cada linha de compra do subdf
+                rendimentos = []
+                for _, row in subdf.iterrows():
+                    dia_compra = pd.to_datetime(row['Dia de Compra'])
+                    quantidade = row['Quantidade']
+
+                    # Filtrar colunas de datas iguais ou posteriores à data de compra
+                    colunas_uteis = linha_ajuste.columns[datas_ajuste >= dia_compra]
+
+                    # Soma dos valores de ajuste após a data de compra
+                    rendimento = linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
+                    rendimentos.append(rendimento)
+
+                # Atribuir os rendimentos ao subdf
+                subdf['Rendimento'] = rendimentos
+                rendimento_final = sum(rendimentos)
+
+            else:
+                rendimento_final = (preco_ajuste_atual - preco_medio_compra) * qtd_total
+            
             return pd.Series({
                 'Quantidade': qtd_total,
                 'Dia de Compra': subdf.iloc[-1]['Dia de Compra'],
@@ -649,17 +734,46 @@ def att_portifosições():
     # Atualizar preço de ajuste considerando múltiplas ocorrências de ativos
     df_portifolio['Preço de Ajuste Atual'] = df_portifolio['Ativo'].map(fechamento_dict)
 
-    # Atualizar cálculo de rendimento
+    # Carregar o DataFrame de ajustes (caso tenha DAPs)
+    df_ajuste = pd.read_parquet('df_valor_ajuste_contrato.parquet')
+    colunas_datas = df_ajuste.columns[1:]
+    df_ajuste[colunas_datas] = df_ajuste[colunas_datas].replace('\.', '', regex=True).replace(',', '.', regex=True)
+    df_ajuste[colunas_datas] = df_ajuste[colunas_datas].astype(float)
+
+    # Converter nomes das colunas para datetime
+    datas_convertidas = pd.to_datetime(colunas_datas, errors='coerce')
+    colunas_datas_validas = [col for col, data in zip(df_ajuste.columns[1:], datas_convertidas) if pd.notnull(data)]
+    df_ajuste = df_ajuste[['Assets'] + colunas_datas_validas]
+    datas_validas = pd.to_datetime(colunas_datas_validas)
+
+    # Função para calcular rendimento linha a linha
     def calcular_rendimento(row):
         preco_compra = row['Preço de Compra']
         preco_de_ajuste = row['Preço de Ajuste Atual']
         quantidade = row['Quantidade']
+        ativo = row['Ativo']
 
-        if row['Ativo'] == 'TREASURY':
+        if ativo == 'TREASURY':
             return quantidade * (preco_de_ajuste - preco_compra) * (dolar / 10000)
+
+        elif 'DAP' in ativo:
+            dia_compra = pd.to_datetime(row['Dia de Compra'])
+
+            # Pega linha do ativo no df_ajuste
+            linha_ajuste = df_ajuste[df_ajuste['Assets'] == ativo].drop(columns='Assets')
+
+            if linha_ajuste.empty:
+                return 0  # Ativo não encontrado
+
+            # Selecionar colunas com datas >= data de compra
+            colunas_uteis = linha_ajuste.columns[datas_validas >= dia_compra]
+
+            # Soma os ajustes após a data de compra e multiplica pela quantidade
+            return linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
+
         else:
             return quantidade * (preco_de_ajuste - preco_compra)
-
+        
     df_portifolio['Rendimento'] = df_portifolio.apply(calcular_rendimento, axis=1)
 
     max_id = df_portifolio['Id'].max()
@@ -2532,6 +2646,17 @@ def atualizar_parquet_fundos(
     status_container = st.empty()
     mensagens = ["⏳ Aguarde até o Total ser concluído..."]
     status_container.markdown(" | ".join(mensagens))
+    # Carregar o DataFrame de ajustes (caso tenha DAPs)
+    df_ajuste = pd.read_parquet('df_valor_ajuste_contrato.parquet')
+    colunas_datas = df_ajuste.columns[1:]
+    df_ajuste[colunas_datas] = df_ajuste[colunas_datas].replace('\.', '', regex=True).replace(',', '.', regex=True)
+    df_ajuste[colunas_datas] = df_ajuste[colunas_datas].astype(float)
+
+    # Converter nomes das colunas para datetime
+    datas_convertidas = pd.to_datetime(colunas_datas, errors='coerce')
+    colunas_datas_validas = [col for col, data in zip(df_ajuste.columns[1:], datas_convertidas) if pd.notnull(data)]
+    df_ajuste = df_ajuste[['Assets'] + colunas_datas_validas]
+    datas_validas = pd.to_datetime(colunas_datas_validas)
 
     # 4) Loop principal: para cada Fundo (linha de df_current)
     for fundo, row_fundo in df_current.iterrows():
@@ -2555,6 +2680,7 @@ def atualizar_parquet_fundos(
         # 4.2) Filtra as transações do dia para encontrar os ativos
         subset = df_info[df_info["Dia de Compra"] == dia_operacao]
         lista_assets = subset["Ativo"].unique()
+
         # 4.3) Para cada Ativo, atualizar ou inserir
         for asset in lista_assets:
 
@@ -2608,6 +2734,20 @@ def atualizar_parquet_fundos(
                 # Rendimento
                 if asset == 'TREASURY':
                     rendimento = (preco_fechamento_dia - preco_compra) * dolar / 10000
+                elif 'DAP' in asset:
+                    dia_compra = pd.to_datetime(dia_operacao)
+                    # Pega linha do ativo no df_ajuste
+                    linha_ajuste = df_ajuste[df_ajuste['Assets'] == asset].drop(columns='Assets')
+
+                    if linha_ajuste.empty:
+                        rendimento =  0  # Ativo não encontrado
+
+                    # Selecionar colunas com datas >= data de compra
+                    colunas_uteis = linha_ajuste.columns[datas_validas >= dia_compra]
+
+                    # Soma os ajustes após a data de compra e multiplica pela quantidade
+                    rendimento = linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
+                
                 else:
                     rendimento = (preco_fechamento_dia - preco_compra)
                 df_fundo.loc[asset, col_Rend] = quantidade * rendimento
@@ -2671,6 +2811,21 @@ def atualizar_parquet_fundos(
                 # 7) Rendimento
                 if asset == 'TREASURY':
                     rendimento_unit = (preco_fechamento_dia - preco_compra_new) * dolar / 10000
+
+                elif 'DAP' in asset:
+                    dia_compra = pd.to_datetime(dia_operacao)
+                    # Pega linha do ativo no df_ajuste
+                    linha_ajuste = df_ajuste[df_ajuste['Assets'] == asset].drop(columns='Assets')
+
+                    if linha_ajuste.empty:
+                        rendimento_unit =  0  # Ativo não encontrado
+
+                    # Selecionar colunas com datas >= data de compra
+                    colunas_uteis = linha_ajuste.columns[datas_validas >= dia_compra]
+
+                    # Soma os ajustes após a data de compra e multiplica pela quantidade
+                    rendimento_unit = linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
+
                 else:
                     rendimento_unit = (preco_fechamento_dia - preco_compra_new)
 
@@ -2687,7 +2842,7 @@ def atualizar_parquet_fundos(
         add_data_2(df_fundo, table_name)  # permanece a mesma chamada
         print(f"[{fundo}] -> parquet atualizado: {nome_arquivo_parquet}")
 
- 
+ #
 
 def analisar_performance_fundos(
     data_inicial,
@@ -3029,7 +3184,17 @@ def analisar_dados_fundos():
                                  == 'WDO1', dia_atual].values[0]
 
     # Supõe-se que `files`, `df_b3_fechamento`, e `dia_atual` estão definidos
-    
+    # Carregar o DataFrame de ajustes (caso tenha DAPs)
+    df_ajuste = pd.read_parquet('df_valor_ajuste_contrato.parquet')
+    colunas_datas = df_ajuste.columns[1:]
+    df_ajuste[colunas_datas] = df_ajuste[colunas_datas].replace('\.', '', regex=True).replace(',', '.', regex=True)
+    df_ajuste[colunas_datas] = df_ajuste[colunas_datas].astype(float)
+
+    # Converter nomes das colunas para datetime
+    datas_convertidas = pd.to_datetime(colunas_datas, errors='coerce')
+    colunas_datas_validas = [col for col, data in zip(df_ajuste.columns[1:], datas_convertidas) if pd.notnull(data)]
+    df_ajuste = df_ajuste[['Assets'] + colunas_datas_validas]
+    datas_validas = pd.to_datetime(colunas_datas_validas)
     for file in files:
         # Lê o arquivo parquet
         df_fundos = pd.read_parquet(f'BaseFundos/{file}')
@@ -3075,6 +3240,21 @@ def analisar_dados_fundos():
                             # Calcula o rendimento
                             rendimento = (
                                 preco_fechamento - preco_anterior) * quantidade * dolar / 10000
+                            
+                        elif 'DAP' in idx:
+                            dia_compra = pd.to_datetime(data_fechamento)
+                            # Pega linha do ativo no df_ajuste
+                            linha_ajuste = df_ajuste[df_ajuste['Assets'] == idx].drop(columns='Assets')
+
+                            if linha_ajuste.empty:
+                                rendimento =  0  # Ativo não encontrado
+
+                            # Selecionar colunas com datas >= data de compra
+                            colunas_uteis = linha_ajuste.columns[datas_validas == dia_compra]
+
+                            # Soma os ajustes após a data de compra e multiplica pela quantidade
+                            rendimento = linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
+                            
                         else:
                             rendimento = (preco_fechamento -
                                           preco_anterior) * quantidade
@@ -3148,6 +3328,19 @@ def analisar_dados_fundos():
                             # Calcula o rendimento
                             rendimento = (
                                 preco_fechamento - preco_anterior) * quantidade * dolar / 10000
+                            
+                        if 'DAP' in idx:
+                            dia_compra = pd.to_datetime(data_fechamento)
+                            # Pega linha do ativo no df_ajuste
+                            linha_ajuste = df_ajuste[df_ajuste['Assets'] == idx].drop(columns='Assets')
+
+                            if linha_ajuste.empty:
+                                rendimento =  0
+                                # Ativo não encontrado
+                            
+                            # Selecionar colunas com datas >= data de compra
+                            colunas_uteis = linha_ajuste.columns[datas_validas == dia_compra]
+                            rendimento = linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
 
                         else:
                             rendimento = (preco_fechamento -

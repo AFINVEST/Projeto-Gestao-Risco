@@ -11,8 +11,9 @@ import os
 import pandas_market_calendars as mcal
 
 
-def processar_dados(processed_data, hoje_str):
 
+def processar_dados(processed_data, hoje_str):
+    
     # Definindo as colunas de interesse
     columns = [
         'Mercadoria',
@@ -27,16 +28,11 @@ def processar_dados(processed_data, hoje_str):
     df = pd.DataFrame(processed_data, columns=columns)
 
     # Ajustar o nome da mercadoria para ser as 3 primeiras letras + últimas 2 do vencimento
-    df['Mercadoria'] = df['Mercadoria'].str[:3] + \
-        '_' + df['Vencimento'].str[-2:]
+    df['Mercadoria'] = df['Mercadoria'].str[:3] + '_' + df['Vencimento'].str[-2:]
 
     # Tirar o '1' do nome da DI1
-    df.loc[df['Mercadoria'].str.startswith(
-        'DI1'), 'Mercadoria'] = 'DI_' + df['Vencimento'].str[-2:]
-
-    # Tirar o '1' do nome da DI1
-    df.loc[df['Mercadoria'].str.startswith(
-        'DAP'), 'Mercadoria'] = 'DAP' + df['Vencimento'].str[-2:]
+    df.loc[df['Mercadoria'].str.startswith('DI1'), 'Mercadoria'] = 'DI_' + df['Vencimento'].str[-2:]
+    df.loc[df['Mercadoria'].str.startswith('DAP'), 'Mercadoria'] = 'DAP' + df['Vencimento'].str[-2:]
 
     # Mudar nome do DOL e T10 (exemplo)
     df.loc[df['Mercadoria'].str.startswith('DOL_'), 'Mercadoria'] = 'WDO1'
@@ -48,18 +44,16 @@ def processar_dados(processed_data, hoje_str):
     # -------------------------------------------------
     # Agora, vamos criar (ou atualizar) 2 DataFrames:
     #  1) df_preco_de_ajuste_atual
-    #  2) df_variacao
+    #  2) df_variacao (comentado)
     #
     # Cada um terá:
     #   - índice = Mercadoria
-    #   - colunas = datas (string) no formato YYYY-MM-DD (por exemplo)
-    #
+    #   - colunas = datas (string) no formato YYYY-MM-DD
     # ---------------------------------------------------
 
     # 1) Transformando o df original em Série para cada componente
     #    index = Mercadoria, values = coluna correspondente
-    serie_preco_ajuste = pd.Series(
-        df['Preço de ajuste Atual'].values, index=df['Mercadoria'])
+    serie_preco_ajuste = pd.Series(df['Preço de ajuste Atual'].values, index=df['Mercadoria'])
     serie_variacao = pd.Series(df['Variação'].values, index=df['Mercadoria'])
 
     # Nome da coluna que será adicionada/atualizada (data do dia)
@@ -68,54 +62,40 @@ def processar_dados(processed_data, hoje_str):
     # 2) Carregar (ou criar) df_preco_de_ajuste_atual
     nome_arquivo_preco_ajuste = 'df_preco_de_ajuste_atual.parquet'
     if os.path.exists(nome_arquivo_preco_ajuste):
-        df_preco_de_ajuste_atual = pd.read_parquet(
-            nome_arquivo_preco_ajuste)
+        df_preco_de_ajuste_atual = pd.read_parquet(nome_arquivo_preco_ajuste)
         # Colocar como index a primeira coluna
-        df_preco_de_ajuste_atual = df_preco_de_ajuste_atual.set_index(
-            df_preco_de_ajuste_atual.columns[0])
+        df_preco_de_ajuste_atual = df_preco_de_ajuste_atual.set_index(df_preco_de_ajuste_atual.columns[0])
     else:
         df_preco_de_ajuste_atual = pd.DataFrame()
 
     # 3) Garantir que o índice contemple todas as Mercadorias
-    #    (Unir o índice atual do df com o novo índice)
-    mercadorias_unificadas = df_preco_de_ajuste_atual.index.union(
-        serie_preco_ajuste.index)
-    df_preco_de_ajuste_atual = df_preco_de_ajuste_atual.reindex(
-        index=mercadorias_unificadas)
+    mercadorias_unificadas = df_preco_de_ajuste_atual.index.union(serie_preco_ajuste.index)
+    df_preco_de_ajuste_atual = df_preco_de_ajuste_atual.reindex(index=mercadorias_unificadas)
 
     df_preco_de_ajuste_atual.index.name = 'Assets'
 
-    # 4) Se a coluna (data) não existir, cria; se existir e você quiser atualizar, basta sobrescrever
+    # 4) Se a coluna (data) não existir, cria; se existir e quiser atualizar, basta sobrescrever
     df_preco_de_ajuste_atual[hoje_str] = serie_preco_ajuste
 
     # 5) Salvar em parquet
     df_preco_de_ajuste_atual.reset_index(inplace=True)
-    # Criar uma coluna com o proximo dia duplicando a coluna de hoje
-    # Obter o calendário da B3
+    # Criar uma coluna com o próximo dia duplicando a coluna de hoje
     b3 = mcal.get_calendar('B3')
-
-    # Data de hoje
     hoje = datetime.today().date()
-
-    # Pegar os últimos e próximos dias úteis ao redor de hoje
-    datas_uteis = b3.schedule(
-        start_date=hoje - timedelta(days=15), end_date=hoje + timedelta(days=10))
+    datas_uteis = b3.schedule(start_date=hoje - timedelta(days=15), end_date=hoje + timedelta(days=10))
     datas_uteis_index = datas_uteis.index.date
 
-    # Encontrar o último dia útil estritamente anterior a hoje
     data_inicial = max([d for d in datas_uteis_index if d < hoje])
-
-    # Encontrar o próximo dia útil após a data inicial
-    proximo_dia = min([d for d in datas_uteis_index if d >
-                     hoje])
+    proximo_dia = min([d for d in datas_uteis_index if d > hoje])
     hoje_data = datetime.strptime(hoje_str, '%Y-%m-%d').date()
+
     if hoje_data == hoje:
         df_preco_de_ajuste_atual[f'{proximo_dia}'] = df_preco_de_ajuste_atual[hoje_str]
 
     df_preco_de_ajuste_atual.to_parquet(nome_arquivo_preco_ajuste)
 
     # # ------------------------------------------
-    # #  Mesma lógica para df_variacao
+    # #  Mesma lógica para df_variacao (COMENTADA)
     # # ------------------------------------------
     # nome_arquivo_variacao = 'df_variacao.parquet'
     # if os.path.exists(nome_arquivo_variacao):
@@ -123,23 +103,44 @@ def processar_dados(processed_data, hoje_str):
     # else:
     #     df_variacao_atual = pd.DataFrame()
 
-    # # Unificar índices
-    # mercadorias_unificadas = df_variacao_atual.index.union(
-    #     serie_variacao.index)
+    # mercadorias_unificadas = df_variacao_atual.index.union(serie_variacao.index)
     # df_variacao_atual = df_variacao_atual.reindex(index=mercadorias_unificadas)
     # df_variacao_atual.index.name = 'Assets'
 
-    # # Cria/atualiza a coluna de hoje
     # df_variacao_atual[hoje_str] = serie_variacao
-
-    # # Salva em parquet
     # df_variacao_atual.to_parquet(nome_arquivo_variacao)
 
-    # nome_arquivo_variacao = 'df_variacao.parquet'
-    # if os.path.exists(nome_arquivo_variacao):
-    #     df_variacao_atual = pd.read_parquet(nome_arquivo_variacao, index_col=0)
-    # else:
-    #     df_variacao_atual = pd.DataFrame()
+    # ------------------------------------------------
+    #          [ALTERAÇÃO SOLICITADA]
+    # ------------------------------------------------
+    # Se o primeiro dígito de 'Variação' for '-', adiciona um '-' antes do valor em
+    # 'Valor do ajuste por contrato (R$)'. Caso contrário, não faz nada.
+    df.loc[df['Variação'].str.startswith('-'), 'Valor do ajuste por contrato (R$)'] = (
+        '-' + df['Valor do ajuste por contrato (R$)'].astype(str)
+    )
+    # ------------------------------------------------
+
+    serie_valor_ajuste = pd.Series(df['Valor do ajuste por contrato (R$)'].values, index=df['Mercadoria'])
+
+    nome_arquivo_valor_ajuste = 'df_valor_ajuste_contrato.parquet'
+    if os.path.exists(nome_arquivo_valor_ajuste):
+        df_valor_ajuste_atual = pd.read_parquet(nome_arquivo_valor_ajuste)
+        df_valor_ajuste_atual = df_valor_ajuste_atual.set_index(df_valor_ajuste_atual.columns[0])
+    else:
+        df_valor_ajuste_atual = pd.DataFrame()
+
+    mercadorias_unificadas = df_valor_ajuste_atual.index.union(serie_valor_ajuste.index)
+    df_valor_ajuste_atual = df_valor_ajuste_atual.reindex(index=mercadorias_unificadas)
+    df_valor_ajuste_atual.index.name = 'Assets'
+
+    df_valor_ajuste_atual[hoje_str] = serie_valor_ajuste
+
+    df_valor_ajuste_atual.reset_index(inplace=True)
+    if hoje_data == hoje:
+        df_valor_ajuste_atual[f'{proximo_dia}'] = df_valor_ajuste_atual[hoje_str]
+
+    df_valor_ajuste_atual.to_parquet(nome_arquivo_valor_ajuste)
+
     print("Processamento concluído!")
 
 # Função para gerar uma lista de dias úteis a partir de uma data inicial

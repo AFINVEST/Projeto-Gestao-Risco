@@ -4697,7 +4697,6 @@ def main_page():
                 else:
                     # Calcula o número de contratos que faltam ou excedem
                     diferencas = quantidade_inicial[asset] - soma_atual
-
                     # Calcula o peso relativo e os resíduos
                     filtered_df['Peso Relativo'] = (
                         filtered_df[f'Contratos {asset}'] /

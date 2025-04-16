@@ -88,7 +88,7 @@ def processar_dados(processed_data, hoje_str):
     data_inicial = max([d for d in datas_uteis_index if d < hoje])
     proximo_dia = min([d for d in datas_uteis_index if d > hoje])
     hoje_data = datetime.strptime(hoje_str, '%Y-%m-%d').date()
-
+    hoje ='2025-04-15'
     if hoje_data == hoje:
         df_preco_de_ajuste_atual[f'{proximo_dia}'] = df_preco_de_ajuste_atual[hoje_str]
 

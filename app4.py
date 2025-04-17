@@ -327,7 +327,6 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
 
                 # Obter a data da compra específica do ativo
                 data_compra_raw = dia_compra.get(asset)
-
                 if data_compra_raw is None:
                     st.error(f"Data de compra não encontrada para o ativo {asset}")
                 else:
@@ -337,12 +336,17 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                     if coluna_dia_compra_str not in df_ajuste.columns:
                         st.error(f"Coluna de data '{coluna_dia_compra_str}' não encontrada no DataFrame.")
                     else:
-                        filtro = df_ajuste['Assets'] == asset
+                        filtro = df_ajuste['Assets'] == asset                    
                         if filtro.any():
                             valor_ajuste = df_ajuste.loc[filtro, coluna_dia_compra_str].values[0]
-
-                            # Calcular o rendimento
-                            rendimento = valor_ajuste * qtd_final
+                            #Ver se tem alguma coluna de ajuste posterior a data de compra
+                            colunas_uteis = df_ajuste.columns[df_ajuste.columns > coluna_dia_compra_str]
+                            colunas_uteis = colunas_uteis[colunas_uteis != 'Assets']
+                            if len(colunas_uteis) > 0:
+                                # Pegar o valor do ajuste mais recente
+                                rendimento = valor_ajuste * qtd_final
+                            else:
+                                rendimento = 0
                         else:
                             st.error(f"Ativo {asset} não encontrado no DataFrame.")
 
@@ -431,7 +435,9 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
             # Rendimento por ativo DAP
             if 'DAP' in subdf['Ativo'].iloc[0]:
                 df_ajuste = pd.read_parquet('df_valor_ajuste_contrato.parquet')
-
+                #Ver se a ultima coluna é igual a penultima
+                if df_ajuste.iloc[:, -1].equals(df_ajuste.iloc[:, -2]):
+                    df_ajuste = df_ajuste.iloc[:, :-1]
                 # Corrigir formatação
                 colunas_datas = df_ajuste.columns[1:]
                 df_ajuste[colunas_datas] = df_ajuste[colunas_datas].replace('\.', '', regex=True).replace(',', '.', regex=True)
@@ -460,7 +466,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                     quantidade = row['Quantidade']
 
                     # Filtrar colunas de datas iguais ou posteriores à data de compra
-                    colunas_uteis = linha_ajuste.columns[datas_ajuste >= dia_compra]
+                    colunas_uteis = linha_ajuste.columns[datas_ajuste > dia_compra]
 
                     # Soma dos valores de ajuste após a data de compra
                     rendimento = linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
@@ -736,6 +742,9 @@ def att_portifosições():
 
     # Carregar o DataFrame de ajustes (caso tenha DAPs)
     df_ajuste = pd.read_parquet('df_valor_ajuste_contrato.parquet')
+    #Ver se a ultima coluna é igual a penultima
+    if df_ajuste.iloc[:, -1].equals(df_ajuste.iloc[:, -2]):
+        df_ajuste = df_ajuste.iloc[:, :-1]
     colunas_datas = df_ajuste.columns[1:]
     df_ajuste[colunas_datas] = df_ajuste[colunas_datas].replace('\.', '', regex=True).replace(',', '.', regex=True)
     df_ajuste[colunas_datas] = df_ajuste[colunas_datas].astype(float)
@@ -766,7 +775,7 @@ def att_portifosições():
                 return 0  # Ativo não encontrado
 
             # Selecionar colunas com datas >= data de compra
-            colunas_uteis = linha_ajuste.columns[datas_validas >= dia_compra]
+            colunas_uteis = linha_ajuste.columns[datas_validas > dia_compra]
 
             # Soma os ajustes após a data de compra e multiplica pela quantidade
             return linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
@@ -2648,6 +2657,9 @@ def atualizar_parquet_fundos(
     status_container.markdown(" | ".join(mensagens))
     # Carregar o DataFrame de ajustes (caso tenha DAPs)
     df_ajuste = pd.read_parquet('df_valor_ajuste_contrato.parquet')
+    #Ver se a ultima coluna é igual a penultima
+    if df_ajuste.iloc[:, -1].equals(df_ajuste.iloc[:, -2]):
+        df_ajuste = df_ajuste.iloc[:, :-1]
     colunas_datas = df_ajuste.columns[1:]
     df_ajuste[colunas_datas] = df_ajuste[colunas_datas].replace('\.', '', regex=True).replace(',', '.', regex=True)
     df_ajuste[colunas_datas] = df_ajuste[colunas_datas].astype(float)
@@ -2743,7 +2755,7 @@ def atualizar_parquet_fundos(
                         rendimento =  0  # Ativo não encontrado
 
                     # Selecionar colunas com datas >= data de compra
-                    colunas_uteis = linha_ajuste.columns[datas_validas >= dia_compra]
+                    colunas_uteis = linha_ajuste.columns[datas_validas > dia_compra]
 
                     # Soma os ajustes após a data de compra e multiplica pela quantidade
                     rendimento = linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
@@ -3186,6 +3198,9 @@ def analisar_dados_fundos():
     # Supõe-se que `files`, `df_b3_fechamento`, e `dia_atual` estão definidos
     # Carregar o DataFrame de ajustes (caso tenha DAPs)
     df_ajuste = pd.read_parquet('df_valor_ajuste_contrato.parquet')
+    #Ver se a ultima coluna é igual a penultima
+    if df_ajuste.iloc[:, -1].equals(df_ajuste.iloc[:, -2]):
+        df_ajuste = df_ajuste.iloc[:, :-1]
     colunas_datas = df_ajuste.columns[1:]
     df_ajuste[colunas_datas] = df_ajuste[colunas_datas].replace('\.', '', regex=True).replace(',', '.', regex=True)
     df_ajuste[colunas_datas] = df_ajuste[colunas_datas].astype(float)
@@ -3254,7 +3269,22 @@ def analisar_dados_fundos():
 
                             # Soma os ajustes após a data de compra e multiplica pela quantidade
                             rendimento = linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
-                            
+
+                            colunas_datas_originais = linha_ajuste.columns[1:]
+
+                            novos_nomes_colunas = [pd.to_datetime(col, errors='coerce').strftime('%Y-%m-%d') for col in colunas_datas_originais]
+
+                            renomear_colunas = dict(zip(colunas_datas_originais, novos_nomes_colunas))
+
+                            df_ajuste.rename(columns=renomear_colunas, inplace=True)
+
+                            coluna_dia_compra_str = pd.to_datetime(dia_compra).strftime('%Y-%m-%d')
+
+                            colunas_uteis = df_ajuste.columns[df_ajuste.columns >= coluna_dia_compra_str]
+                            colunas_uteis = colunas_uteis[colunas_uteis != 'Assets']
+                            if len(colunas_uteis) <= 0:
+                                # Pegar o valor do ajuste mais recente
+                                rendimento = 0
                         else:
                             rendimento = (preco_fechamento -
                                           preco_anterior) * quantidade
@@ -5031,21 +5061,106 @@ def main_page():
 
                     # Criando o gráfico de barras
                     # Cria a figura e os eixos
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    sns.barplot(x='date', y='Rendimento_diario', hue='fundo',
-                                data=df_fundos_long, ax=ax, palette="Blues")
-                    # Rotaciona as datas para melhor visualização
-                    ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
-                    ax.set_title("Rendimento Diário por Fundo")
-                    ax.set_xlabel("Data")
-                    ax.set_ylabel("Rendimento Diário")
-                    # Mudar o título da legenda para Fundos
-                    ax.legend(title='Fundos')
+                    from plotnine import (
+                        ggplot, aes, geom_col, geom_line,
+                        labs, scale_fill_brewer, scale_color_manual, scale_x_datetime,
+                        theme_minimal, theme,
+                        element_rect, element_line, element_text
+                    )
 
-                    plt.tight_layout()
+                    # --------------------------------------------------------------------------- #
+                    # 1)  RENDIMENTO DIÁRIO POR FUNDO  (barras agrupadas)
+                    # --------------------------------------------------------------------------- #
+                    def gg_rendimento_diario_fundos(df_fundos_long: pd.DataFrame):
+                        df_plot = df_fundos_long.copy()
+                        df_plot["date"] = pd.to_datetime(df_plot["date"], dayfirst=True)
 
+                        p = (
+                            ggplot(df_plot,
+                                aes("date", "Rendimento_diario", fill="fundo"))
+                            + geom_col(position="dodge", width=.8)
+                            + labs(title="Rendimento Diário por Fundo",
+                                x="Data",
+                                y="Rendimento Diário")
+                            # paleta sequencial azul (similar aos exemplos anteriores)
+                            + scale_fill_brewer(type="seq", palette="Blues")
+                            # rótulo a cada 2 dias
+                            + scale_x_datetime(date_breaks="2 days", date_labels="%d‑%b")
+                            # -------- tema minimalista + ajustes manuais -------------------------
+                            + theme_minimal()
+                            + theme(
+                                figure_size=(14, 6),
+                                plot_background=element_rect(fill="white", colour=None),
+                                panel_background=element_rect(fill="white", colour="black"),
+                                panel_grid_major=element_line(colour="#CCCCCC"),
+                                panel_grid_minor=element_line(colour="#CCCCCC", linetype="dotted"),
+                                axis_text_x=element_text(rotation=45, ha="right"),
+                                axis_title_x=element_text(weight="bold"),
+                                axis_title_y=element_text(weight="bold"),
+                                # legenda horizontal abaixo
+                                legend_position="bottom",
+                                legend_direction="horizontal",
+                                legend_title=element_text(weight="bold"),
+                                plot_title=element_text(colour="#003366", size=13)
+                            )
+                        )
+                        return p
+
+
+                    # --------------------------------------------------------------------------- #
+                    # 2)  CURVA ACUMULADA POR FUNDO  (linha)
+                    # --------------------------------------------------------------------------- #
+                    def gg_curva_capital_fundos(df_fundos_long: pd.DataFrame):
+                        df = df_fundos_long.copy()
+                        df["date"] = pd.to_datetime(df["date"], dayfirst=True)
+                        df.sort_values(["fundo", "date"], inplace=True)
+                        df["acumulado"] = df.groupby("fundo")["Rendimento_diario"].cumsum()
+
+                        # paleta personalizada – uma cor distinta para cada fundo
+                        palette_fundos = {
+                            "GLOBAL BONDS"        : "#003366",  # azul‑escuro
+                            "HORIZONTE"           : "#B03A2E",  # vermelho tijolo
+                            "JERA2026"            : "#138D75",  # verde
+                            "REAL FIM"            : "#7F3C8D",  # roxo
+                            "BH FIRF INFRA"       : "#D35400",  # laranja queimado
+                            "BORDEAUX INFRA"      : "#1ABC9C",  # turquesa
+                            "TOPAZIO INFRA"       : "#34495E",  # cinza‑azulado
+                            "MANACA INFRA FIRF"   : "#C27E00",  # mostarda
+                            "AF DEB INCENTIVADAS" : "#E0115F"   # magenta
+                        }
+
+                        p = (
+                            ggplot(df,
+                                aes("date", "acumulado",
+                                    colour="fundo", group="fundo"))
+                            + geom_line(size=1.2)
+                            + labs(title="Rendimento Acumulado – Curva de Capital por Fundo",
+                                x="Data",
+                                y="Valor Acumulado")
+                            + scale_color_manual(values=palette_fundos)
+                            + scale_x_datetime(date_breaks="2 days", date_labels="%d‑%b")
+                            + theme_minimal()
+                            + theme(
+                                figure_size=(14, 6),
+                                plot_background=element_rect(fill="white", colour=None),
+                                panel_background=element_rect(fill="white", colour="black"),
+                                panel_grid_major=element_line(colour="#CCCCCC"),
+                                panel_grid_minor=element_line(colour="#CCCCCC", linetype="dotted"),
+                                axis_text_x=element_text(rotation=45, ha="right"),
+                                axis_title_x=element_text(weight="bold"),
+                                axis_title_y=element_text(weight="bold"),
+                                legend_position="bottom",
+                                legend_direction="horizontal",
+                                legend_title=element_text(weight="bold"),
+                                plot_title=element_text(colour="#003366", size=13)
+                            )
+                        )
+                        return p
                     # Exibe o gráfico com o Streamlit, passando a figura
-
+                # gráfico de barras
+                fig_diario = gg_rendimento_diario_fundos(df_fundos_long).draw()
+                # curva acumulada
+                fig_acum = gg_curva_capital_fundos(df_fundos_long).draw()
                 df_final = df_final_pl
 
                 if fundos_lista:
@@ -5071,8 +5186,12 @@ def main_page():
                     df_combinado = df_fundos_grana + " / " + df_fundos_copy
                     #Dropar linha do total
                     df_combinado = df_combinado.drop('Total', axis=0)
+                    st.write('### Tabela de Rendimento Diário por Estratégia')
                     st.table(df_combinado)
-                    st.pyplot(fig)
+                    st.write('### Gráficos de Rendimento Diário e Acumulado')
+                    st.pyplot(fig_diario)
+                    st.write('### Graficos de Curva de Capital')
+                    st.pyplot(fig_acum)
 
             elif visao == "Estratégia":
                 lista_estrategias = {
@@ -5178,17 +5297,94 @@ def main_page():
 
                     # Criando o gráfico de barras
                     # Cria a figura e os eixos
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    sns.barplot(x='date', y='Rendimento_diario', hue='estratégia',
-                                data=df_estrategias_long, ax=ax, palette="Blues")
-                    ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
-                    ax.set_title("Rendimento Diário por Estratégia")
-                    ax.set_xlabel("Data")
-                    ax.set_ylabel("Rendimento Diário")
-                    ax.legend(title='Estraégias')
-                    plt.tight_layout()
-                    
+                    from plotnine import (
+                        ggplot, aes, geom_col, geom_line, labs,
+                        scale_fill_brewer, scale_color_manual, scale_x_datetime,
+                        theme_minimal, theme,
+                        element_text, element_rect, element_line
+                    )
 
+                    # --------------------------------------------------------------------------- #
+                    # 1)  GRÁFICO DE BARRAS – Rendimento Diário por Estratégia
+                    # --------------------------------------------------------------------------- #
+                    def gg_rendimento_diario(df_estrategias_long: pd.DataFrame):
+                        df_plot = df_estrategias_long.copy()
+                        df_plot["date"] = pd.to_datetime(df_plot["date"], dayfirst=True)
+
+                        p = (
+                            ggplot(df_plot,
+                                aes("date", "Rendimento_diario", fill="estratégia"))
+                            + geom_col(position="dodge", width=.8)
+                            + labs(title="Rendimento Diário por Estratégia",
+                                x="Data",
+                                y="Rendimento Diário")
+                            + scale_fill_brewer(type="seq", palette="Blues")
+                            + scale_x_datetime(date_breaks="2 days", date_labels="%d‑%b")  # ← 2 dias
+                            + theme_minimal()
+                            + theme(
+                                figure_size=(14, 6),
+                                plot_background=element_rect(fill="white", colour=None),
+                                panel_background=element_rect(fill="white", colour="black"),
+                                panel_grid_major=element_line(colour="#CCCCCC"),
+                                panel_grid_minor=element_line(colour="#CCCCCC", linetype="dotted"),
+                                axis_text_x=element_text(rotation=90, ha="right"),
+                                axis_title_x=element_text(weight="bold"),
+                                axis_title_y=element_text(weight="bold"),
+                                # --- legenda abaixo ------------------------------------------------
+                                legend_position="bottom",
+                                legend_direction="horizontal",
+                                legend_box_margin=0,
+                                plot_title=element_text(colour="#003366", size=13)
+                            )
+                        )
+                        return p
+
+                    # --------------------------------------------------------------------------- #
+                    # 2)  GRÁFICO DE LINHA – Curva de Capital (rendimento acumulado)
+                    # --------------------------------------------------------------------------- #
+                    def gg_curva_capital(df_long: pd.DataFrame):
+                        df = df_long.copy()
+                        df["date"] = pd.to_datetime(df["date"], dayfirst=True)
+                        df.sort_values(["estratégia", "date"], inplace=True)
+                        df["acumulado"] = df.groupby("estratégia")["Rendimento_diario"].cumsum()
+
+                        palette_curvas = {
+                            "JUROS NOMINAIS BRASIL": "#B03A2E",
+                            "JUROS REAIS BRASIL"  : "#003366",
+                            "MOEDAS"              : "#138D75",
+                            "OUTRA CATEGORIA"     : "#7F3C8D"
+                        }
+
+                        p = (
+                            ggplot(df,
+                                aes("date", "acumulado", colour="estratégia", group="estratégia"))
+                            + geom_line(size=1.2)
+                            + labs(title="Rendimento Acumulado – Curva de Capital",
+                                x="Data",
+                                y="Valor Acumulado")
+                            + scale_color_manual(values=palette_curvas)
+                            + scale_x_datetime(date_breaks="2 days", date_labels="%d‑%b")  # ← 2 dias
+                            + theme_minimal()
+                            + theme(
+                                figure_size=(14, 6),
+                                plot_background=element_rect(fill="white", colour=None),
+                                panel_background=element_rect(fill="white", colour="black"),
+                                panel_grid_major=element_line(colour="#CCCCCC"),
+                                panel_grid_minor=element_line(colour="#CCCCCC", linetype="dotted"),
+                                axis_text_x=element_text(rotation=90, ha="right"),
+                                axis_title_x=element_text(weight="bold"),
+                                axis_title_y=element_text(weight="bold"),
+                                legend_position="bottom",          # legenda central abaixo
+                                legend_direction="horizontal",
+                                legend_box_margin=0,
+                                plot_title=element_text(colour="#003366", size=13)
+                            )
+                        )
+                        return p
+                    # plt.show()
+
+                    # --- se estiver no Streamlit --------------------------------------------------
+                    # import streamlit as st
                     # Exibe o gráfico com o Streamlit, passando a figura
                
                 df_final = df_final_pl
@@ -5249,8 +5445,18 @@ def main_page():
                 df_combinado = df_combinado.drop('Total', axis=0)
                 df_combinado.drop(columns=['Total'], inplace=True)
                 #Teste
+                p_barras = gg_rendimento_diario(df_estrategias_long)
+                fig1 = p_barras.draw()          # converte o ggplot em Figure
+                p_curva = gg_curva_capital(df_estrategias_long)
+                fig2 = p_curva.draw()
+
+                st.write('### Tabela de Rendimento Diário por Estratégia')
                 st.table(df_combinado)
-                st.pyplot(fig)
+                st.write('### Gráficos de Rendimento Diário por Estratégia')
+                st.pyplot(fig1)
+                st.write('### Graficos de Curva de Capital')
+                st.pyplot(fig2)
+                #st.pyplot(fig2)
  
             elif visao == "Ativo":
                 lista_ativos = df_final.index
@@ -5317,15 +5523,66 @@ def main_page():
                     #df_ativos_long['date'] = df_ativos_long['date'].dt.date
                     #df_ativos_long['date'] = df_ativos_long['date'].dt.strftime('%b %Y')
                     # Criando o gráfico de barras
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    sns.barplot(x='date', y='Rendimento_diario', hue='ativo',
-                                data=df_ativos_long, ax=ax, palette="Blues")
-                    ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
-                    ax.set_title("Rendimento Diário por Ativo")
-                    ax.set_xlabel("Data")
-                    ax.set_ylabel("Rendimento Diário")
-                    ax.legend(title='Ativos')
-                    plt.tight_layout()
+                    sns.set_theme(style="whitegrid")
+                    plt.rcParams.update({
+                        "figure.figsize"   : (16, 7),
+                        "axes.facecolor"   : "white",
+                        "axes.edgecolor"   : "black",
+                        "grid.color"       : "#CCCCCC",
+                        "grid.linestyle"   : "-",
+                        "grid.alpha"       : 1.0,
+                        "axes.titleweight" : "bold",
+                        "axes.titlesize"   : 13,
+                        "axes.titlecolor"  : "#003366",
+                        "axes.labelweight" : "bold",
+                        "xtick.labelsize"  : 10,
+                        "ytick.labelsize"  : 10,
+                    })
+
+                    # -------- função de plotagem -------------------------------------------------
+                    def plot_rendimento_diario_ativo(df_ativos_long: pd.DataFrame):
+                        fig, ax = plt.subplots()
+
+                        sns.barplot(
+                            x="date",
+                            y="Rendimento_diario",
+                            hue="ativo",
+                            data=df_ativos_long,
+                            ax=ax,
+                            palette="Blues"
+                        )
+
+                        # Datas inclinadas
+                        ax.set_xticklabels(
+                            ax.get_xticklabels(),
+                            rotation=45,
+                            ha="right"
+                        )
+
+                        # Títulos e rótulos
+                        ax.set_title("Rendimento Diário por Ativo")
+                        ax.set_xlabel("Data")
+                        ax.set_ylabel("Rendimento Diário")
+
+                        # Grade menor pontilhada (para imitar panel_grid_minor)
+                        ax.grid(which="minor", linestyle=":", linewidth=0.5, color="#CCCCCC")
+                        ax.minorticks_on()
+
+                        # Legenda embaixo, coerente com os demais gráficos
+                        ax.legend(
+                            title="Ativos",
+                            loc="upper left",
+                            bbox_to_anchor=(0.02, 0.98),
+                            ncol=3,
+                            frameon=False
+                        )
+
+                        plt.tight_layout()
+                        return fig
+
+                    # ---- exemplo de uso em Streamlit -------------------------------------------
+                    # import streamlit as st
+                    fig = plot_rendimento_diario_ativo(df_ativos_long)
 
                     # Exibe o gráfico com o Streamlit, passando a figura
 

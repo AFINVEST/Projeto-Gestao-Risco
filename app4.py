@@ -3292,6 +3292,10 @@ def analisar_dados_fundos():
                             if len(colunas_uteis) <= 0:
                                 # Pegar o valor do ajuste mais recente
                                 rendimento = 0
+                            dia_compra = pd.to_datetime(data_fechamento)
+                            dia_fechamento = pd.to_datetime(data_operacao)
+                            if dia_compra == dia_fechamento:
+                                rendimento = 0
                         else:
                             rendimento = (preco_fechamento -
                                           preco_anterior) * quantidade
@@ -3366,18 +3370,22 @@ def analisar_dados_fundos():
                             rendimento = (
                                 preco_fechamento - preco_anterior) * quantidade * dolar / 10000
                             
-                        if 'DAP' in idx:
+                        elif 'DAP' in idx:
                             dia_compra = pd.to_datetime(data_fechamento)
-                            # Pega linha do ativo no df_ajuste
-                            linha_ajuste = df_ajuste[df_ajuste['Assets'] == idx].drop(columns='Assets')
+                            dia_fechamento = pd.to_datetime(data_operacao)
+                            if dia_compra == dia_fechamento:
+                                rendimento = 0
+                            else:
+                                # Pega linha do ativo no df_ajuste
+                                linha_ajuste = df_ajuste[df_ajuste['Assets'] == idx].drop(columns='Assets')
 
-                            if linha_ajuste.empty:
-                                rendimento =  0
-                                # Ativo não encontrado
-                            
-                            # Selecionar colunas com datas >= data de compra
-                            colunas_uteis = linha_ajuste.columns[datas_validas >= dia_compra]
-                            rendimento = linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
+                                if linha_ajuste.empty:
+                                    rendimento =  0
+                                    # Ativo não encontrado
+                                
+                                # Selecionar colunas com datas >= data de compra
+                                colunas_uteis = linha_ajuste.columns[datas_validas == dia_compra]
+                                rendimento = linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
 
                         else:
                             rendimento = (preco_fechamento -

@@ -9,6 +9,13 @@ import datetime
 import os
 from datetime import date
 from supabase import create_client
+from plotnine import (
+                        ggplot, aes, geom_col, geom_line, labs,
+                        scale_fill_brewer, scale_color_manual, scale_x_datetime,
+                        theme_minimal, theme,
+                        element_text, element_rect, element_line
+                    )
+
 
 # ==========================================================
 #               FUNÇÕES AUXILIARES (MESMAS)
@@ -3369,7 +3376,7 @@ def analisar_dados_fundos():
                                 # Ativo não encontrado
                             
                             # Selecionar colunas com datas >= data de compra
-                            colunas_uteis = linha_ajuste.columns[datas_validas == dia_compra]
+                            colunas_uteis = linha_ajuste.columns[datas_validas >= dia_compra]
                             rendimento = linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
 
                         else:
@@ -3398,7 +3405,6 @@ def analisar_dados_fundos():
                 # Adicionar a nova linha ao DataFrame final
                 df_final_pl = pd.concat([df_final_pl, df_rendimentos_append])
             
-
     return df_final, df_final_pl
 
 def pl_dia(df, tipo_agrupamento="Semanal"):
@@ -3635,9 +3641,10 @@ def calcular_retorno_sobre_pl(df_fundos, df2, pl_parquet_path="pl_fundos_teste.p
         
         # Dividir Rendimento_diario pelo PL total
         if soma_pl != 0 and not np.isnan(soma_pl):
-            pl_totais.append(f'{rendimento / soma_pl * 10000:.2f} bps')
+            pl_totais.append(rendimento / soma_pl * 10000)
         else:
             pl_totais.append(np.nan)
+
     # Cria a coluna de resultado
     df2['Retorno_sobre_PL'] = pl_totais
     
@@ -4952,6 +4959,19 @@ def main_page():
                 df_final_pl.columns = pd.to_datetime(
                     df_final_pl.columns).strftime('%d-%b-%y')
 
+            df_totais = df_final_pl.copy()
+            #Deixar somente as linhas que no indice tem a palavra 'Total'
+            df_totais = df_totais[df_totais.index.str.contains('Total')]
+            #Tirar tudo depois do espaço no index
+            df_totais.index = df_totais.index.str.split(' - ').str[0]
+            df_totais = df_totais.sum()
+            #Colocar a primeira linha como 'Total'
+            df_totais = df_totais.to_frame().T
+            df_totais.index = ['Total']
+
+
+
+
             # ADICIONAR UMA COLUNA DE TOTAL PARA O DF_FINAL
             df_final['Total'] = df_final.sum(axis=1)
             df_final_pl['Total'] = df_final_pl.sum(axis=1)
@@ -5065,28 +5085,61 @@ def main_page():
                         ggplot, aes, geom_col, geom_line,
                         labs, scale_fill_brewer, scale_color_manual, scale_x_datetime,
                         theme_minimal, theme,
-                        element_rect, element_line, element_text
+                        element_rect, element_line, element_text,scale_fill_manual
                     )
 
                     # --------------------------------------------------------------------------- #
                     # 1)  RENDIMENTO DIÁRIO POR FUNDO  (barras agrupadas)
                     # --------------------------------------------------------------------------- #
-                    def gg_rendimento_diario_fundos(df_fundos_long: pd.DataFrame):
-                        df_plot = df_fundos_long.copy()
-                        df_plot["date"] = pd.to_datetime(df_plot["date"], dayfirst=True)
+                    
 
+
+                    # paleta personalizada – uma cor distinta para cada fundo
+                    palette_fundos = {
+                        "GLOBAL BONDS"        : "#003366",  # azul‑escuro
+                        "HORIZONTE"           : "#B03A2E",  # vermelho tijolo
+                        "JERA2026"            : "#138D75",  # verde
+                        "REAL FIM"            : "#7F3C8D",  # roxo
+                        "BH FIRF INFRA"       : "#D35400",  # laranja queimado
+                        "BORDEAUX INFRA"      : "#1ABC9C",  # turquesa
+                        "TOPAZIO INFRA"       : "#34495E",  # cinza‑azulado
+                        "MANACA INFRA FIRF"   : "#C27E00",  # mostarda
+                        "AF DEB INCENTIVADAS" : "#E0115F"   # magenta
+                    }
+
+
+                    def gg_rendimento_diario_fundos(df_fundos_long: pd.DataFrame, tol: float = 0):
+                        """
+                        Plota rendimento diário por fundo.
+                        • Mostra só as datas com |Rendimento_diario| > tol
+                        • Aplica paleta_fundos como cores fixas.
+                        """
+                        # ---------------------------------------------- prepara dados
+                        df_plot = (
+                            df_fundos_long
+                            .copy()
+                            .assign(date=pd.to_datetime(df_fundos_long["date"], dayfirst=True))
+                            .dropna(subset=["Rendimento_diario"])
+                            .loc[lambda d: d["Rendimento_diario"].abs() > tol]
+                        )
+
+                        if df_plot.empty:
+                            raise ValueError("Nenhuma linha com Rendimento_diario diferente de zero.")
+
+                        ordered_dates = sorted(df_plot["date"].unique())
+                        df_plot["date_str"] = pd.Categorical(
+                            df_plot["date"].dt.strftime("%d‑%b"),
+                            categories=[d.strftime("%d‑%b") for d in ordered_dates],
+                            ordered=True
+                        )
+
+                        # ---------------------------------------------- gráfico
                         p = (
-                            ggplot(df_plot,
-                                aes("date", "Rendimento_diario", fill="fundo"))
+                            ggplot(df_plot, aes("date_str", "Rendimento_diario", fill="fundo"))
                             + geom_col(position="dodge", width=.8)
                             + labs(title="Rendimento Diário por Fundo",
-                                x="Data",
-                                y="Rendimento Diário")
-                            # paleta sequencial azul (similar aos exemplos anteriores)
-                            + scale_fill_brewer(type="seq", palette="Blues")
-                            # rótulo a cada 2 dias
-                            + scale_x_datetime(date_breaks="2 days", date_labels="%d‑%b")
-                            # -------- tema minimalista + ajustes manuais -------------------------
+                                x="Data", y="Rendimento Diário")
+                            + scale_fill_manual(values=palette_fundos)          # ⬅️ paleta aplicada
                             + theme_minimal()
                             + theme(
                                 figure_size=(14, 6),
@@ -5097,7 +5150,6 @@ def main_page():
                                 axis_text_x=element_text(rotation=45, ha="right"),
                                 axis_title_x=element_text(weight="bold"),
                                 axis_title_y=element_text(weight="bold"),
-                                # legenda horizontal abaixo
                                 legend_position="bottom",
                                 legend_direction="horizontal",
                                 legend_title=element_text(weight="bold"),
@@ -5138,7 +5190,7 @@ def main_page():
                                 x="Data",
                                 y="Valor Acumulado")
                             + scale_color_manual(values=palette_fundos)
-                            + scale_x_datetime(date_breaks="2 days", date_labels="%d‑%b")
+                            + scale_x_datetime(date_breaks="1 days", date_labels="%d‑%b")
                             + theme_minimal()
                             + theme(
                                 figure_size=(14, 6),
@@ -5177,15 +5229,25 @@ def main_page():
                         i.split(' - ')[1] for i in df_fundos.index.to_list()]
                     df_fundos = df_fundos.groupby('Fundo').sum()
                     df_fundos_copy = df_fundos.copy()
-                    df_fundos_copy = pd.concat([df_fundos_copy, linha_total])
+                    df_fundos_copy = pd.concat([df_fundos_copy, df_totais])
+                    
+                    coluna_totais = df_fundos_copy.loc['Total']
+                        
+                    #Mudar a celula da linha 'Total' e da coluna 'Total' para coluna_totais.sum()
+                    df_fundos_copy.iloc[-1, -1] = coluna_totais.sum()
 
+                    df_copia_fundos = df_fundos_copy.copy()
+                    
                     for col in df_fundos_copy.columns:
                         df_fundos_copy[col] = df_fundos_copy[col].apply(
                             lambda x: f"{x:.2f}bps")
-
+                        
+                    #df_totais
+                    #Adicionar df_totais na tabela df_fundos_copy na onde tiver as mesmas datas
                     df_combinado = df_fundos_grana + " / " + df_fundos_copy
+
                     #Dropar linha do total
-                    df_combinado = df_combinado.drop('Total', axis=0)
+                    #df_combinado = df_combinado.drop('Total', axis=0)
                     st.write('### Tabela de Rendimento Diário por Estratégia')
                     st.table(df_combinado)
                     st.write('### Gráficos de Rendimento Diário e Acumulado')
@@ -5236,6 +5298,7 @@ def main_page():
                             i.split(' - ')[1] for i in df_estrategias.index.to_list()]
                         df_estrategias = df_estrategias[df_estrategias['Fundo'] != 'Total']
                         df_estrategias.drop(columns=['Fundo'], inplace=True)
+
                     # Agora, adicionar a coluna 'Estrategia' corretamente:
                     lista_estrategias_atualizar = []
                     for idx, row in df_estrategias.iterrows():
@@ -5253,19 +5316,23 @@ def main_page():
                     df_estrategias = df_estrategias.groupby('Estrategia').sum()
 
                     df_estrategias_copy = df_estrategias.copy()
-                    df_estrategias_copy.loc['Total'] = df_estrategias_copy.sum(
-                    )
+                    df_estrategias_copy.loc['Total'] = df_estrategias_copy.sum()
                     for col in df_estrategias_copy.columns:
                         df_estrategias_copy[col] = df_estrategias_copy[col].apply(
                             lambda x: f"R${x:,.2f}")
                     # Adicionar a linha Total
 
+
                     # Exibe a tabela filtrada
                     df_estrategias_grana = df_estrategias_copy.copy()
 
                     # Transforma o DataFrame de formato largo para longo
+
                     # T (transpose) para transformar colunas em linhas
                     df_estrategias_long = df_estrategias.T.reset_index()
+                    
+
+
                     # A primeira coluna será a data e as demais são as estratégias
                     df_estrategias_long.columns = [
                         'date'] + list(df_estrategias.index)
@@ -5297,29 +5364,60 @@ def main_page():
 
                     # Criando o gráfico de barras
                     # Cria a figura e os eixos
-                    from plotnine import (
-                        ggplot, aes, geom_col, geom_line, labs,
-                        scale_fill_brewer, scale_color_manual, scale_x_datetime,
-                        theme_minimal, theme,
-                        element_text, element_rect, element_line
-                    )
 
                     # --------------------------------------------------------------------------- #
                     # 1)  GRÁFICO DE BARRAS – Rendimento Diário por Estratégia
                     # --------------------------------------------------------------------------- #
-                    def gg_rendimento_diario(df_estrategias_long: pd.DataFrame):
-                        df_plot = df_estrategias_long.copy()
-                        df_plot["date"] = pd.to_datetime(df_plot["date"], dayfirst=True)
 
+                    def gg_rendimento_diario(df_estrategias_long: pd.DataFrame, tol: float = 0):
+                        """
+                        Plota barras de rendimento diário.
+                        • Mostra no eixo‑X apenas as datas que têm pelo menos um valor |rendimento| > tol.
+                        • Converte datas para eixo categórico, mantendo ordenação cronológica.
+                        """
+                        from plotnine import (
+                        ggplot, aes, geom_col, geom_line, labs,
+                        scale_fill_brewer, scale_color_manual, scale_x_datetime,
+                        theme_minimal, theme,
+                        element_text, element_rect, element_line
+                        )
+                        # ---------------------------------------------------------- prepara dados
+                        df_plot = (
+                            df_estrategias_long
+                            .copy()
+                            .assign(date=pd.to_datetime(df_estrategias_long["date"], dayfirst=True))
+                            # 1. só dados não-nulos
+                            .dropna(subset=["Rendimento_diario"])
+                            # 2. remove linhas com rendimento ‘nulo’ (zero ou dentro do limite tol)
+                            .loc[lambda d: d["Rendimento_diario"].abs() > tol]
+                        )
+
+                        # Se nada sobrar, evita erro
+                        if df_plot.empty:
+                            raise ValueError("Nenhuma linha com Rendimento_diario diferente de zero.")
+
+                        # -------------------------------------------------- eixo X categórico
+                        ordered_dates = sorted(df_plot["date"].unique())          # ordem cronológica
+                        df_plot["date_str"] = pd.Categorical(
+                            df_plot["date"].dt.strftime("%d‑%b"),                  # rótulo
+                            categories=[d.strftime("%d‑%b") for d in ordered_dates],
+                            ordered=True
+                        )
+
+                        palette_curvas = {
+                            "JUROS NOMINAIS BRASIL": "#B03A2E",
+                            "JUROS REAIS BRASIL"  : "#003366",
+                            "MOEDAS"              : "#138D75",
+                            "JUROS US"     : "#7F3C8D"
+                        }
+
+                        # --------------------------------------------------------- gráfico
                         p = (
-                            ggplot(df_plot,
-                                aes("date", "Rendimento_diario", fill="estratégia"))
+                            ggplot(df_plot, aes("date_str", "Rendimento_diario", fill="estratégia"))
                             + geom_col(position="dodge", width=.8)
                             + labs(title="Rendimento Diário por Estratégia",
-                                x="Data",
-                                y="Rendimento Diário")
-                            + scale_fill_brewer(type="seq", palette="Blues")
-                            + scale_x_datetime(date_breaks="2 days", date_labels="%d‑%b")  # ← 2 dias
+                                x="Data", y="Rendimento Diário")
+                            + scale_color_manual(values=palette_curvas)
                             + theme_minimal()
                             + theme(
                                 figure_size=(14, 6),
@@ -5330,7 +5428,6 @@ def main_page():
                                 axis_text_x=element_text(rotation=90, ha="right"),
                                 axis_title_x=element_text(weight="bold"),
                                 axis_title_y=element_text(weight="bold"),
-                                # --- legenda abaixo ------------------------------------------------
                                 legend_position="bottom",
                                 legend_direction="horizontal",
                                 legend_box_margin=0,
@@ -5339,10 +5436,17 @@ def main_page():
                         )
                         return p
 
+
                     # --------------------------------------------------------------------------- #
                     # 2)  GRÁFICO DE LINHA – Curva de Capital (rendimento acumulado)
                     # --------------------------------------------------------------------------- #
                     def gg_curva_capital(df_long: pd.DataFrame):
+                        from plotnine import (
+                        ggplot, aes, geom_col, geom_line, labs,
+                        scale_fill_brewer, scale_color_manual, scale_x_datetime,
+                        theme_minimal, theme,
+                        element_text, element_rect, element_line
+                        )
                         df = df_long.copy()
                         df["date"] = pd.to_datetime(df["date"], dayfirst=True)
                         df.sort_values(["estratégia", "date"], inplace=True)
@@ -5352,7 +5456,7 @@ def main_page():
                             "JUROS NOMINAIS BRASIL": "#B03A2E",
                             "JUROS REAIS BRASIL"  : "#003366",
                             "MOEDAS"              : "#138D75",
-                            "OUTRA CATEGORIA"     : "#7F3C8D"
+                            "JUROS US"     : "#7F3C8D"
                         }
 
                         p = (
@@ -5433,17 +5537,29 @@ def main_page():
                             lambda x: f"{x:.2f}bps")
                                         # Remover a parte da hora
 
+                
                 df_final22 = df_final22.rename(columns = {'estratégia':'Estrategia'})
                 df_final22 = df_final22.pivot(index = 'Estrategia', columns = 'date', values = 'Rendimento_diario')
                 #Tirar o horário
                 df_final22.columns = pd.to_datetime(df_final22.columns)
                 df_final22.columns = df_final22.columns.strftime('%d-%b-%y')
+                df_final22 = pd.concat([df_final22, df_totais])
 
+                df_final22['Total'] = df_final22.sum(axis=1)
+                    
+                coluna_totais = df_final22.loc['Total']
+                        
+                #Mudar a celula da linha 'Total' e da coluna 'Total' para coluna_totais.sum()
+                df_final22.iloc[-1, -1] = coluna_totais.sum()
+
+                for col in df_final22.columns:
+                    df_final22[col] = df_final22[col].apply(
+                        lambda x: f"{x:.2f}bps")
                 
                 #st.write(df_estrategias_copy,df_estrategias_grana,df_final22)
                 df_combinado = df_estrategias_grana + " / " + df_final22
-                df_combinado = df_combinado.drop('Total', axis=0)
-                df_combinado.drop(columns=['Total'], inplace=True)
+                #df_combinado = df_combinado.drop('Total', axis=0)
+                #df_combinado.drop(columns=['Total'], inplace=True)
                 #Teste
                 p_barras = gg_rendimento_diario(df_estrategias_long)
                 fig1 = p_barras.draw()          # converte o ggplot em Figure

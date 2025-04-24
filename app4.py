@@ -426,14 +426,19 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
         def agrupar_por_ativo(subdf):
             # Quantidade total
             qtd_total = subdf['Quantidade'].sum()
-            
+
+
+
+            if qtd_total != 0:
             # Média ponderada de Preço de Compra:
             # (soma de [Quantidade_i * PreçoCompra_i]) / soma(Quantidade_i)
-            preco_medio_compra = (
-                (subdf['Quantidade'] * subdf['Preço de Compra']).sum() 
-                / qtd_total
-            )
-            
+                preco_medio_compra = (
+                    (subdf['Quantidade'] * subdf['Preço de Compra']).sum() 
+                    / qtd_total
+                )
+            else:
+                preco_medio_compra = 0
+                
             # Preço de Ajuste Atual mais recente (a linha final depois de sort)
             preco_ajuste_atual = subdf.iloc[-1]['Preço de Ajuste Atual']
 

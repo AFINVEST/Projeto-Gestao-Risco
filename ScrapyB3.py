@@ -201,7 +201,7 @@ try:
     driver.get("https://www.b3.com.br/pt_br/market-data-e-indices/servicos-de-dados/market-data/historico/derivativos/ajustes-do-pregao/")
 
     # Aguarda o carregamento da página
-    time.sleep(3)
+    time.sleep(1)
 
     try:
         # Localizar o campo de entrada de data
@@ -211,7 +211,7 @@ try:
         )
         driver.switch_to.frame(iframe)
 
-        time.sleep(2)
+        time.sleep(1)
 
         for dia in datas_uteis:
             input_data = WebDriverWait(driver, 3).until(
@@ -226,7 +226,7 @@ try:
                     (By.CSS_SELECTOR, "button.button.expand"))
             )
             botao_ok.click()
-            time.sleep(5)
+            time.sleep(2)
             # Esperar um tempo para garantir que a página carregue os resultados
             # (Opcional) Faça aqui a coleta e processamento dos dados da tabela para cada data
             # Exemplo: Adicionar uma função para capturar os dados processados
@@ -321,7 +321,7 @@ try:
                 print(f"Erro ao rolar para o topo da página: {e}")
             print(f"Data {dia} processada com sucesso!")
             print("Aguardando 5 segundos para a próxima data...")
-            time.sleep(5)
+            time.sleep(2)
 
     except Exception as e:
         print(f"Erro: {e}")

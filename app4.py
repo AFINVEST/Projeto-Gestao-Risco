@@ -4491,6 +4491,8 @@ def main_page():
 
         # 6. Exibição (exemplo usando st.table no Streamlit)
         # st.subheader("Resumo do Portfólio Atual")
+        #Se alguma linha for zero na coluna "Quantidade Total", não exibir
+        df_portifolio_default_copy = df_portifolio_default_copy[df_portifolio_default_copy["Quantidade Total"] != 0]
         st.table(df_portifolio_default_copy)
         df_b3_fechamento = pd.read_parquet("df_preco_de_ajuste_atual_completo.parquet")
         ultimo_dia_dados_b3 = df_b3_fechamento.columns[-1]

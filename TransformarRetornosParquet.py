@@ -34,18 +34,18 @@ for file in files:
 
 print('Conversão finalizada')
 
-df = pd.read_parquet('portifolio_posições.parquet')
+df = pd.read_parquet('Dados/portifolio_posições.parquet')
 
-file_pl = "pl_fundos.parquet"
+file_pl = "Dados/pl_fundos.parquet"
 df2 = pd.read_parquet(file_pl)
 # Colocar como indice a coluna 0
 df2 = df2.set_index(df2.columns[0])
 
 
-df3 = pd.read_parquet('pl_fundos_teste.parquet')
+df3 = pd.read_parquet('Dados/pl_fundos_teste.parquet')
 
 
-file_bbg = 'BBG - ECO DASH.xlsx'
+file_bbg = 'Dados/BBG - ECO DASH.xlsx'
 df = pd.read_excel(file_bbg, sheet_name='BZ RATES',
                    skiprows=1, thousands='.', decimal=',')
 
@@ -62,7 +62,7 @@ df.columns = [
     'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY', 'IBOV',
     'NTNB25', 'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40', 'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'
 ]
-df.to_parquet('df_inicial.parquet')
+df.to_parquet('Dados/df_inicial.parquet')
 
 df_divone = pd.read_excel(file_bbg, sheet_name='DIV01',
                           skiprows=1, usecols='E:F', nrows=33)
@@ -76,9 +76,9 @@ columns = [
 df_divone.columns = columns
 df_divone = df_divone.drop(df_divone.index[0])
 
-df_divone.to_parquet('df_divone.parquet')
+df_divone.to_parquet('Dados/df_divone.parquet')
 
-df_ntnb = pd.read_excel('FechamentoNTNBs.xlsx')
+df_ntnb = pd.read_excel('Dados/FechamentoNTNBs.xlsx')
 df_ntnb.columns = df_ntnb.iloc[0]
 df_ntnb = df_ntnb.drop(df_ntnb.index[0])
 # Dropar a primeira linha
@@ -98,10 +98,10 @@ colunas = df_ntnb.columns
 for col in colunas:
     df_ntnb[col] = df_ntnb[col].apply(lambda x: str(x).replace('.', ','))
 
-df_b3 = pd.read_parquet('df_preco_de_ajuste_atual.parquet')
+df_b3 = pd.read_parquet('Dados/df_preco_de_ajuste_atual.parquet')
 
 
 # Fazer o merge dos dataframes
 df_precos = pd.concat([df_b3, df_ntnb], axis=0)
 
-df_precos.to_parquet('df_preco_de_ajuste_atual_completo.parquet')
+df_precos.to_parquet('Dados/df_preco_de_ajuste_atual_completo.parquet')

@@ -1,333 +1,209 @@
+"""
+AJUSTES DE PREGÃO – B3
+----------------------------------------------------------
+Fluxo
+1. Lê e alinha df_preco_de_ajuste_atual.parquet e df_valor_ajuste_contrato.parquet
+2. Descobre a última data comum gravada (last_common_dt)
+3. Faz scraping (lógica original) de last_common_dt até o último dia útil antes de hoje
+4. Depois do scraping, compara as **duas últimas colunas**; se todas as
+   linhas forem iguais nos DOIS parquets, entende-se que a última coluna
+   já é apenas uma cópia, então **não duplica** de novo.  
+   Caso contrário, duplica a coluna do último dia útil real → próximo dia útil
+5. Salva com índice “Assets”
+----------------------------------------------------------
+"""
+
+# ───────────── imports ─────────────
+import os
+import time
+from datetime import date, timedelta, datetime
+
+import pandas as pd
+import pandas_market_calendars as mcal
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.action_chains import ActionChains
-import pandas as pd
-from datetime import datetime, timedelta
-import time
-import os
-import pandas_market_calendars as mcal
 
 
-
-def processar_dados(processed_data, hoje_str):
-    
-    # Definindo as colunas de interesse
-    columns = [
-        'Mercadoria',
-        'Vencimento',
-        'Preço de ajuste anterior',
-        'Preço de ajuste Atual',
-        'Variação',
-        'Valor do ajuste por contrato (R$)'
-    ]
-
-    # Cria DataFrame principal
-    df = pd.DataFrame(processed_data, columns=columns)
-
-    # Ajustar o nome da mercadoria para ser as 3 primeiras letras + últimas 2 do vencimento
-    df['Mercadoria'] = df['Mercadoria'].str[:3] + '_' + df['Vencimento'].str[-2:]
-
-    # Tirar o '1' do nome da DI1
-    df.loc[df['Mercadoria'].str.startswith('DI1'), 'Mercadoria'] = 'DI_' + df['Vencimento'].str[-2:]
-    df.loc[df['Mercadoria'].str.startswith('DAP'), 'Mercadoria'] = 'DAP' + df['Vencimento'].str[-2:]
-
-    # Mudar nome do DOL e T10 (exemplo)
-    df.loc[df['Mercadoria'].str.startswith('DOL_'), 'Mercadoria'] = 'WDO1'
-    df.loc[df['Mercadoria'].str.startswith('T10_'), 'Mercadoria'] = 'TREASURY'
-
-    # Remover a coluna Vencimento do DataFrame final
-    df.drop('Vencimento', axis=1, inplace=True)
-
-    # -------------------------------------------------
-    # Agora, vamos criar (ou atualizar) 2 DataFrames:
-    #  1) df_preco_de_ajuste_atual
-    #  2) df_variacao (comentado)
-    #
-    # Cada um terá:
-    #   - índice = Mercadoria
-    #   - colunas = datas (string) no formato YYYY-MM-DD
-    # ---------------------------------------------------
-
-    # 1) Transformando o df original em Série para cada componente
-    #    index = Mercadoria, values = coluna correspondente
-    serie_preco_ajuste = pd.Series(df['Preço de ajuste Atual'].values, index=df['Mercadoria'])
-    serie_variacao = pd.Series(df['Variação'].values, index=df['Mercadoria'])
-
-    # Nome da coluna que será adicionada/atualizada (data do dia)
-    # hoje_str = datetime.now().strftime('%Y-%m-%d')
-
-    # 2) Carregar (ou criar) df_preco_de_ajuste_atual
-    nome_arquivo_preco_ajuste = 'df_preco_de_ajuste_atual.parquet'
-    if os.path.exists(nome_arquivo_preco_ajuste):
-        df_preco_de_ajuste_atual = pd.read_parquet(nome_arquivo_preco_ajuste)
-        # Colocar como index a primeira coluna
-        df_preco_de_ajuste_atual = df_preco_de_ajuste_atual.set_index(df_preco_de_ajuste_atual.columns[0])
-    else:
-        df_preco_de_ajuste_atual = pd.DataFrame()
-
-    # 3) Garantir que o índice contemple todas as Mercadorias
-    mercadorias_unificadas = df_preco_de_ajuste_atual.index.union(serie_preco_ajuste.index)
-    df_preco_de_ajuste_atual = df_preco_de_ajuste_atual.reindex(index=mercadorias_unificadas)
-
-    df_preco_de_ajuste_atual.index.name = 'Assets'
-
-    # 4) Se a coluna (data) não existir, cria; se existir e quiser atualizar, basta sobrescrever
-    df_preco_de_ajuste_atual[hoje_str] = serie_preco_ajuste
-
-    # 5) Salvar em parquet
-    df_preco_de_ajuste_atual.reset_index(inplace=True)
-    # Criar uma coluna com o próximo dia duplicando a coluna de hoje
-    b3 = mcal.get_calendar('B3')
-    hoje = datetime.today().date()
-    datas_uteis = b3.schedule(start_date=hoje - timedelta(days=15), end_date=hoje + timedelta(days=10))
-    datas_uteis_index = datas_uteis.index.date
-
-    data_inicial = max([d for d in datas_uteis_index if d < hoje])
-    proximo_dia = min([d for d in datas_uteis_index if d > hoje])
-    hoje_data = datetime.strptime(hoje_str, '%Y-%m-%d').date()
-    if hoje_data == hoje:
-        df_preco_de_ajuste_atual[f'{proximo_dia}'] = df_preco_de_ajuste_atual[hoje_str]
-
-    df_preco_de_ajuste_atual.to_parquet(nome_arquivo_preco_ajuste)
-
-    # # ------------------------------------------
-    # #  Mesma lógica para df_variacao (COMENTADA)
-    # # ------------------------------------------
-    # nome_arquivo_variacao = 'df_variacao.parquet'
-    # if os.path.exists(nome_arquivo_variacao):
-    #     df_variacao_atual = pd.read_parquet(nome_arquivo_variacao, index_col=0)
-    # else:
-    #     df_variacao_atual = pd.DataFrame()
-
-    # mercadorias_unificadas = df_variacao_atual.index.union(serie_variacao.index)
-    # df_variacao_atual = df_variacao_atual.reindex(index=mercadorias_unificadas)
-    # df_variacao_atual.index.name = 'Assets'
-
-    # df_variacao_atual[hoje_str] = serie_variacao
-    # df_variacao_atual.to_parquet(nome_arquivo_variacao)
-
-    # ------------------------------------------------
-    #          [ALTERAÇÃO SOLICITADA]
-    # ------------------------------------------------
-    # Se o primeiro dígito de 'Variação' for '-', adiciona um '-' antes do valor em
-    # 'Valor do ajuste por contrato (R$)'. Caso contrário, não faz nada.
-    df.loc[df['Variação'].str.startswith('-'), 'Valor do ajuste por contrato (R$)'] = (
-        '-' + df['Valor do ajuste por contrato (R$)'].astype(str)
-    )
-    # ------------------------------------------------
-
-    serie_valor_ajuste = pd.Series(df['Valor do ajuste por contrato (R$)'].values, index=df['Mercadoria'])
-
-    nome_arquivo_valor_ajuste = 'df_valor_ajuste_contrato.parquet'
-    if os.path.exists(nome_arquivo_valor_ajuste):
-        df_valor_ajuste_atual = pd.read_parquet(nome_arquivo_valor_ajuste)
-        df_valor_ajuste_atual = df_valor_ajuste_atual.set_index(df_valor_ajuste_atual.columns[0])
-    else:
-        df_valor_ajuste_atual = pd.DataFrame()
-
-    mercadorias_unificadas = df_valor_ajuste_atual.index.union(serie_valor_ajuste.index)
-    df_valor_ajuste_atual = df_valor_ajuste_atual.reindex(index=mercadorias_unificadas)
-    df_valor_ajuste_atual.index.name = 'Assets'
-
-    df_valor_ajuste_atual[hoje_str] = serie_valor_ajuste
-
-    df_valor_ajuste_atual.reset_index(inplace=True)
-    if hoje_data == hoje:
-        df_valor_ajuste_atual[f'{proximo_dia}'] = df_valor_ajuste_atual[hoje_str]
-
-    df_valor_ajuste_atual.to_parquet(nome_arquivo_valor_ajuste)
-
-    print("Processamento concluído!")
-
-# Função para gerar uma lista de dias úteis a partir de uma data inicial
+# ────────── utilitários ────────────
+def ler_parquet(path: str):
+    if not os.path.exists(path):
+        return pd.DataFrame(), []
+    df = pd.read_parquet(path)
+    df = df.set_index(df.columns[0])
+    df.index.name = "Assets"
+    df = df[~df.index.duplicated(keep="last")]
+    dates = sorted({pd.to_datetime(c).date() for c in df.columns})
+    return df, dates
 
 
-def obter_dias_uteis(data_inicio):
-    data_atual = data_inicio
-    dias_uteis = []
-    while data_atual <= datetime.now():  # Inclui até a data atual
-        if data_atual.weekday() < 5:  # Dias de semana (0 = segunda-feira, 4 = sexta-feira)
-            dias_uteis.append(data_atual.strftime("%d/%m/%Y"))
-        data_atual += timedelta(days=1)
-    return dias_uteis
+def garantir_coluna(df: pd.DataFrame, nova_dt: date, col_base: str):
+    col = nova_dt.isoformat()
+    if col not in df.columns:
+        df[col] = df[col_base]
 
 
-# Configurar o serviço do ChromeDriver
-service = Service()
+def prox_util(cal, d: date) -> date:
+    return cal.valid_days(d + timedelta(days=1),
+                          d + timedelta(days=10))[0].date()
 
-# Inicializar o navegador
-driver = webdriver.Chrome()
 
-# Configurar a data inicial
-# data_inicial = datetime(2024, 1, 16)  # 16/01/2024
-# Importar calendário da b3
-# Obter o calendário da B3
-b3 = mcal.get_calendar('B3')
+def salvar(df: pd.DataFrame, path: str):
+    df.index.name = "Assets"
+    df.reset_index().rename(
+        columns={df.reset_index().columns[0]: "Assets"}).to_parquet(path)
 
-# Data de hoje
-hoje = datetime.today().date()
 
-# Pegar os últimos e próximos dias úteis ao redor de hoje
-datas_uteis = b3.schedule(
-    start_date=hoje - timedelta(days=15), end_date=hoje + timedelta(days=10))
-datas_uteis_index = datas_uteis.index.date
+# ────────── caminhos / leitura ─────────
+P_PRECO = "Dados/df_preco_de_ajuste_atual.parquet"
+P_VALOR = "Dados/df_valor_ajuste_contrato.parquet"
 
-# Encontrar o último dia útil estritamente anterior a hoje
-data_inicial = max([d for d in datas_uteis_index if d < hoje])
+df_p, dates_p = ler_parquet(P_PRECO)
+df_v, dates_v = ler_parquet(P_VALOR)
+if not dates_p or not dates_v:
+    raise ValueError("Parquets vazios. Grave manualmente a primeira data.")
 
-# Encontrar o próximo dia útil após a data inicial
-proximo_dia = min([d for d in datas_uteis_index if d > data_inicial])
+# ────────── alinhar colunas ───────────
+all_dates = sorted(set(dates_p) | set(dates_v))
+for d in all_dates:
+    if d.isoformat() not in df_p.columns:
+        prev = max(x for x in dates_p if x <= d)
+        garantir_coluna(df_p, d, prev.isoformat())
+    if d.isoformat() not in df_v.columns:
+        prev = max(x for x in dates_v if x <= d)
+        garantir_coluna(df_v, d, prev.isoformat())
 
-# Encontrar o último dia útil estritamente anterior a hoje
-dia_anterior = max([d for d in datas_uteis_index if d < data_inicial])
-print(data_inicial, proximo_dia, dia_anterior)
+dates_p = sorted({pd.to_datetime(c).date() for c in df_p.columns})
+dates_v = sorted({pd.to_datetime(c).date() for c in df_v.columns})
+last_common_dt = min(dates_p[-1], dates_v[-1])
 
-# data_inicial = datetime(2025, 4, 4)  # 16/01/2024
-# dias_uteis = obter_dias_uteis(data_inicial)
-# Colocar dias uteis em uma lista
-datas_uteis = []
-datas_uteis.append(data_inicial.strftime("%d/%m/%Y"))
-datas_uteis.append(proximo_dia.strftime("%d/%m/%Y"))
+# ────────── calendário B3 ────────────
+cal = mcal.get_calendar("B3")
+today = date.today()
+ultimo_util = cal.valid_days(today - timedelta(days=10), today)[-1].date()
+dias_scrap = [d.date() for d in cal.valid_days(last_common_dt, ultimo_util)]
 
-# datas_uteis.append(proximo_dia.strftime("%d/%m/%Y"))
+# ────────── funções p/ normalizar e gravar ──────────
 
-# Adicionar o dia atual à lista de dias úteis
 
-try:
-    # Acessar o site de login
-    driver.get("https://www.b3.com.br/pt_br/market-data-e-indices/servicos-de-dados/market-data/historico/derivativos/ajustes-do-pregao/")
+def normalizar(df_raw):
+    df = pd.DataFrame(df_raw, columns=["Mercadoria", "Vencimento",
+                                       "Preço de ajuste anterior", "Preço de ajuste Atual",
+                                       "Variação", "Valor do ajuste por contrato (R$)"])
+    df["Mercadoria"] = df["Mercadoria"].str[:3] + \
+        "_" + df["Vencimento"].str[-2:]
+    df.loc[df["Mercadoria"].str.startswith(
+        "DI1"), "Mercadoria"] = "DI_" + df["Vencimento"].str[-2:]
+    df.loc[df["Mercadoria"].str.startswith(
+        "DAP"), "Mercadoria"] = "DAP" + df["Vencimento"].str[-2:]
+    df.loc[df["Mercadoria"].str.startswith("DOL_"), "Mercadoria"] = "WDO1"
+    df.loc[df["Mercadoria"].str.startswith("T10_"), "Mercadoria"] = "TREASURY"
+    df.drop("Vencimento", axis=1, inplace=True)
+    neg = df["Variação"].str.startswith("-")
+    df.loc[neg, "Valor do ajuste por contrato (R$)"] = "-" + \
+        df.loc[neg, "Valor do ajuste por contrato (R$)"].astype(str)
+    return df
 
-    # Aguarda o carregamento da página
-    time.sleep(1)
 
+def gravar(df_norm, d: date):
+    global df_p, df_v
+    col = d.isoformat()
+    s_preco = pd.Series(df_norm["Preço de ajuste Atual"].values,
+                        index=df_norm["Mercadoria"]).groupby(level=0).last()
+    s_valor = pd.Series(df_norm["Valor do ajuste por contrato (R$)"].values,
+                        index=df_norm["Mercadoria"]).groupby(level=0).last()
+    df_p = df_p.reindex(df_p.index.union(s_preco.index))
+    df_v = df_v.reindex(df_v.index.union(s_valor.index))
+    df_p[col] = s_preco
+    df_v[col] = s_valor
+    print(f"   • {col} gravado")
+
+
+# ────────── scraping (lógica ORIGINAL) ─────────
+if dias_scrap:
+    print("Scraping →", ", ".join(d.strftime("%Y-%m-%d") for d in dias_scrap))
+    driver = webdriver.Chrome(service=Service())
     try:
-        # Localizar o campo de entrada de data
-        # Esperar o iframe estar disponível e alternar para ele
+        driver.get(
+            "https://www.b3.com.br/pt_br/market-data-e-indices/servicos-de-dados/market-data/historico/derivativos/ajustes-do-pregao/")
+        time.sleep(1)
         iframe = WebDriverWait(driver, 3).until(
-            EC.presence_of_element_located((By.TAG_NAME, "iframe"))
-        )
+            EC.presence_of_element_located((By.TAG_NAME, "iframe")))
         driver.switch_to.frame(iframe)
-
         time.sleep(1)
 
-        for dia in datas_uteis:
-            input_data = WebDriverWait(driver, 3).until(
+        for d in dias_scrap:
+            dia_fmt = d.strftime("%d/%m/%Y")
+            input_box = WebDriverWait(driver, 3).until(
                 EC.presence_of_element_located((By.ID, "dData1")))
-            # Limpar o campo e inserir a data
-            input_data.clear()
-            input_data.send_keys(dia)
+            input_box.clear()
+            input_box.send_keys(dia_fmt)
 
-            # Clicar no botão "OK"
-            botao_ok = WebDriverWait(driver, 10).until(
+            WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located(
                     (By.CSS_SELECTOR, "button.button.expand"))
-            )
-            botao_ok.click()
+            ).click()
             time.sleep(2)
-            # Esperar um tempo para garantir que a página carregue os resultados
-            # (Opcional) Faça aqui a coleta e processamento dos dados da tabela para cada data
-            # Exemplo: Adicionar uma função para capturar os dados processados
-            # processar_dados(data)
 
-            # Localizar a tabela pelo ID
             table = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.ID, "tblDadosAjustes"))
-            )
-
-            # Rolar até a tabela para garantir visibilidade
+                EC.presence_of_element_located((By.ID, "tblDadosAjustes")))
             driver.execute_script("arguments[0].scrollIntoView(true);", table)
-
-            # Capturar as linhas da tabela
             rows = table.find_elements(By.CSS_SELECTOR, "tr")
 
-            # Extrair os dados da tabela
-            data_list = []
-            for row in rows:
-                columns = row.find_elements(By.TAG_NAME, "td")
-                data = [col.text.strip() for col in columns]
-                if data:
-                    data_list.append(data)
+            data_list = [
+                [c.text.strip() for c in r.find_elements(By.TAG_NAME, "td")]
+                for r in rows if r.find_elements(By.TAG_NAME, "td")
+            ]
 
-            # Lista para armazenar os dados processados
-            processed_data = []
-            # Preciso salvar em um dataframe os dados que estão em uma tabela em que a primeira coluna tem elementos que valem para multiplas linhas. como o seguinte exemplo "['ABEVO - Contrato Futuro de ABEV3', 'F25', '11,21', '11,40', '0,19', '0,19'] ['G25', '11,21', '11,47', '0,26', '0,26'] ['H25', '11,22', '11,53', '0,31', '0,31']
-
-            # Processar os dados
-            for data in data_list:
-                # Verificar o número de elementos na linha atual
-                if len(data) == 6:
-                    # Se houver 6 elementos, é uma nova mercadoria
-                    mercadoria = data[0]
-                    vencimento = data[1]
-                    preco_ajuste_anterior = data[2]
-                    preco_ajuste_atual = data[3]
-                    variacao = data[4]
-                    valor_ajuste_contrato = data[5]
-                    ano = vencimento[-2:]
-                    ano = int(ano)
-                    if mercadoria == 'DI1 - DI de 1 dia':
-                        # Se o vencimento conter a letra F é pra ser adicionado
-                        if 'F' in vencimento:
-                            processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
-                                                   preco_ajuste_atual, variacao, valor_ajuste_contrato])
-                    elif mercadoria == 'DAP - Cupom de DI x IPCA':  # Ano impar pegar K, Ano par será Q
-                        if ano % 2 != 0:
-                            if 'K' in vencimento:
-                                processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
-                                                       preco_ajuste_atual, variacao, valor_ajuste_contrato])
-                        else:
-                            if 'Q' in vencimento:
-                                processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
-                                                       preco_ajuste_atual, variacao, valor_ajuste_contrato])
-
-                    elif mercadoria == 'DOL - Dólar comercial' or mercadoria == 'T10 - US T-Note 10 anos':
-                        processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
-                                               preco_ajuste_atual, variacao, valor_ajuste_contrato])
-
+            processed, mercadoria = [], None
+            for ln in data_list:
+                if len(ln) == 6:
+                    mercadoria, venc, pa_ant, pa_atu, var, val_aj = ln
                 else:
-                    # Se houver menos de 6 elementos, é um vencimento adicional
-                    vencimento = data[0]
-                    preco_ajuste_anterior = data[1]
-                    preco_ajuste_atual = data[2]
-                    variacao = data[3]
-                    valor_ajuste_contrato = data[4]
-                    ano = vencimento[-2:]
-                    ano = int(ano)
-                    if mercadoria == 'DI1 - DI de 1 dia':
-                        # Se o vencimento conter a letra F é pra ser adicionado
-                        if 'F' in vencimento:
-                            processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
-                                                   preco_ajuste_atual, variacao, valor_ajuste_contrato])
-                    elif mercadoria == 'DAP - Cupom de DI x IPCA':
-                        if ano % 2 != 0:
-                            if 'K' in vencimento:
-                                processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
-                                                       preco_ajuste_atual, variacao, valor_ajuste_contrato])
-                        else:
-                            if 'Q' in vencimento:
-                                processed_data.append([mercadoria, vencimento, preco_ajuste_anterior,
-                                                       preco_ajuste_atual, variacao, valor_ajuste_contrato])
-                # Adicionar os dados processados à lista
-            # mudar o dia para o formato YYYY-MM-DD
-            dia = datetime.strptime(dia, "%d/%m/%Y").strftime("%Y-%m-%d")
-            processar_dados(processed_data, dia)
-            # Role para o topo da página
-            try:
-                driver.execute_script("window.scrollTo(0, 0);")
-            except Exception as e:
-                print(f"Erro ao rolar para o topo da página: {e}")
-            print(f"Data {dia} processada com sucesso!")
-            print("Aguardando 5 segundos para a próxima data...")
-            time.sleep(2)
+                    venc, pa_ant, pa_atu, var, val_aj = ln
+                ano = int(venc[-2:])
 
-    except Exception as e:
-        print(f"Erro: {e}")
+                if mercadoria == 'DI1 - DI de 1 dia':
+                    if 'F' not in venc:
+                        continue
+                elif mercadoria == 'DAP - Cupom de DI x IPCA':
+                    if (ano % 2 and 'K' not in venc) or (ano % 2 == 0 and 'Q' not in venc):
+                        continue
+                elif mercadoria not in ('DOL - Dólar comercial', 'T10 - US T-Note 10 anos'):
+                    continue
 
-    # driver.quit()
+                processed.append(
+                    [mercadoria, venc, pa_ant, pa_atu, var, val_aj])
 
-except Exception as e:
-    print(e)
-    # driver.quit()
+            gravar(normalizar(processed), d)
+            time.sleep(1.5)
+
+    finally:
+        driver.quit()
+else:
+    print("Nenhum dia para scraping.")
+
+# ────────── DUPLICAR apenas se necessário ─────────
+cols_sorted = sorted(df_p.columns)
+if len(cols_sorted) >= 2:
+    last_col, prev_col = cols_sorted[-1], cols_sorted[-2]
+    iguais_preco = df_p[last_col].equals(df_p[prev_col])
+    iguais_valor = df_v[last_col].equals(df_v[prev_col])
+else:
+    iguais_preco = iguais_valor = False   # só 1 coluna → precisa duplicar
+
+if iguais_preco and iguais_valor:
+    print("Última coluna já é cópia idêntica — não duplica de novo.")
+else:
+    last_dt = pd.to_datetime(cols_sorted[-1]).date()
+    prox_dt = prox_util(cal, last_dt)
+    garantir_coluna(df_p, prox_dt, last_col)
+    garantir_coluna(df_v, prox_dt, last_col)
+    print(f"Coluna duplicada para o próximo dia útil: {prox_dt}")
+
+# ────────── salvar finais ─────────
+salvar(df_p, P_PRECO)
+salvar(df_v, P_VALOR)
+print("Processo finalizado.")

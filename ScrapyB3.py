@@ -62,8 +62,25 @@ P_VALOR = "Dados/df_valor_ajuste_contrato.parquet"
 
 df_p, dates_p = ler_parquet(P_PRECO)
 df_v, dates_v = ler_parquet(P_VALOR)
-if not dates_p or not dates_v:
-    raise ValueError("Parquets vazios. Grave manualmente a primeira data.")
+
+# ───── NOVO BLOCO ─────
+if not dates_p or not dates_v:            # se qualquer um estiver vazio…
+    print("Parquets não encontrados. Criando arquivos a partir de 01-01-2025.")
+    start_dt = date(2025, 1, 1)
+    col = start_dt.isoformat()
+
+    # cria DataFrames vazios com a coluna inicial
+    df_p = pd.DataFrame(columns=[col])
+    df_v = pd.DataFrame(columns=[col])
+    df_p.index.name = df_v.index.name = "Assets"
+
+    # grava imediatamente nos caminhos definidos,
+    # assim o resto do script já trabalha com eles
+    salvar(df_p, P_PRECO)
+    salvar(df_v, P_VALOR)
+
+    # atualiza as listas de datas para a lógica seguinte
+    dates_p = dates_v = [start_dt]
 
 # ────────── alinhar colunas ───────────
 all_dates = sorted(set(dates_p) | set(dates_v))
@@ -82,6 +99,8 @@ last_common_dt = min(dates_p[-1], dates_v[-1])
 # ────────── calendário B3 ────────────
 cal = mcal.get_calendar("B3")
 today = date.today()
+# Adiciona 1 dia para evitar erro de scraping no último dia útil
+#today = today - timedelta(days=2)
 ultimo_util = cal.valid_days(today - timedelta(days=10), today)[-1].date()
 dias_scrap = [d.date() for d in cal.valid_days(last_common_dt, ultimo_util)]
 
@@ -111,9 +130,9 @@ def gravar(df_norm, d: date):
     global df_p, df_v
     col = d.isoformat()
     s_preco = pd.Series(df_norm["Preço de ajuste Atual"].values,
-                        index=df_norm["Mercadoria"]).groupby(level=0).last()
+                        index=df_norm["Mercadoria"]).groupby(level=0).first()
     s_valor = pd.Series(df_norm["Valor do ajuste por contrato (R$)"].values,
-                        index=df_norm["Mercadoria"]).groupby(level=0).last()
+                        index=df_norm["Mercadoria"]).groupby(level=0).first()
     df_p = df_p.reindex(df_p.index.union(s_preco.index))
     df_v = df_v.reindex(df_v.index.union(s_valor.index))
     df_p[col] = s_preco

@@ -3816,7 +3816,7 @@ def calcular_retorno_sobre_pl(df_fundos, df2, pl_parquet_path="Dados/pl_fundos_t
                 pl_fundo = pl_fundo.replace('.', '')
                 pl_fundo = pl_fundo.replace(',', '.')
                 pl_fundo = float(pl_fundo)
-                if pd.notnull(pl_fundo):
+                if pd.notnull(pl_fundo):    
                     soma_pl += pl_fundo
 
         # Dividir Rendimento_diario pelo PL total

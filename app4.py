@@ -2819,8 +2819,9 @@ def atualizar_parquet_fundos(
         subset = df_info[df_info["Dia de Compra"] == dia_operacao]
         st.write(f"Ativos do fundo {fundo}: {subset['Ativo'].unique()}")
         st.write(subset)
-        subset = subset[subset["Ativo"].isin(
-            df_current.columns[df_current.columns])]
+        df_current.columns = df_current.columns.str.strip().str.replace('\xa0', ' ', regex=True)
+        contrato_cols = df_current.columns[df_current.columns.str.startswith("Contratos ")]
+        subset = subset[subset["Ativo"].isin(contrato_cols)]
         lista_assets = subset["Ativo"].unique()
         st.write(f"Ativos do fundo {fundo}: {lista_assets}")
         st.write(df_current)

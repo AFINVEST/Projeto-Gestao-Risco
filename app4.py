@@ -2739,6 +2739,7 @@ def atualizar_parquet_fundos(
     # DF de transações: [Ativo, Quantidade, Dia de Compra, Preço de Compra, ...]
     df_info,
     # DF de preços de fechamento B3: colunas ["Assets", <data1>, <data2>, ...]
+    quantidade_nomes,
 ):
 
     # 1) Ler df_fechamento_b3 e tratar
@@ -2817,16 +2818,13 @@ def atualizar_parquet_fundos(
 
         # 4.2) Filtra as transações do dia para encontrar os ativos
         subset = df_info[df_info["Dia de Compra"] == dia_operacao]
-        st.write(f"Ativos do fundo {fundo}: {subset['Ativo'].unique()}")
-        st.write(subset)
-        # Lista única de ativos no subset
+        
         ativos_subset = subset["Ativo"].unique()
 
-        # Filtra apenas os que existem nas colunas do df_current
-        lista_assets = [ativo for ativo in ativos_subset if ativo in df_current.columns]
+        # pegar as keys do dicionario de quantidade_nomes e adicionar as keys na lista de assets
+        lista_assets = list(quantidade_nomes.keys())
         
         st.write(f"Ativos do fundo {fundo}: {lista_assets}")
-        st.write(df_current)
 
         # 4.3) Para cada Ativo, atualizar ou inserir
         for asset in lista_assets:
@@ -4581,13 +4579,14 @@ def main_page():
                             </style>
                             '''
                 )
+            
 
             df_port, key, soma_pl_sem_pesos = checkar_portifolio(
                 assets, quantidade_nomes, precos_user, data_compra, filtered_df)
             st.write(filtered_df)
             if key == True:
                 atualizar_parquet_fundos(
-                    filtered_df, data_compra_todos, df_port)
+                    filtered_df, data_compra_todos, df_port,quantidade_nomes)
             with cool3:
                 st.write("### Portfólio Atualizado")
                 st.table(filtered_df[columns])

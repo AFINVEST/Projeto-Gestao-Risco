@@ -2820,10 +2820,10 @@ def atualizar_parquet_fundos(
         subset = subset[subset["Ativo"].isin(
             df_current.columns[df_current.columns.str.startswith("Contratos")])]
         lista_assets = subset["Ativo"].unique()
+        st.write(f"Ativos do fundo {fundo}: {lista_assets}")
 
         # 4.3) Para cada Ativo, atualizar ou inserir
         for asset in lista_assets:
-
             # -----------------------------
             # DETERMINAR as colunas do dia
             # -----------------------------

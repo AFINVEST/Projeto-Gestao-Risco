@@ -2818,7 +2818,7 @@ def atualizar_parquet_fundos(
         # 4.2) Filtra as transações do dia para encontrar os ativos
         subset = df_info[df_info["Dia de Compra"] == dia_operacao]
         subset = subset[subset["Ativo"].isin(
-            df_current.columns[df_current.columns.str.startswith("Contratos")])]
+            df_current.columns[df_current.columns.str.startswith("Contratos ")])]
         lista_assets = subset["Ativo"].unique()
         st.write(f"Ativos do fundo {fundo}: {lista_assets}")
         st.write(df_current)
@@ -4579,6 +4579,7 @@ def main_page():
 
             df_port, key, soma_pl_sem_pesos = checkar_portifolio(
                 assets, quantidade_nomes, precos_user, data_compra, filtered_df)
+            st.write(filtered_df)
             if key == True:
                 atualizar_parquet_fundos(
                     filtered_df, data_compra_todos, df_port)

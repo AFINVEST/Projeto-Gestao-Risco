@@ -9,8 +9,15 @@ import pandas as pd
 import time
 import os
 from datetime import datetime, timedelta
+import re                      # ⇢ para tratar “R$”
 
 
+################### Cuidado -> Codigo pode quebrar com mudanças no site, como a adiação de novos fundos ###################
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Funções de apoio
+# ──────────────────────────────────────────────────────────────────────────────
 def get_last_value(row, date_columns):
     """Encontra o último valor não nulo/não vazio em uma linha"""
     for date in reversed(date_columns):
@@ -20,11 +27,31 @@ def get_last_value(row, date_columns):
     return "--"
 
 
+def _txt_to_float(txt: str) -> float:
+    """Converte 'R$ 1.234.567,89' → 1234567.89   e '--' → 0.0"""
+    if not isinstance(txt, str) or txt.strip() in ("", "--"):
+        return 0.0
+    num = txt.replace("R$", "").replace(".", "").replace(",", ".").strip()
+    try:
+        return float(num)
+    except ValueError:
+        return 0.0
+
+
+def _float_to_txt(val: float) -> str:
+    """Converte 1234567.89 → 'R$ 1.234.567,89'"""
+    inteiro, frac = f"{val:,.2f}".split(".")
+    inteiro = inteiro.replace(",", ".")
+    return f"R$ {inteiro},{frac}"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 def main():
     # Configurações iniciais
     service = Service()
     driver = webdriver.Chrome(service=service)
-    parquet_path = "Dados/pl_fundos_teste.parquet"
+    #parquet_path = "Dados/pl_fundos_teste.parquet"
+    parquet_path = "pl_fundos.parquet"
     fundos_base = [
         ("AF DEB INCENTIVADAS", "R$ 11.660.312,30"),
         ("AF INVEST GERAES PREV", "--"),
@@ -44,6 +71,7 @@ def main():
         ("HORIZONTE", "R$ 242.504.609,40"),
         ("JERA2026", "--"),
         ("MANACA INFRA FIRF", "--"),
+        ("MINAS DIVIDENDOS", "--"),
         ("MINAS O.N.E. FIA", "R$ 1.902.353,24"),
         ("REAL FIM", "--"),
         ("ROMEU FC FIM CP IE", "R$ 214.564.570,12"),
@@ -58,19 +86,20 @@ def main():
         # Verificar se o arquivo existe
         if os.path.exists(parquet_path):
             df_todos = pd.read_parquet(parquet_path)
-            existing_dates = [col for col in df_todos.columns if col not in [
-                "Fundos/Carteiras Adm", "Último Valor", "Unnamed: 0"]]
-            last_date = max([datetime.strptime(d, "%Y-%m-%d")
-                            for d in existing_dates]) if existing_dates else None
+            existing_dates = [col for col in df_todos.columns
+                              if col not in ["Fundos/Carteiras Adm",
+                                             "Último Valor", "Unnamed: 0"]]
+            last_date = (max(datetime.strptime(d, "%Y-%m-%d")
+                        for d in existing_dates) if existing_dates else None)
         else:
-            df_todos = pd.DataFrame(fundos_base, columns=[
-                                    "Fundos/Carteiras Adm", "Valor"])
+            df_todos = pd.DataFrame(fundos_base,
+                                    columns=["Fundos/Carteiras Adm", "Valor"])
             df_todos = df_todos[["Fundos/Carteiras Adm"]]
             last_date = None
 
         # Definir datas de coleta
-        start_date = last_date + \
-            timedelta(days=1) if last_date else datetime(2025, 1, 1)
+        start_date = last_date + timedelta(days=1) if last_date \
+            else datetime(2025, 1, 1)
         end_date = datetime.today()
 
         if start_date > end_date:
@@ -79,7 +108,7 @@ def main():
 
         # Login
         driver.get("https://afinvest.com.br/login/interno")
-        time.sleep(2)  # Espera para renderização
+        time.sleep(2)
         WebDriverWait(driver, 10).until(EC.presence_of_element_located(
             (By.ID, "atributo"))).send_keys("emanuel.cabral@afinvest.com.br")
         driver.find_element(By.ID, "passwordLogin").send_keys("Afs@2024")
@@ -87,12 +116,18 @@ def main():
 
         # Navegação
         driver.get("https://afinvest.com.br/interno/relatorios/patrimonios")
-        time.sleep(3)  # Espera para renderização
+        time.sleep(3)
         WebDriverWait(driver, 10).until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR, "button.btn.btn-outline-primary[data-type='custom']"))).click()
-        time.sleep(3)  # Espera para renderização
+            (By.CSS_SELECTOR,
+             "button.btn.btn-outline-primary[data-type='custom']"))).click()
+        time.sleep(3)
         date_input = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "date_patrimony_table_fundo")))
+            EC.presence_of_element_located((By.ID, "date_patrimony_table_fundo"))
+        )
+
+        # Indices dos fundos que compõem o TOTAL
+        indices_total = [0, 7, 10, 14, 15, 16, 17, 20, 25]
+
         # Coleta de dados
         current_date = start_date
         while current_date <= end_date:
@@ -103,7 +138,7 @@ def main():
             time.sleep(3)
             WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.ID, "table_patrimony")))
-            time.sleep(2)  # Espera para renderização
+            time.sleep(2)
 
             # Coletar dados da tabela
             rows = WebDriverWait(driver, 10).until(
@@ -111,19 +146,27 @@ def main():
                     (By.CSS_SELECTOR, "#table_patrimony tbody tr"))
             )
 
-            new_data = {row.find_elements(By.TAG_NAME, "td")[0].text: row.find_elements(By.TAG_NAME, "td")[1].text
-                        for row in rows if len(row.find_elements(By.TAG_NAME, "td")) > 1}
+            new_data = {row.find_elements(By.TAG_NAME, "td")[0].text:
+                        row.find_elements(By.TAG_NAME, "td")[1].text
+                        for row in rows if len(row.find_elements(
+                            By.TAG_NAME, "td")) > 1}
 
-            # Adicionar nova coluna
+            # Adicionar nova coluna ao DataFrame
             col_name = current_date.strftime("%Y-%m-%d")
-            df_todos[col_name] = df_todos["Fundos/Carteiras Adm"].map(
-                new_data).fillna("--")
+            df_todos[col_name] = df_todos["Fundos/Carteiras Adm"] \
+                .map(new_data).fillna("--")
+
+            # ─── recalcula a linha TOTAL para esta data ────────────────────
+            soma = df_todos.loc[indices_total, col_name] \
+                            .apply(_txt_to_float).sum()
+            df_todos.loc[df_todos["Fundos/Carteiras Adm"] == "TOTAL",
+                         col_name] = _float_to_txt(soma)
 
             current_date += timedelta(days=1)
 
-        # Na seção de atualização do DataFrame:
-        date_columns = sorted(
-            [col for col in df_todos.columns if col.startswith("202")], reverse=True)
+        # Atualiza “Último Valor”
+        date_columns = sorted([col for col in df_todos.columns
+                               if col.startswith("202")], reverse=True)
         df_todos["Último Valor"] = df_todos.apply(
             lambda row: get_last_value(row, date_columns), axis=1)
 
@@ -131,14 +174,16 @@ def main():
         columns_order = ["Fundos/Carteiras Adm"] + \
             sorted(date_columns) + ["Último Valor"]
         df_todos = df_todos[columns_order]
-        for i in range(1, len(df_todos.columns)):  # Começa da segunda coluna em diante
-            coluna_atual = df_todos.columns[i]
-            coluna_anterior = df_todos.columns[i - 1]
-            if coluna_atual != 'Fundos/Carteiras Adm' and coluna_atual != '2025-01-01':
-                df_todos[coluna_atual] = df_todos[coluna_atual].mask(
-                    df_todos[coluna_atual] == "--", df_todos[coluna_anterior])
 
-        # Salvar arquivo
+        # Forward‑fill para "--"
+        for i in range(1, len(df_todos.columns)):
+            col_atual = df_todos.columns[i]
+            col_prev = df_todos.columns[i - 1]
+            if col_atual not in ('Fundos/Carteiras Adm', '2025-01-01'):
+                df_todos[col_atual] = df_todos[col_atual].mask(
+                    df_todos[col_atual] == "--", df_todos[col_prev])
+
+        # Salvar arquivo Parquet
         df_todos.to_parquet(parquet_path, index=False)
         print("Dados atualizados com sucesso!")
 

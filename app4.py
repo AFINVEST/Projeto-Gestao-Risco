@@ -35,7 +35,7 @@ def process_portfolio(df_pl, Weights):
         .replace('--', np.nan)
         .astype(float)
     )
-    df_pl = df_pl.iloc[[5, 9, 10, 11, 17, 18, 19, 20, 22]]
+    df_pl = df_pl.iloc[[4, 8, 9, 10, 16, 17, 18, 19, 21]]
     weights_zero = []
     for weight in Weights:
         if weight == 0:
@@ -56,7 +56,7 @@ def process_portfolio(df_pl, Weights):
 
 
 def process_portfolio_especifico(df_pl, Weights, fundo):
-    df_pl = df_pl.iloc[[5, 9, 10, 11, 17, 18, 19, 20, 22]]
+    df_pl = df_pl.iloc[[4, 8, 9, 10, 16, 17, 18, 19, 21]]
     weights_zero = []
     for weight in Weights:
         if weight == 0:
@@ -2818,14 +2818,10 @@ def atualizar_parquet_fundos(
 
         # 4.2) Filtra as transações do dia para encontrar os ativos
         subset = df_info[df_info["Dia de Compra"] == dia_operacao]
-        
-        ativos_subset = subset["Ativo"].unique()
 
         # pegar as keys do dicionario de quantidade_nomes e adicionar as keys na lista de assets
         lista_assets = list(quantidade_nomes.keys())
         
-        st.write(f"Ativos do fundo {fundo}: {lista_assets}")
-
         # 4.3) Para cada Ativo, atualizar ou inserir
         for asset in lista_assets:
             # -----------------------------
@@ -4583,7 +4579,6 @@ def main_page():
 
             df_port, key, soma_pl_sem_pesos = checkar_portifolio(
                 assets, quantidade_nomes, precos_user, data_compra, filtered_df)
-            st.write(filtered_df)
             if key == True:
                 atualizar_parquet_fundos(
                     filtered_df, data_compra_todos, df_port,quantidade_nomes)
@@ -5250,13 +5245,14 @@ def main_page():
 
                     df_fundos_copy = df_fundos.copy()
                     df_fundos_copy.loc['Total'] = df_fundos.sum()
+                    total_fundos = df_fundos_copy.loc['Total', 'Total']
 
                     for col in df_fundos_copy.columns:
                         df_fundos_copy[col] = df_fundos_copy[col].apply(
                             lambda x: f"R${x:,.2f}")
 
                     df_fundos_grana = df_fundos_copy
-
+                    #Pegar o valor da coluna total e da linha total
                     # Transforma o DataFrame de formato largo para longo
                     # T (transpose) para transformar colunas em linhas
                     df_fundos_long = df_fundos.T.reset_index()
@@ -5459,7 +5455,8 @@ def main_page():
                     coluna_totais = df_fundos_copy.loc['Total']
 
                     # Mudar a celula da linha 'Total' e da coluna 'Total' para coluna_totais.sum()
-                    df_fundos_copy.iloc[-1, -1] = coluna_totais.sum()
+                    #st.write(total_fundos,soma_pl_sem_pesos)
+                    df_fundos_copy.iloc[-1, -1] = total_fundos/soma_pl_sem_pesos * 10000
 
                     df_copia_fundos = df_fundos_copy.copy()
 
@@ -5543,6 +5540,8 @@ def main_page():
                     df_estrategias_copy = df_estrategias.copy()
                     df_estrategias_copy.loc['Total'] = df_estrategias_copy.sum(
                     )
+                    total_estrategias = df_estrategias_copy.loc['Total', 'Total']
+
                     for col in df_estrategias_copy.columns:
                         df_estrategias_copy[col] = df_estrategias_copy[col].apply(
                             lambda x: f"R${x:,.2f}")
@@ -5778,6 +5777,7 @@ def main_page():
                     df_estrategias_copy = df_estrategias.copy()
                     df_estrategias_copy.loc['Total'] = df_estrategias_copy.sum(
                     )
+                    df_estrategias_copy.iloc[-1, -1] = total_estrategias/soma_pl_sem_pesos * 10000
                     for col in df_estrategias_copy.columns:
                         df_estrategias_copy[col] = df_estrategias_copy[col].apply(
                             lambda x: f"{x:.2f}bps")
@@ -5797,7 +5797,7 @@ def main_page():
                 coluna_totais = df_final22.loc['Total']
 
                 # Mudar a celula da linha 'Total' e da coluna 'Total' para coluna_totais.sum()
-                df_final22.iloc[-1, -1] = coluna_totais.sum()
+                df_final22.iloc[-1, -1] = total_estrategias/soma_pl_sem_pesos * 10000
 
                 for col in df_final22.columns:
                     df_final22[col] = df_final22[col].apply(

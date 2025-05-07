@@ -4894,7 +4894,7 @@ def main_page():
                 columns_sem_fundo.remove('Fundos/Carteiras Adm')
             if 'PL' in columns_sem_fundo:
                 columns_sem_fundo.remove('PL')
-
+            #
             st.write("### Selecione as colunas")
             col1_, col2_, col3_ = st.columns([4, 3, 3])
             columns = []

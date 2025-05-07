@@ -3557,7 +3557,7 @@ def analisar_dados_fundos(soma_pl_sem_pesos):
                             rendimento = (preco_fechamento -
                                           preco_anterior) * quantidade
 
-                        rendimento = (rendimento / soma_pl_sem_pesos) * 10000
+                        rendimento = (rendimento / soma_pl) * 10000
 
                         # Adiciona o rendimento ao DataFrame de resultados
                         df_rendimentos.loc[f"{idx}  EM BIPS - {data_operacao}",
@@ -5096,6 +5096,7 @@ def main_page():
             # --- Seletor de Tipo de Visão ---
             print(f'PL utilizado: {soma_pl_sem_pesos}')
             df_final, df_final_pl = analisar_dados_fundos(soma_pl_sem_pesos)
+            st.write(df_final,df_final_pl)
 
             df_final.columns = pd.to_datetime(df_final.columns)
             df_final_pl.columns = pd.to_datetime(df_final_pl.columns)
@@ -5454,6 +5455,7 @@ def main_page():
 
                     coluna_totais = df_fundos_copy.loc['Total']
 
+
                     # Mudar a celula da linha 'Total' e da coluna 'Total' para coluna_totais.sum()
                     # st.write(total_fundos,soma_pl_sem_pesos)
                     df_fundos_copy.iloc[-1, -1] = total_fundos / \
@@ -5468,6 +5470,8 @@ def main_page():
                     # df_totais
                     # Adicionar df_totais na tabela df_fundos_copy na onde tiver as mesmas datas
                     df_combinado = df_fundos_grana + " / " + df_fundos_copy
+
+                    df_combinado.loc['Total'] = df_combinado.loc['Total'].str.split('/').str[0].str.strip()
 
                     # Dropar linha do total
                     # df_combinado = df_combinado.drop('Total', axis=0)
@@ -5778,8 +5782,12 @@ def main_page():
                     df_estrategias_copy = df_estrategias.copy()
                     df_estrategias_copy.loc['Total'] = df_estrategias_copy.sum(
                     )
+                    #Substituir a linha Total por ""
+                    # Substitui os valores da linha 'Total' por string vazia
+
                     df_estrategias_copy.iloc[-1, -
                                              1] = total_estrategias/soma_pl_sem_pesos * 10000
+                    
                     for col in df_estrategias_copy.columns:
                         df_estrategias_copy[col] = df_estrategias_copy[col].apply(
                             lambda x: f"{x:.2f}bps")
@@ -5799,15 +5807,17 @@ def main_page():
                 coluna_totais = df_final22.loc['Total']
 
                 # Mudar a celula da linha 'Total' e da coluna 'Total' para coluna_totais.sum()
-                df_final22.iloc[-1, -1] = total_estrategias / \
-                    soma_pl_sem_pesos * 10000
+                df_final22.iloc[-1, -1] = coluna_totais.sum()
 
                 for col in df_final22.columns:
                     df_final22[col] = df_final22[col].apply(
                         lambda x: f"{x:.2f}bps")
 
+
+
                 # st.write(df_estrategias_copy,df_estrategias_grana,df_final22)
                 df_combinado = df_estrategias_grana + " / " + df_final22
+                df_combinado.loc['Total'] = df_combinado.loc['Total'].str.split('/').str[0].str.strip()
                 # df_combinado = df_combinado.drop('Total', axis=0)
                 # df_combinado.drop(columns=['Total'], inplace=True)
                 # Teste

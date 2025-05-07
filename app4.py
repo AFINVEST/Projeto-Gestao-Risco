@@ -5094,9 +5094,7 @@ def main_page():
             )
 
             # --- Seletor de Tipo de Visão ---
-            print(f'PL utilizado: {soma_pl_sem_pesos}')
             df_final, df_final_pl = analisar_dados_fundos(soma_pl_sem_pesos)
-            st.write(df_final,df_final_pl)
 
             df_final.columns = pd.to_datetime(df_final.columns)
             df_final_pl.columns = pd.to_datetime(df_final_pl.columns)

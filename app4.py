@@ -2821,7 +2821,7 @@ def atualizar_parquet_fundos(
 
         # pegar as keys do dicionario de quantidade_nomes e adicionar as keys na lista de assets
         lista_assets = list(quantidade_nomes.keys())
-        
+
         # 4.3) Para cada Ativo, atualizar ou inserir
         for asset in lista_assets:
             # -----------------------------
@@ -3340,7 +3340,7 @@ def apagar_dados_data(data_apag):
         f"[{nome_arquivo_portifolio}] -> parquet atualizado: {nome_arquivo_portifolio}")
 
 
-def analisar_dados_fundos():
+def analisar_dados_fundos(soma_pl_sem_pesos):
     files = os.listdir('BaseFundos')
     df_b3_fechamento = pd.read_parquet(
         "Dados/df_preco_de_ajuste_atual_completo.parquet")
@@ -3557,7 +3557,7 @@ def analisar_dados_fundos():
                             rendimento = (preco_fechamento -
                                           preco_anterior) * quantidade
 
-                        rendimento = (rendimento / soma_pl) * 10000
+                        rendimento = (rendimento / soma_pl_sem_pesos) * 10000
 
                         # Adiciona o rendimento ao DataFrame de resultados
                         df_rendimentos.loc[f"{idx}  EM BIPS - {data_operacao}",
@@ -3818,7 +3818,7 @@ def calcular_retorno_sobre_pl(df_fundos, df2, pl_parquet_path="Dados/pl_fundos_t
                 pl_fundo = pl_fundo.replace('.', '')
                 pl_fundo = pl_fundo.replace(',', '.')
                 pl_fundo = float(pl_fundo)
-                if pd.notnull(pl_fundo):    
+                if pd.notnull(pl_fundo):
                     soma_pl += pl_fundo
 
         # Dividir Rendimento_diario pelo PL total
@@ -4575,13 +4575,12 @@ def main_page():
                             </style>
                             '''
                 )
-            
 
             df_port, key, soma_pl_sem_pesos = checkar_portifolio(
                 assets, quantidade_nomes, precos_user, data_compra, filtered_df)
             if key == True:
                 atualizar_parquet_fundos(
-                    filtered_df, data_compra_todos, df_port,quantidade_nomes)
+                    filtered_df, data_compra_todos, df_port, quantidade_nomes)
             with cool3:
                 st.write("### Portfólio Atualizado")
                 st.table(filtered_df[columns])
@@ -5095,7 +5094,8 @@ def main_page():
             )
 
             # --- Seletor de Tipo de Visão ---
-            df_final, df_final_pl = analisar_dados_fundos()
+            print(f'PL utilizado: {soma_pl_sem_pesos}')
+            df_final, df_final_pl = analisar_dados_fundos(soma_pl_sem_pesos)
 
             df_final.columns = pd.to_datetime(df_final.columns)
             df_final_pl.columns = pd.to_datetime(df_final_pl.columns)
@@ -5252,7 +5252,7 @@ def main_page():
                             lambda x: f"R${x:,.2f}")
 
                     df_fundos_grana = df_fundos_copy
-                    #Pegar o valor da coluna total e da linha total
+                    # Pegar o valor da coluna total e da linha total
                     # Transforma o DataFrame de formato largo para longo
                     # T (transpose) para transformar colunas em linhas
                     df_fundos_long = df_fundos.T.reset_index()
@@ -5455,8 +5455,9 @@ def main_page():
                     coluna_totais = df_fundos_copy.loc['Total']
 
                     # Mudar a celula da linha 'Total' e da coluna 'Total' para coluna_totais.sum()
-                    #st.write(total_fundos,soma_pl_sem_pesos)
-                    df_fundos_copy.iloc[-1, -1] = total_fundos/soma_pl_sem_pesos * 10000
+                    # st.write(total_fundos,soma_pl_sem_pesos)
+                    df_fundos_copy.iloc[-1, -1] = total_fundos / \
+                        soma_pl_sem_pesos * 10000
 
                     df_copia_fundos = df_fundos_copy.copy()
 
@@ -5777,7 +5778,8 @@ def main_page():
                     df_estrategias_copy = df_estrategias.copy()
                     df_estrategias_copy.loc['Total'] = df_estrategias_copy.sum(
                     )
-                    df_estrategias_copy.iloc[-1, -1] = total_estrategias/soma_pl_sem_pesos * 10000
+                    df_estrategias_copy.iloc[-1, -
+                                             1] = total_estrategias/soma_pl_sem_pesos * 10000
                     for col in df_estrategias_copy.columns:
                         df_estrategias_copy[col] = df_estrategias_copy[col].apply(
                             lambda x: f"{x:.2f}bps")
@@ -5797,7 +5799,8 @@ def main_page():
                 coluna_totais = df_final22.loc['Total']
 
                 # Mudar a celula da linha 'Total' e da coluna 'Total' para coluna_totais.sum()
-                df_final22.iloc[-1, -1] = total_estrategias/soma_pl_sem_pesos * 10000
+                df_final22.iloc[-1, -1] = total_estrategias / \
+                    soma_pl_sem_pesos * 10000
 
                 for col in df_final22.columns:
                     df_final22[col] = df_final22[col].apply(

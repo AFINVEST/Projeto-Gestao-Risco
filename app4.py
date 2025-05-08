@@ -4006,7 +4006,7 @@ def main_page():
         st.sidebar.write("## Ativos do Portfólio")
 
         default_or_not = st.sidebar.checkbox(
-            "Usar ativos portfólio", value=True)
+            "Usar ativos portfólio", value=False)
 
         if default_or_not:
             assets = st.sidebar.multiselect("Selecione os ativos:",
@@ -5200,14 +5200,6 @@ def main_page():
             # linha_total.index = ['Total']
             # Adicionar a linha de soma na tabela filtrada
 
-            # Chama a função de análise
-            dict_result = analisar_performance_fundos(
-                data_inicial,
-                data_final,
-                lista_estrategias,
-                lista_ativos
-            )
-
             if visao == "Fundo":
                 lista_fundos = df_final.index
                 lista_fundos = lista_fundos.to_list()
@@ -5810,8 +5802,6 @@ def main_page():
                 for col in df_final22.columns:
                     df_final22[col] = df_final22[col].apply(
                         lambda x: f"{x:.2f}bps")
-
-
 
                 # st.write(df_estrategias_copy,df_estrategias_grana,df_final22)
                 df_combinado = df_estrategias_grana + " / " + df_final22

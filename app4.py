@@ -5106,7 +5106,7 @@ def main_page():
             df_final_pl = df_final_pl.loc[:, (df_final_pl.columns >= pd.to_datetime(
                 data_inicial)) & (df_final_pl.columns <= pd.to_datetime(data_final))]
 
-            # vOLTAR AS COLUNAS PARA O FORMATO ORIGINAL
+            # VOLTAR AS COLUNAS PARA O FORMATO ORIGINAL
             df_final.columns = df_final.columns.strftime('%d-%b-%y')
             df_final_pl.columns = df_final_pl.columns.strftime('%d-%b-%y')
 

@@ -2990,7 +2990,7 @@ def atualizar_parquet_fundos(
 
                     # Soma os ajustes após a data de compra e multiplica pela quantidade
                     rendimento_unit = linha_ajuste[colunas_uteis].sum(
-                        axis=1).values[0] * quantidade
+                        axis=1).values[0] * quantidade_new
 
                 else:
                     rendimento_unit = (preco_fechamento_dia - preco_compra_new)

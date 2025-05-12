@@ -50,8 +50,8 @@ def main():
     # Configurações iniciais
     service = Service()
     driver = webdriver.Chrome(service=service)
-    #parquet_path = "Dados/pl_fundos_teste.parquet"
-    parquet_path = "pl_fundos.parquet"
+    parquet_path = "Dados/pl_fundos_teste.parquet"
+    #parquet_path = "pl_fundos.parquet"
     fundos_base = [
         ("AF DEB INCENTIVADAS", "R$ 11.660.312,30"),
         ("AF INVEST GERAES PREV", "--"),

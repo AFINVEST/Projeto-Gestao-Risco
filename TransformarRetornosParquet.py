@@ -41,7 +41,6 @@ df2 = pd.read_parquet(file_pl)
 # Colocar como indice a coluna 0
 df2 = df2.set_index(df2.columns[0])
 
-
 df3 = pd.read_parquet('Dados/pl_fundos_teste.parquet')
 
 

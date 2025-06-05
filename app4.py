@@ -5185,60 +5185,60 @@ def main_page():
                             "AF DEB INCENTIVADAS": "#E0115F"   # magenta
                         }
 
-                        def gg_rendimento_diario_fundos(df_fundos_long: pd.DataFrame, tol: float = 0):
+                        def gg_rendimento_diario_fundos(
+                            df_fundos_long: pd.DataFrame,
+                            tol: float = 0,
+                        ):
+                            # -------------------------------------------------- PREPARO DOS DADOS
                             df_plot = (
                                 df_fundos_long
                                 .copy()
-                                # ⬇️ formato explícito evita o erro
-                                .assign(date=pd.to_datetime(df_fundos_long['date'],
-                                                            format='%d %b %Y',
-                                                            dayfirst=True,
-                                                            errors='coerce'))
-                                .dropna(subset=['Rendimento_diario'])
-                                .loc[lambda d: d['Rendimento_diario'].abs() > tol]
+                                # 1️⃣  Converte qualquer coisa que pareça data
+                                .assign(
+                                    date=pd.to_datetime(
+                                        df_fundos_long["date"],      # aceita “Mar 2025” ou “01/03/2025”
+                                        dayfirst=True,               # 03/04/2025 → 3-abr-2025
+                                        errors="coerce",             # se não der pra converter vira NaT
+                                    )
+                                )
+                                # 2️⃣  Mantém só linhas que têm data válida e rendimento ≠ 0 (ou acima de tol)
+                                .dropna(subset=["date", "Rendimento_diario"])
+                                .loc[lambda d: d["Rendimento_diario"].abs() > tol]
                             )
 
                             if df_plot.empty:
-                                raise ValueError(
-                                    "Nenhuma linha com Rendimento_diario diferente de zero.")
+                                raise ValueError("Nenhuma linha com Rendimento_diario diferente de zero.")
 
-                            ordered_dates = sorted(df_plot["date"].unique())
+                            # -------------------------------------------------- ORDENAÇÃO DAS DATAS
+                            ordered_dates = df_plot["date"].sort_values().unique()
+                            ordered_labels = [d.strftime("%d-%b") for d in ordered_dates]  # 01-Mar
+
                             df_plot["date_str"] = pd.Categorical(
-                                df_plot["date"].dt.strftime("%d‑%b"),
-                                categories=[d.strftime("%d‑%b")
-                                            for d in ordered_dates],
-                                ordered=True
+                                df_plot["date"].dt.strftime("%d-%b"),
+                                categories=ordered_labels,
+                                ordered=True,
                             )
 
-                            # ---------------------------------------------- gráfico
+                            # -------------------------------------------------- GRÁFICO
                             p = (
-                                ggplot(df_plot, aes(
-                                    "date_str", "Rendimento_diario", fill="fundo"))
+                                ggplot(df_plot, aes("date_str", "Rendimento_diario", fill="fundo"))
                                 + geom_col(position="dodge", width=.8)
-                                + labs(title="Rendimento Diário por Fundo",
-                                    x="Data", y="Rendimento Diário")
-                                # ⬅️ paleta aplicada
+                                + labs(
+                                    title="Rendimento Diário por Fundo",
+                                    x="Data",
+                                    y="Rendimento Diário",
+                                )
                                 + scale_fill_manual(values=palette_fundos)
                                 + theme_minimal()
                                 + theme(
                                     figure_size=(14, 6),
-                                    plot_background=element_rect(
-                                        fill="white", colour=None),
-                                    panel_background=element_rect(
-                                        fill="white", colour="black"),
-                                    panel_grid_major=element_line(
-                                        colour="#CCCCCC"),
-                                    panel_grid_minor=element_line(
-                                        colour="#CCCCCC", linetype="dotted"),
-                                    axis_text_x=element_text(
-                                        rotation=45, ha="right"),
+                                    axis_text_x=element_text(rotation=45, ha="right"),
                                     axis_title_x=element_text(weight="bold"),
                                     axis_title_y=element_text(weight="bold"),
                                     legend_position="bottom",
                                     legend_direction="horizontal",
                                     legend_title=element_text(weight="bold"),
-                                    plot_title=element_text(
-                                        colour="#003366", size=13)
+                                    plot_title=element_text(colour="#003366", size=13),
                                 )
                             )
                             return p

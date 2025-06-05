@@ -3443,6 +3443,17 @@ def analisar_dados_fundos(
     # ------------------------------------------------------------------ 3. saída
     df_final    = pd.DataFrame(df_cash).T.fillna(0)
     df_final_pl = pd.DataFrame(df_bps ).T.fillna(0)
+    # Se o P&L do dia é 0 → o bps TEM de ser 0 também
+    ZERO_EPS = 1e-9                   # tolerância numérica
+    df_final_pl = df_final_pl.mask(df_final.abs() < ZERO_EPS, 0)
+    TOL_QTD = 1e-6     # ou use 0 se quantidade é inteira
+    TOL_PL  = 0.01     # < 50 centavos tratamos como zero PL
+
+    # -- 1) se você tem DataFrame de quantidades
+    # df_final_pl = df_final_pl.where(df_quant.abs() > TOL_QTD, 0)
+
+    # -- 2) se não tem quantidades, use o próprio PL
+    df_final_pl = df_final_pl.where(df_final_pl.abs() >= TOL_PL, 0)
 
     df_final["Total"]    = df_final.sum(axis=1)
     df_final_pl["Total"] = df_final_pl.sum(axis=1)
@@ -5116,12 +5127,15 @@ def main_page():
                         df_fundos['Fundo'] = [
                             i.split(' - ')[1] for i in df_fundos.index.to_list()]
                         df_fundos = df_fundos.groupby('Fundo').sum()
+                        TOL_REAIS = 0.01 # 1 centavo (ajuste se quiser)
+                        df_fundos = df_fundos.where(df_fundos.abs() >= TOL_REAIS, 0)
 
                         df_fundos_copy = df_fundos.copy()
                         df_fundos_copy.loc['Total'] = df_fundos.sum()
                         total_fundos = df_fundos_copy.loc['Total', 'Total']
 
                         for col in df_fundos_copy.columns:
+
                             df_fundos_copy[col] = df_fundos_copy[col].apply(
                                 lambda x: f"R${x:,.2f}")
 
@@ -5334,10 +5348,15 @@ def main_page():
 
                         df_copia_fundos = df_fundos_copy.copy()
 
+                        # ------------------------------------------------------------------------------
+                        # Mostra “0.00 bps” sempre que o valor real for zero (ou perto de zero)
+                        ZERO_EPS = 0.0005     # 0,00005 bps  → ≈ 1 centavo em PL de 20 MM
+
                         for col in df_fundos_copy.columns:
                             df_fundos_copy[col] = df_fundos_copy[col].apply(
-                                lambda x: f"{x:.2f}bps")
-
+                                lambda x: "0.00bps" if abs(x) < ZERO_EPS else f"{x:.2f}bps"
+                            )
+                        # ------------------------------------------------------------------------------
                         # df_totais
                         # Adicionar df_totais na tabela df_fundos_copy na onde tiver as mesmas datas
                         df_combinado = df_fundos_grana + " / " + df_fundos_copy
@@ -5412,6 +5431,11 @@ def main_page():
                                 lista_estrategias_atualizar.append('MOEDAS')
                         df_estrategias['Estrategia'] = lista_estrategias_atualizar
                         df_estrategias = df_estrategias.groupby('Estrategia').sum()
+                        # ------------------------------------------------------------------
+                        # Zera valores muito pequenos para evitar 0,01 bps “fantasma”
+                        TOL_REAIS = 0.01          # corte de 1 centavo; ajuste se quiser
+                        df_estrategias = df_estrategias.where(df_estrategias.abs() >= TOL_REAIS, 0)
+                        # ------------------------------------------------------------------
 
                         df_estrategias_copy = df_estrategias.copy()
                         df_estrategias_copy.loc['Total'] = df_estrategias_copy.sum(

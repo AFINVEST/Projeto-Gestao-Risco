@@ -4516,6 +4516,7 @@ def main_page():
 
         else:
             st.write("Nenhum Ativo selecionado.")
+
     elif opti == "Ver Portfólio":
         with st.spinner("Carregando dados do portfólio…"):
             # Agrupamento corrigido
@@ -5185,18 +5186,16 @@ def main_page():
                         }
 
                         def gg_rendimento_diario_fundos(df_fundos_long: pd.DataFrame, tol: float = 0):
-                            """
-                            Plota rendimento diário por fundo.
-                            • Mostra só as datas com |Rendimento_diario| > tol
-                            • Aplica paleta_fundos como cores fixas.
-                            """
-                            # ---------------------------------------------- prepara dados
                             df_plot = (
                                 df_fundos_long
                                 .copy()
-                                .assign(date=pd.to_datetime(df_fundos_long["date"], dayfirst=True))
-                                .dropna(subset=["Rendimento_diario"])
-                                .loc[lambda d: d["Rendimento_diario"].abs() > tol]
+                                # ⬇️ formato explícito evita o erro
+                                .assign(date=pd.to_datetime(df_fundos_long['date'],
+                                                            format='%d %b %Y',
+                                                            dayfirst=True,
+                                                            errors='coerce'))
+                                .dropna(subset=['Rendimento_diario'])
+                                .loc[lambda d: d['Rendimento_diario'].abs() > tol]
                             )
 
                             if df_plot.empty:

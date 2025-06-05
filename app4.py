@@ -5164,11 +5164,9 @@ def main_page():
                         if tipo_filtro == "Diário":
                             df_fundos_long['date'] = df_fundos_long['date'].dt.strftime(
                                 '%d %b %Y')
-
                         elif tipo_filtro == "Semanal":
                             df_fundos_long['date'] = df_fundos_long['date'].dt.strftime(
                                 '%d %b %Y')
-
                         else:
                             df_fundos_long['date'] = df_fundos_long['date'].dt.strftime(
                                 '%b %Y')
@@ -5315,7 +5313,8 @@ def main_page():
                                 )
                             )
                             return p
-                        # Exibe o gráfico com o Streamlit, passando a figura
+                    
+                    # Exibe o gráfico com o Streamlit, passando a figura
                     # gráfico de barras
                     fig_diario = gg_rendimento_diario_fundos(df_fundos_long).draw()
                     # curva acumulada

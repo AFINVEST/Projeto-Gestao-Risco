@@ -4531,72 +4531,67 @@ def main_page():
     elif opti == "Ver Portfólio":
         with st.spinner("Carregando dados do portfólio…"):
             # Agrupamento corrigido
-            df_portifolio_default = portifolio_default.groupby("Ativo").agg({
-                "Quantidade": "sum",  # Soma as quantidades
-                # Média ponderada
-                "Preço de Compra": lambda x: (x * portifolio_default.loc[x.index, "Quantidade"]).sum() / portifolio_default.loc[x.index, "Quantidade"].sum(),
-                "Preço de Ajuste Atual": "mean",  # Exemplo, calcula a média
-                "Rendimento": "sum"  # Soma os rendimentos
-            }).reset_index()
+            # ------------------------------------------------------------------
+            # 1) helper para média ponderada
+            # ------------------------------------------------------------------
+            def wavg(df, value_col, weight_col="Quantidade"):
+                w = df[weight_col].abs()            # usa abs() se quiser média “bruta”
+                return np.nan if w.sum() == 0 else (df[value_col] * w).sum() / w.sum()
+
+            # ------------------------------------------------------------------
+            # 2) consolida por ativo
+            # ------------------------------------------------------------------
+            df_portifolio_default = (
+                portifolio_default
+                    .groupby("Ativo", as_index=False)
+                    .apply(lambda g: pd.Series({
+                        "Quantidade"           : g["Quantidade"].sum(),
+                        "Preço de Compra"      : wavg(g, "Preço de Compra"),
+                        "Preço de Ajuste Atual": wavg(g, "Preço de Ajuste Atual"),
+                        "Rendimento"           : g["Rendimento"].sum()
+                    }))
+            )
+
+            # descarta posições zeradas
             df_portifolio_default = df_portifolio_default[df_portifolio_default["Quantidade"] != 0]
-            df_portifolio_default2 = df_portifolio_default.copy()
-            st.subheader("Resumo do Portfólio Atual")
-            df_portifolio_default = df_portifolio_default2.copy()
 
-            # 1. Define a função de média ponderada para “Preço de Compra”
-            def weighted_avg_preco_compra(subdf):
-                total_q = subdf["Quantidade"].sum()
-                if total_q == 0:
-                    # Retorna 0 ou np.nan, a seu critério.
-                    # Se quiser visualizar como 0, retorne 0.
-                    return 0
-                else:
-                    return (subdf["Preço de Compra"] * subdf["Quantidade"]).sum() / total_q
+            # ------------------------------------------------------------------
+            # 3) linha Total • as colunas-preço usam média ponderada
+            # ------------------------------------------------------------------
+            q_tot  = df_portifolio_default["Quantidade"].sum()
+            vlc_pc = (df_portifolio_default["Quantidade"] * df_portifolio_default["Preço de Compra"]).sum()
+            vlc_pa = (df_portifolio_default["Quantidade"] * df_portifolio_default["Preço de Ajuste Atual"]).sum()
 
-            # 2. Faz o groupby usando a função de média ponderada acima
-            # 3. Caso haja necessidade de garantir que todos os ativos apareçam
-            # mesmo que tenham quantidade zero (e não sumam nada na tabela),
-            # podemos fazer um reindex usando os ativos únicos do DataFrame original:
-            unique_assets = portifolio_default["Ativo"].unique()
-            df_portifolio_default = df_portifolio_default.set_index(
-                "Ativo").reindex(unique_assets, fill_value=0).reset_index()
+            total_row = {
+                "Ativo"               : "Total",
+                "Quantidade"          : q_tot,
+                "Preço de Compra"      : np.nan if q_tot == 0 else vlc_pc / q_tot,
+                "Preço de Ajuste Atual": np.nan if q_tot == 0 else vlc_pa / q_tot,
+                "Rendimento"          : df_portifolio_default["Rendimento"].sum()
+            }
 
-            # 4. Adiciona a linha de soma total
-            sum_row = df_portifolio_default.select_dtypes(include='number').sum()
-            sum_row["Ativo"] = "Total"
+            df_portifolio_default = (
+                pd.concat([df_portifolio_default, pd.DataFrame([total_row])], ignore_index=True)
+                .set_index("Ativo")
+            )
 
-            df_portifolio_default = pd.concat(
-                [df_portifolio_default, sum_row.to_frame().T],
-                ignore_index=True
-            ).set_index("Ativo")
+            # ------------------------------------------------------------------
+            # 4) formatação/renome igual ao seu código -------------------------
+            df_fmt = df_portifolio_default.copy()
+            df_fmt["Quantidade"]            = fmt_int(df_fmt["Quantidade"])
+            df_fmt["Preço de Compra"]       = fmt_money(df_fmt["Preço de Compra"])
+            df_fmt["Preço de Ajuste Atual"] = fmt_money(df_fmt["Preço de Ajuste Atual"])
+            df_fmt["Rendimento"]            = fmt_money(df_fmt["Rendimento"])
 
-            # 5. Formatação das colunas (exemplo seguindo seu código)
-            df_portifolio_default_copy = df_portifolio_default.copy()
-            df_portifolio_default_copy["Quantidade"]           = fmt_int(df_portifolio_default_copy["Quantidade"])
-            df_portifolio_default_copy["Preço de Compra"]      = fmt_money(df_portifolio_default_copy["Preço de Compra"])
-            df_portifolio_default_copy["Preço de Ajuste Atual"] = fmt_money(df_portifolio_default_copy["Preço de Ajuste Atual"])
-            df_portifolio_default_copy["Rendimento"]           = fmt_money(df_portifolio_default_copy["Rendimento"])
-
-            df_portifolio_default_copy = df_portifolio_default_copy.rename(columns={
-                "Quantidade": "Quantidade Total",
-                "Preço de Compra": "Preço de Compra Médio",
+            df_fmt = df_fmt.rename(columns={
+                "Quantidade"           : "Quantidade Total",
+                "Preço de Compra"      : "Preço de Compra Médio",
                 "Preço de Ajuste Atual": "Preço de Ajuste Atual Médio",
-                "Rendimento": "P&L"
+                "Rendimento"           : "P&L"
             })
 
-            # 6. Exibição (exemplo usando st.table no Streamlit)
-            # st.subheader("Resumo do Portfólio Atual")
-            # Se alguma linha for zero na coluna "Quantidade Total", não exibir
-            df_portifolio_default_copy = df_portifolio_default_copy[
-                df_portifolio_default_copy["Quantidade Total"] != "0"]
-            # Substituir a celula da Coluna Preco de Compra Medio na linha Total por "R$0,00"
-            df_portifolio_default_copy.loc["Total",
-                                        "Preço de Compra Médio"] = ""
-            # Substituir a celula da Coluna Preço de Ajuste Atual Médio na linha Total por "R$0,00"
-            df_portifolio_default_copy.loc["Total",
-                                        "Preço de Ajuste Atual Médio"] = ""
-
-            st.table(df_portifolio_default_copy)
+            # limpa linhas/colunas a gosto, depois…
+            st.table(df_fmt)
             df_b3_fechamento = load_b3_prices()
             ultimo_dia_dados_b3 = df_b3_fechamento.columns[-1]
             ultimo_dia_dados_b3 = datetime.datetime.strptime(

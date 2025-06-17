@@ -106,7 +106,6 @@ ultimo_util = cal.valid_days(today - timedelta(days=10), today)[-1].date()
 dias_scrap = [d.date() for d in cal.valid_days(last_common_dt, ultimo_util)]
 
 # ────────── funções p/ normalizar e gravar ──────────
-
 def normalizar(df_raw):
     df = pd.DataFrame(df_raw, columns=["Mercadoria", "Vencimento",
                                        "Preço de ajuste anterior", "Preço de ajuste Atual",

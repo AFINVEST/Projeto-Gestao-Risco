@@ -4925,7 +4925,7 @@ def main_page():
                 visao = st.sidebar.selectbox("Escolha o tipo de visão", [
                                             "Fundo", "Estratégia"], index=0)
                 tipo_filtro = st.sidebar.selectbox("Escolha o filtro de tempo", [
-                                                "Diário", "Semanal", "Mensal"], index=1)
+                                                "Diário", "Semanal", "Mensal"], index=2)
 
                 dados_portifolio_atual = pd.read_parquet(
                     'Dados/portifolio_posições.parquet')

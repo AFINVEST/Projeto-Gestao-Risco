@@ -4591,7 +4591,9 @@ def main_page():
             })
 
             # limpa linhas/colunas a gosto, depois…
-            st.table(df_fmt)
+            df_fmt2 = df_fmt.copy()
+            df_fmt2 = df_fmt2.drop(columns=["P&L"])
+            st.table(df_fmt2)
             df_b3_fechamento = load_b3_prices()
             ultimo_dia_dados_b3 = df_b3_fechamento.columns[-1]
             ultimo_dia_dados_b3 = datetime.datetime.strptime(

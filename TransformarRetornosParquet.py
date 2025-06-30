@@ -49,7 +49,7 @@ df = pd.read_excel(file_bbg, sheet_name='BZ RATES',
                    skiprows=1, thousands='.', decimal=',')
 
 df.drop(['Unnamed: 0', 'Unnamed: 1', 'Unnamed: 2',
-        'Unnamed: 3', 'Unnamed: 26'], axis=1, inplace=True)
+        'Unnamed: 3', 'Unnamed: 25'], axis=1, inplace=True)
 df.columns.values[0] = 'Date'
 df = df.drop([0])  # Remove a primeira linha
 df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y')
@@ -57,20 +57,20 @@ df.drop(['WSP1 Index'], axis=1, inplace=True)
 
 df.columns = [
     'Date', 'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
-    'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP25', 'DAP26', 'DAP27',
+    'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP26', 'DAP27',
     'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY', 'IBOV',
-    'NTNB25', 'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40', 'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'
+    'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40', 'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'
 ]
 df.to_parquet('Dados/df_inicial.parquet')
 
 df_divone = pd.read_excel(file_bbg, sheet_name='DIV01',
-                          skiprows=1, usecols='E:F', nrows=33)
+                          skiprows=1, usecols='E:F', nrows=31)
 df_divone = df_divone.T
 columns = [
     'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
-    'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP25', 'DAP26', 'DAP27',
+    'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP26', 'DAP27',
     'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY', 'IBOV', 'S&P',
-    'NTNB25', 'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40', 'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'
+    'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40', 'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'
 ]
 df_divone.columns = columns
 df_divone = df_divone.drop(df_divone.index[0])

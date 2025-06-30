@@ -4916,9 +4916,9 @@ def main_page():
                 }
                 lista_ativos = [
                     'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
-                    'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP25', 'DAP26', 'DAP27',
+                    'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP26', 'DAP27',
                     'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY',
-                    'NTNB25', 'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40', 'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'
+                    'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40', 'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'
                 ]
                 st.write('---')
                 st.title("Análise de Performance dos Fundos")

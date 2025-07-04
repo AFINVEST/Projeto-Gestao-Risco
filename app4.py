@@ -1071,9 +1071,9 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos, op1, o
                         drawndown_dolar = (
                             valor_acumulado - pico_max) / pico_max
                         drawndown_dolar = drawndown_dolar.min()
-                        st.write(f"Drawndown Dolar: {drawndown_dolar}")
+                        #st.write(f"Drawndown Dolar: {drawndown_dolar}")
                         drawndown_dolar = df_retorno['WDO1'].min()
-                        st.write(f"Drawndown Dolar: {drawndown_dolar}")
+                        #st.write(f"Drawndown Dolar: {drawndown_dolar}")
                         df_divone_dolar = drawndown_dolar
                         df_divone_dolar = df_divone_dolar * quantidade_dolar
                         df_divone_dolar = abs(df_divone_dolar) * dolar

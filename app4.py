@@ -3876,11 +3876,448 @@ def load_basefundos() -> dict[str, pd.DataFrame]:
         out[nome] = df
     return out
 
+@st.cache_data(show_spinner="Lendo PL…", ttl=3600)      # 1 h de validade
+def load_total_pl() -> tuple[float, str]:
+    """
+    Soma o PL dos fundos autorizados na penúltima coluna-data
+    de Dados/pl_fundos_teste.parquet.
+    Devolve (pl_total_float, data_ref_yyyy-mm-dd).
+    """
+    import pandas as pd, numpy as np
+
+    # ---------- 1. lista de fundos que entram na soma ----------
+    allow_list = {
+        'AF DEB INCENTIVADAS',
+        'BH FIRF INFRA',
+        'BORDEAUX INFRA',
+        'GLOBAL BONDS',
+        'HORIZONTE',
+        'JERA2026',
+        'MANACA INFRA FIRF',
+        'REAL FIM',
+        'TOPAZIO INFRA',
+    }
+
+    # ---------- 2. lê parquet ----------
+    df = pd.read_parquet("Dados/pl_fundos_teste.parquet")
+
+    # mantém só os fundos permitidos
+    df = df[df["Fundos/Carteiras Adm"].isin(allow_list)].copy()
+
+    # ---------- 3. identifica penúltima coluna-data ----------
+    cols_data = [c for c in df.columns
+                 if c not in ("Fundos/Carteiras Adm", "Último Valor")]
+    cols_data = sorted(cols_data)        # ordem cronológica
+    if not cols_data:
+        raise ValueError("Parquet não contém colunas-data.")
+    data_ref = cols_data[-1]             # penúltima = última válida
+
+    # ---------- 4. converte texto "R$ 12.753.920,35" → float ----------
+    df[data_ref] = (df[data_ref].astype(str)
+                    .str.replace(r"[R$\s\.]", "", regex=True)  # tira R$, espaço, ponto
+                    .str.replace(",", ".", regex=False)        # vírgula → ponto
+                    .replace({"": np.nan, "--": np.nan})
+                    .astype(float)
+                    .fillna(0.0))
+
+    # ---------- 5. soma ----------------
+    pl_total = float(df[data_ref].sum())
+    st.write(df)
+
+    return pl_total, data_ref
+
+_ALLOW_FUNDS = {
+    'AF DEB INCENTIVADAS', 'BH FIRF INFRA', 'BORDEAUX INFRA',
+    'GLOBAL BONDS', 'HORIZONTE', 'JERA2026',
+    'MANACA INFRA FIRF', 'REAL FIM', 'TOPAZIO INFRA'
+}
+
+@st.cache_data(ttl=3600)
+def load_pl_series() -> pd.Series:
+    """
+    Lê `Dados/pl_fundos_teste.parquet` e devolve uma *Series*
+    indexada pela data (datetime64) com o **PL total** diário
+    SOMENTE dos fundos da lista _ALLOW_FUNDS.
+    """
+    df = pd.read_parquet("Dados/pl_fundos_teste.parquet")
+
+    # mantém apenas os fundos autorizados
+    df = df[df["Fundos/Carteiras Adm"].isin(_ALLOW_FUNDS)].copy()
+
+    # converte cada coluna-data ("YYYY-MM-DD") para float
+    cols_data = [c for c in df.columns
+                 if c not in ("Fundos/Carteiras Adm", "Último Valor")]
+
+    def _to_float(col):
+        return (df[col].astype(str)
+                    .str.replace(r"[R$\s\.]", "", regex=True)
+                    .str.replace(",", ".", regex=False)
+                    .replace({"": np.nan, "--": np.nan})
+                    .astype(float)
+                    .fillna(0.0))
+
+    pl_totais = {c: _to_float(c).sum() for c in cols_data}
+
+    pl_series = (pd.Series(pl_totais)
+                   .rename("PL_total")
+                   .sort_index())
+    pl_series.index = pd.to_datetime(pl_series.index)
+
+    return pl_series
+
+@st.cache_data(ttl=24*3600)          # só renova 1 vez por dia
+def load_lft_series() -> pd.Series:
+    """
+    Lê `Dados/dados_lft.csv` que contém a *cotação* da LFT
+        Data, RetornoLFT   (ex.: 113.2481)
+    Converte-a em **variação percentual diária** (decimal) e
+    devolve uma Series indexada por datetime.
+    """
+    df = (pd.read_csv("Dados/dados_lft.csv", parse_dates=["Data"])
+            .rename(columns={"RetornoLFT": "preco"}))
+    df.dropna(inplace=True)  # remove linhas sem data ou preço
+
+    # garante número
+    df["preco"] = pd.to_numeric(df["preco"], errors="coerce")
+
+    # ordena por data e calcula retorno:  P_t / P_{t-1} − 1
+    df = df.sort_values("Data")
+    df["lft_ret"] = df["preco"].pct_change().fillna(0.0)
+
+    # limpa infinitos ou NaN residuais (podem aparecer se P_{t-1}=0)
+    df["lft_ret"] = (df["lft_ret"]
+                       .replace([np.inf, -np.inf], np.nan)
+                       .fillna(0.0))
+
+    return df.set_index("Data")["lft_ret"].astype(float)
+
+def analisar_dados_fundos2(
+        soma_pl_sem_pesos: float,
+        df_b3_fechamento : pd.DataFrame | None = None,
+        df_ajuste        : pd.DataFrame | None = None,
+        basefundos       : dict[str, pd.DataFrame] | None = None
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    import numpy as np, pandas as pd
+
+    # ───────── 1. entradas
+    if df_b3_fechamento is None:
+        df_b3_fechamento = load_b3_prices()
+    if df_ajuste is None:
+        df_ajuste = load_ajustes()
+    if basefundos is None:
+        basefundos = load_basefundos()
+
+    preco_lookup = df_b3_fechamento.set_index("Assets")          # lookup rápido
+    dolar        = preco_lookup.loc["WDO1", df_b3_fechamento.columns[-1]]
+
+    # prepara df_ajuste com cabeçalhos-data
+    df_ajuste = df_ajuste.copy()
+    df_ajuste.columns = (["Assets"] +
+                         [pd.to_datetime(c, errors="coerce").strftime("%Y-%m-%d")
+                          for c in df_ajuste.columns[1:]])
+    df_ajuste.set_index("Assets", inplace=True)
+
+    pnl_cash, pnl_bps = {}, {}
+
+    # ───────── 2. loop fundos / operações
+    for fundo, df_f in basefundos.items():
+        if 'Ativo' in df_f.columns:
+            df_f = df_f.set_index('Ativo')
+        elif df_f.index.name is None:
+            df_f.index.name = 'Ativo'
+
+        cols_qtd = [c for c in df_f.columns if c.endswith("Quantidade")]
+
+        for ativo, linha in df_f.iterrows():
+            for col_q in cols_qtd:
+                qtd = linha[col_q]
+                if pd.isna(qtd) or qtd == 0:
+                    continue
+
+                data_op  = col_q.split()[0]
+                p_compra = linha[col_q.replace("Quantidade", "Preco_Compra")]
+                pl_op    = linha[col_q.replace("Quantidade", "PL")]
+
+                # se PL = 0 ou NaN não dá para calcular bps
+                usa_bps = not pd.isna(pl_op) and pl_op != 0
+
+                p_ant = p_compra
+                for data_fech in df_b3_fechamento.columns[1:]:
+                    if data_fech < data_op:
+                        continue
+
+                    try:
+                        p_fech = preco_lookup.at[ativo, data_fech]
+                    except KeyError:
+                        break       # sem preço, pula resto
+
+                    # regra de rendimento
+                    if ativo == "TREASURY":
+                        rend = (p_fech - p_ant) * qtd * dolar / 10_000
+                    elif "DAP" in ativo:
+                        if data_fech == data_op:
+                            rend = 0
+                        else:
+                            ajuste = df_ajuste.get(data_fech, pd.Series()).get(ativo, 0)
+                            rend   = ajuste * qtd
+                    else:
+                        rend = (p_fech - p_ant) * qtd
+
+                    chave = f"{ativo} - {fundo} - P&L"
+
+                    pnl_cash.setdefault(chave, pd.Series()).at[data_fech] = \
+                        pnl_cash.get(chave, pd.Series()).get(data_fech, 0.0) + rend
+
+                    if usa_bps:
+                        pnl_bps.setdefault(chave, pd.Series()).at[data_fech] = \
+                            pnl_bps.get(chave, pd.Series()).get(data_fech, 0.0) + rend / pl_op * 10_000
+
+                    p_ant = p_fech
+
+    # ───────── 3. saída limpa
+    df_final    = pd.DataFrame(pnl_cash).T.fillna(0.0)
+    df_final_pl = pd.DataFrame(pnl_bps ).T.fillna(0.0)
+
+    # zera bps quando P&L ~ 0
+    ZERO_EPS = 1e-9
+    df_final_pl = df_final_pl.mask(df_final.abs() < ZERO_EPS, 0.0)
+
+    df_final["Total"]    = df_final.sum(axis=1)
+    df_final_pl["Total"] = df_final_pl.sum(axis=1)
+    #Preciso dropar todos os indices que tem 'Total' no nome
+    df_final = df_final[~df_final.index.str.contains("Total")]
+    df_final_pl = df_final_pl[~df_final_pl.index.str.contains("Total")]
+
+    return df_final, df_final_pl
+
+# ---------------------------------------------------------------
+#  FUNÇÃO AUXILIAR – gráfico Altair da cota
+# ---------------------------------------------------------------
+import altair as alt
+
+def plot_cota_altair(cota: pd.Series) -> alt.Chart:
+    df = (
+        cota.reset_index()
+            .rename(columns={"index": "Data", 0: "Cota"})
+            .sort_values("Data")                # garante ordem
+    )
+    y_min, y_max = df["Cota"].min(), df["Cota"].max()
+    pad = 0.002 * (y_max - y_min)
+
+    return (
+        alt.Chart(df)
+            .mark_line(strokeWidth=2, color="#1565c0")
+            .encode(
+                x=alt.X("Data:T", title="", axis=alt.Axis(format="%d-%b")),
+                y=alt.Y("Cota:Q",
+                        scale=alt.Scale(domain=[y_min-pad, y_max+pad]),
+                        title="Índice (base=1)"),
+                tooltip=[alt.Tooltip("Data:T", title="Data", format="%d %b %Y"),
+                         alt.Tooltip("Cota:Q", title="Cota", format=".4f")]
+            )
+            .properties(height=320)
+            .interactive()
+    )
+
+# 2) ---- BARRAS DO RETORNO DIÁRIO ----------------------------------
+def plot_ret_diario(ret: pd.Series) -> alt.Chart:
+    df = (
+        ret.replace([np.inf, -np.inf], np.nan)
+           .dropna()
+           .reset_index()
+           .rename(columns={"index": "Data", 0: "Ret"})
+           .sort_values("Data")
+    )
+    return (
+        alt.Chart(df)
+           .mark_bar()
+           .encode(
+               x=alt.X("Data:T", title="", axis=alt.Axis(format="%d-%b")),
+               y=alt.Y("Ret:Q", title="Retorno diário"),
+               color=alt.condition("datum.Ret >= 0",
+                                   alt.value("#2e7d32"),  # verde
+                                   alt.value("#c62828"))  # vermelho
+           )
+           .properties(height=240)
+    )
+
+import requests
+from datetime import date
+from bcb import sgs                 # <-- biblioteca oficial
+
+@st.cache_data(ttl=24*3600)         # consulta ao SGS no máx. 1 vez/dia
+def load_cdi_series(cache_csv: str = "Dados/cdi_cached.csv") -> pd.Series:
+    """
+    Retorna Series do CDI diário (decimal) indexada por datetime.
+
+    1) tenta ler cache (csv) para evitar requisições repetidas;
+    2) se falhar, baixa do SGS usando bcb.sgs.get() e salva o cache.
+    """
+
+    # ---------- 1. tenta cache ------------------------------------
+    try:
+        s = (pd.read_csv(cache_csv, parse_dates=["Data"])
+                .set_index("Data")["cdi"]
+                .sort_index())
+        if len(s):
+            return s
+    except FileNotFoundError:
+        pass
+
+    # ---------- 2. baixa do SGS -----------------------------------
+    dt_ini = "2025-01-01"                          # qualquer data; bcb aceita ISO
+    dt_fim = date.today().strftime("%Y-%m-%d")     # hoje
+
+    # sgs.get devolve DataFrame já com datetime index e valores float
+    df = sgs.get(12, start=dt_ini, end=dt_fim)     # 12 = CDI Over
+    df.index.name = "Data"
+    df.rename(columns={"12": "cdi"}, inplace=True)   # coluna vira “cdi”
+    df["cdi"] = df["cdi"] / 100                    # para decimal (0.00017)
+    df.to_csv(cache_csv, index=True)               # salva cache
+
+    return df["cdi"]
+
+
+# ==========================================================
+#   PÁGINA – Simular Cota
+# ==========================================================
+def simulate_nav_cota() -> None:
+    """Simula a cota usando PL diário + rendimento da LFT."""
+    import numpy as np, pandas as pd
+
+    st.title("Simulação de Cota – % do PL Total")
+
+    # ───────────────────────────── 1. % investido
+    pct = st.sidebar.slider("Percentual do PL a investir (%)",
+                            0.1, 10.0, 1.0, 0.1) / 100
+
+    # ───────────────────────────── 2. séries auxiliares
+    pl_series  = load_pl_series()           # PL total por dia (float)
+    lft_series = load_lft_series()          # retorno LFT diário (decimal)
+
+    ref_date = pl_series.index[-1]          # penúltima data válida no PL
+    pl_total = pl_series.loc[ref_date]
+    capital0 = pct * pl_total
+
+    st.subheader("Resumo da Simulação")
+    c1, c2 = st.columns(2)
+    c1.metric("PL total", f"R$ {pl_total:,.0f}", help=f"Data ref.: {ref_date.date()}")
+    c2.metric("PL Risco", f"R$ {capital0:,.0f}", help=f"{pct*100:.1f} % do PL")
+
+    # ───────────────────────────── 3. P&L diário (regra Portfólio)
+    df_pnl, _ = analisar_dados_fundos2(
+        soma_pl_sem_pesos = pl_total,
+        df_b3_fechamento  = load_b3_prices(),
+        df_ajuste         = load_ajustes(),
+        basefundos        = load_basefundos()
+    )
+
+    pnl = (df_pnl
+           .drop(columns="Total", errors="ignore")
+           .apply(pd.to_numeric, errors="coerce")
+           .sum(axis=0)
+           .replace([np.inf, -np.inf], np.nan)
+           .dropna())
+    pnl.index = pd.to_datetime(pnl.index)
+    pnl       = pnl.sort_index()
+
+    # ───────────────────────────── 4. alinhar datas
+    common = (
+        pnl.index
+        .intersection(pl_series.index)
+        .intersection(lft_series.index)
+    )  
+    pnl        = pnl.loc[common]
+    pl_series  = pl_series.loc[common]
+    lft_series = lft_series.loc[common]
+    cdi_series = (
+        load_cdi_series()                # já decimal diário
+        .reindex(common)               # garante mesmo índice…
+        .fillna(method="ffill")        # …e preenche datas faltantes
+    )
+
+
+    if pnl.empty:
+        st.warning("Datas de P&L não batem com PL/LFT disponíveis.")
+        return
+
+    # capital efetivamente investido em cada dia (mesmo % do PL)
+    capital_dia = pct * pl_series
 
 
 
+    # ───────────────────────────── 5. ganho de ajuste com LFT
+    ganho_lft  = capital_dia * lft_series          # R$ de ajuste
+    ganho_total = pnl + ganho_lft                  # P&L + ajuste
 
+    # retorno total do dia (%)
+    ret_total = ganho_total / capital_dia
 
+    # cota base-1
+    cota = (1 + ret_total).cumprod()
+
+    # ───────────────────────────── 6. métricas
+# ─────────────── 6. métricas ──────────────────────────────
+    ret_acum      = cota.iloc[-1] - 1                       # retorno da carteira
+    vol_anual     = ret_total.std() * np.sqrt(252)          # vol-anual
+    max_dd        = (cota / cota.cummax() - 1).min()        # drawdown
+
+    # —— CDI no mesmo intervalo
+    cdi_cum       = (1 + cdi_series).cumprod()
+    ret_cdi_acum  = cdi_cum.iloc[-1] - 1                    # retorno CDI
+    excesso_acum  = ret_acum - ret_cdi_acum                 # alfa bruto
+    perc_cdi = (ret_acum / ret_cdi_acum) if ret_cdi_acum != 0 else np.nan
+
+    excesso_diario = ret_total - cdi_series
+
+    mu_excesso   = excesso_diario.mean()        # retorno médio diário
+    sigma_excesso = excesso_diario.std()        # desvio-padrão diário
+
+    sharpe_cdi = (mu_excesso / sigma_excesso) * np.sqrt(252)
+        # ───────────────────────────── 7. gráficos
+    st.altair_chart(plot_cota_altair(cota),  use_container_width=True)
+    st.altair_chart(plot_ret_diario(ret_total), use_container_width=True)
+
+    # ───────────────────────────── 8. cards de métricas
+# ─────────────── 8. caixinhas de métricas ─────────────────
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+
+    c1.metric("Retorno carteira",  f"{ret_acum:,.2%}")
+    c2.metric("Retorno CDI",       f"{ret_cdi_acum:,.2%}")
+    c3.metric("% CDI",     f"{perc_cdi:,.2%}")
+    c4.metric("Vol. anual",        f"{vol_anual:,.2%}")
+    c5.metric("Sharpe sobre CDI",  f"{sharpe_cdi:,.2f}")
+    c6.metric("Máx. Drawdown",     f"{max_dd:,.2%}")
+
+    # ───────────────────────────── 9. download CSV
+    out = pd.DataFrame({
+        "pnl_r$"      : pnl,
+        "ajuste_lft$" : ganho_lft,
+        "ganho_total$": ganho_total,
+        "ret_total"   : ret_total,
+        "cota"        : cota
+    })
+    out["cdi_ret"]      = cdi_series
+    out["excess_ret"]   = excesso_diario
+    #out["cdi_cum"]      = cdi_cum          # opcional
+    #out["excess_cum"]   = excesso_acum     # opcional
+
+    st.download_button("Baixar CSV",
+                       out.to_csv(index_label="data").encode(),
+                       file_name="cota_simulada.csv",
+                       mime="text/csv")
+
+    # opcional: tabela-expander com as colunas
+    st.expander("Detalhe diário").dataframe(out.style.format({
+        "pnl_r$": "R$ {:,.0f}",
+        "ajuste_lft$": "R$ {:,.0f}",
+        "ganho_total$": "R$ {:,.0f}",
+        "ret_total": "{:.4%}",
+        "cota": "{:.4f}",
+        "cdi_ret": "{:.4%}",
+        "excess_ret": "{:.4%}"
+
+    }))
 
 
 # ==========================================================
@@ -3933,7 +4370,7 @@ def main_page():
     default_assets, quantidade_inicial, portifolio_default = processar_dados_port()
     st.sidebar.write("## OPÇÕES DO DASHBOARD")
     opti = st.sidebar.radio("Escolha uma opção:", [
-                            "Ver Portfólio", "Adicionar Ativos", "Remover Ativos"])
+                            "Ver Portfólio", "Adicionar Ativos", "Remover Ativos", "Simular Cota"])
     if opti == "Adicionar Ativos":
         st.sidebar.write("## Ativos do Portfólio")
 
@@ -4985,6 +5422,7 @@ def main_page():
                         df_ajuste        = load_ajustes(),
                         basefundos       = load_basefundos()
                 )
+                st.write(df_final)
                 #Dropar coluna Total em cada um
                 df_final = df_final.drop(columns=['Total'], errors='ignore')
                 df_final_pl = df_final_pl.drop(columns=['Total'], errors='ignore')
@@ -5007,6 +5445,7 @@ def main_page():
                 df_final = df_final[sorted(df_final.columns, key=pd.to_datetime)]
                 df_final_pl = df_final_pl[sorted(
                     df_final_pl.columns, key=pd.to_datetime)]
+                st.write(df_final)
 
                 if tipo_filtro == "Semanal":
                     df_final_T = df_final.T  # Transpomos para ter datas como índice
@@ -6013,6 +6452,8 @@ def main_page():
             else:
                 st.write("Nenhum Ativo selecionado.")
             att_portifosições()
+    elif opti == "Simular Cota":
+        simulate_nav_cota()
     else:
         # Função para apagar os dias de dados que o usuário não quer mais
         st.write("## Apagar Dados")

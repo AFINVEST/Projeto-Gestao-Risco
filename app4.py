@@ -4165,7 +4165,7 @@ def load_cdi_series(cache_csv: str = "Dados/cdi_cached.csv") -> pd.Series:
 
     # ───────── download via API do BCB ───────────────────────────
     SGS_ID  = 12                      # CDI Over / Taxa DI
-    dt_ini  = "2000-01-01"            # pode ajustar
+    dt_ini  = "2025-01-01"            # pode ajustar
     dt_fim  = dt.date.today().strftime("%Y-%m-%d")
 
     url = (f"https://api.bcb.gov.br/dados/serie/bcdata.sgs/{SGS_ID}/dados"
@@ -4199,8 +4199,12 @@ def simulate_nav_cota() -> None:
     st.title("Simulação de Cota – % do PL Total")
 
     # ───────────────────────────── 1. % investido
-    pct = st.sidebar.slider("Percentual do PL a investir (%)",
-                            0.1, 10.0, 1.0, 0.1) / 100
+    pct = st.sidebar.number_input(
+        "Percentual do PL a investir",
+        min_value=0.1, max_value=100.0,
+        value=1.0, step=0.1,
+        format="%.1f"
+      ) / 100        # vira decimal
 
     # ───────────────────────────── 2. séries auxiliares
     pl_series  = load_pl_series()           # PL total por dia (float)
@@ -4231,13 +4235,39 @@ def simulate_nav_cota() -> None:
            .dropna())
     pnl.index = pd.to_datetime(pnl.index)
     pnl       = pnl.sort_index()
+    st.html(
+                '''
+                <style>
+                div[data-testid="stDateInput"] input {
+                    color: black; /* Define o texto */
+                                                    }
+                
+                </style>   
+        
+                '''
+    )
 
     # ───────────────────────────── 4. alinhar datas
     common = (
         pnl.index
         .intersection(pl_series.index)
         .intersection(lft_series.index)
-    )  
+    ) 
+    # ─── filtro de datas ──────────────────────────────────────────────
+    data_min, data_max = pl_series.index.min(), pl_series.index.max()
+
+    d_ini = st.sidebar.date_input("Início",  value=data_min, min_value=data_min, max_value=data_max)
+    d_fim = st.sidebar.date_input("Fim",     value=data_max, min_value=data_min, max_value=data_max)
+
+    # garante ordem
+    if d_ini > d_fim:
+        st.sidebar.error("Data inicial > final.")
+        st.stop()
+
+    # converte p/ Timestamp e aplica corte
+    mask      = (common >= pd.to_datetime(d_ini)) & (common <= pd.to_datetime(d_fim))
+    common    = common[mask]           # reaproveita o mesmo índice filtrado 
+
     pnl        = pnl.loc[common]
     pl_series  = pl_series.loc[common]
     lft_series = lft_series.loc[common]
@@ -4246,6 +4276,7 @@ def simulate_nav_cota() -> None:
         .reindex(common)               # garante mesmo índice…
         .fillna(method="ffill")        # …e preenche datas faltantes
     )
+
 
 
     if pnl.empty:
@@ -4319,16 +4350,90 @@ def simulate_nav_cota() -> None:
                        mime="text/csv")
 
     # opcional: tabela-expander com as colunas
-    st.expander("Detalhe diário").dataframe(out.style.format({
-        "pnl_r$": "R$ {:,.0f}",
-        "ajuste_lft$": "R$ {:,.0f}",
-        "ganho_total$": "R$ {:,.0f}",
-        "ret_total": "{:.4%}",
-        "cota": "{:.4f}",
-        "cdi_ret": "{:.4%}",
-        "excess_ret": "{:.4%}"
+    # ------------------------------------------------------------
+    #  Detalhe diário — nomes de colunas mais claros
+    # ------------------------------------------------------------
+    detalhe_fmt = {
+        "P&L (R$)"           : "R$ {:,.0f}",
+        "Ajuste LFT (R$)"    : "R$ {:,.0f}",
+        "Ganho total (R$)"   : "R$ {:,.0f}",
+        "Retorno diário (%)" : "{:.4%}",
+        "Cota"               : "{:.4f}",
+        "CDI diário (%)"     : "{:.4%}",
+        "Excesso vs CDI (%)" : "{:.4%}"
+    }
 
-    }))
+    out_renomeado = (
+        out.rename(columns={
+            "pnl_r$"      : "P&L (R$)",
+            "ajuste_lft$" : "Ajuste LFT (R$)",
+            "ganho_total$": "Ganho total (R$)",
+            "ret_total"   : "Retorno diário (%)",
+            "cdi_ret"     : "CDI diário (%)",
+            "excess_ret"  : "Excesso vs CDI (%)"
+        })
+    )
+
+    with st.expander("Detalhe diário"):
+        st.dataframe(out_renomeado.style.format(detalhe_fmt))
+
+    # ───────────────────── 1) Retorno mensal ─────────────────────
+    # ------------------------------------------------------------
+    #  Retorno mensal (tabela + gráfico sem título, rótulos destaque)
+    # ------------------------------------------------------------
+    st.write("## Retorno Mensal da Carteira")
+
+    # 1) calcula retorno mensal em ordem
+    ret_mensal = (
+        ret_total
+        .resample("M")
+        .apply(lambda s: (1+s).prod() - 1)            # (1+r).prod-1
+        .sort_index()                                 # garante ordem cronológica
+    )
+
+    # 2) DataFrame para exibir / plotar
+    df_mensal = (
+        ret_mensal
+        .to_frame("Retorno %")
+        .reset_index()
+    )
+    df_mensal["Mês"] = df_mensal["index"].dt.strftime("%b / %y")  # “Jul / 25”
+    df_mensal = df_mensal.drop(columns="index")
+
+    if df_mensal.empty:
+        st.info("Sem dados no intervalo selecionado.")
+    else:
+        # lista ordenada p/ eixo-X
+        ordem = df_mensal["Mês"].tolist()
+
+        barras = (
+            alt.Chart(df_mensal)
+            .mark_bar()
+            .encode(
+                x=alt.X("Mês:O", sort=ordem, title=""),
+                y=alt.Y("Retorno %:Q", title="", axis=alt.Axis(format=".1%")),
+                color=alt.condition("datum['Retorno %'] >= 0",
+                                    alt.value("#2e7d32"),  # verde
+                                    alt.value("#c62828"))  # vermelho
+            )
+        )
+
+        labels = (
+            barras.mark_text(
+                    dy=-10, fontSize=13, fontWeight="bold"
+                )
+                .encode(text=alt.Text("Retorno %:Q", format=".1%"))
+        )
+
+        st.altair_chart(
+            (barras + labels)
+            .properties(height=340)
+            .configure_axis(labelFontSize=12),
+            use_container_width=True
+        )
+
+
+
 
 
 # ==========================================================

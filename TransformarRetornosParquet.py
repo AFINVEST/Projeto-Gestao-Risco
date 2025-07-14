@@ -104,3 +104,15 @@ df_b3 = pd.read_parquet('Dados/df_preco_de_ajuste_atual.parquet')
 df_precos = pd.concat([df_b3, df_ntnb], axis=0)
 
 df_precos.to_parquet('Dados/df_preco_de_ajuste_atual_completo.parquet')
+
+dados = pd.read_excel(r'Z:\Asset Management\FUNDOS e CLUBES\Gerencial\dashboard LFT.xlsx', sheet_name='Historico preços')
+#Renomear a coluna 'Unnamed: 0' para 'Data'
+dados.rename(columns={'Unnamed: 0': 'Data'}, inplace=True)
+#Dropar as primeiras duas linhas
+dados.drop(index=[0, 1], inplace=True)
+#Ficar somente com a coluna 'BLFT 0 06/01/30'
+dados = dados[['Data', 'BLFT 0 06/01/30']]
+#Renomear a coluna 'BLFT 0 06/01/30' para 'RetornoLFT'
+dados.rename(columns={'BLFT 0 06/01/30': 'RetornoLFT'}, inplace=True)
+
+dados.to_csv('Dados/dados_lft.csv', index=False)

@@ -4282,24 +4282,47 @@ def simulate_nav_cota() -> None:
     if pnl.empty:
         st.warning("Datas de P&L não batem com PL/LFT disponíveis.")
         return
+    
+    # ------------- SIDEBAR – parâmetros de custo -----------------
+    st.sidebar.markdown("### Custos diários")
+
+    taxa_adm_on = st.sidebar.checkbox(
+        "Cobrar taxa de administração ‑ 2 % a.a.", value=False
+    )
+
+    custo_pct_aa = st.sidebar.number_input(
+        "Custo adicional (% do PL a.a.)", min_value=0.0, max_value=100.0,
+        value=0.0, step=0.1, format="%.2f"
+    ) / 100        # vira decimal anual
+
+    custo_fixo_rs = st.sidebar.number_input(
+        "Custo fixo diário (R$)", min_value=0.0, value=0.0, step=10.0
+    )
+
+    # ------------- converte para custo diário --------------------
+    rate_adm_dia  = (1.02**(1/252) - 1) if taxa_adm_on else 0.0
+    rate_extra_dia = ((1 + custo_pct_aa)**(1/252) - 1) if custo_pct_aa else 0.0
 
     # capital efetivamente investido em cada dia (mesmo % do PL)
     capital_dia = pct * pl_series
 
+    # após definir capital_dia …
+    custo_adm   = capital_dia * rate_adm_dia
+    custo_extra = capital_dia * rate_extra_dia
+    custo_fixo  = pd.Series(custo_fixo_rs, index=capital_dia.index)
+
+    custo_total = custo_adm + custo_extra + custo_fixo
+
 
 
     # ───────────────────────────── 5. ganho de ajuste com LFT
-    ganho_lft  = capital_dia * lft_series          # R$ de ajuste
-    ganho_total = pnl + ganho_lft                  # P&L + ajuste
-
-    # retorno total do dia (%)
-    ret_total = ganho_total / capital_dia
-
-    # cota base-1
-    cota = (1 + ret_total).cumprod()
+    ganho_lft    = capital_dia * lft_series        # já existia
+    ganho_total  = pnl + ganho_lft - custo_total   # ▼ subtrai custos
+    ret_total    = ganho_total / capital_dia
+    cota         = (1 + ret_total).cumprod()
 
     # ───────────────────────────── 6. métricas
-# ─────────────── 6. métricas ──────────────────────────────
+    # ─────────────── 6. métricas ──────────────────────────────
     ret_acum      = cota.iloc[-1] - 1                       # retorno da carteira
     vol_anual     = ret_total.std() * np.sqrt(252)          # vol-anual
     max_dd        = (cota / cota.cummax() - 1).min()        # drawdown
@@ -4321,7 +4344,7 @@ def simulate_nav_cota() -> None:
     st.altair_chart(plot_ret_diario(ret_total), use_container_width=True)
 
     # ───────────────────────────── 8. cards de métricas
-# ─────────────── 8. caixinhas de métricas ─────────────────
+    # ─────────────── 8. caixinhas de métricas ─────────────────
     c1, c2, c3, c4, c5, c6 = st.columns(6)
 
     c1.metric("Retorno carteira",  f"{ret_acum:,.2%}")
@@ -4333,11 +4356,14 @@ def simulate_nav_cota() -> None:
 
     # ───────────────────────────── 9. download CSV
     out = pd.DataFrame({
-        "pnl_r$"      : pnl,
-        "ajuste_lft$" : ganho_lft,
-        "ganho_total$": ganho_total,
-        "ret_total"   : ret_total,
-        "cota"        : cota
+        "pnl_r$"        : pnl,
+        "ajuste_lft$"   : ganho_lft,
+        "custos_r$"     : -custo_total,            # sinal negativo ⇒ saída de caixa
+        "ganho_total$"  : ganho_total,
+        "ret_total"     : ret_total,
+        "cota"          : cota,
+        "cdi_ret"       : cdi_series,
+        "excess_ret"    : ret_total - cdi_series,
     })
     out["cdi_ret"]      = cdi_series
     out["excess_ret"]   = excesso_diario
@@ -4356,7 +4382,8 @@ def simulate_nav_cota() -> None:
     detalhe_fmt = {
         "P&L (R$)"           : "R$ {:,.0f}",
         "Ajuste LFT (R$)"    : "R$ {:,.0f}",
-        "Ganho total (R$)"   : "R$ {:,.0f}",
+        "Custos (R$)"        : "R$ {:,.0f}",
+        "Ganho líquido (R$)"   : "R$ {:,.0f}",
         "Retorno diário (%)" : "{:.4%}",
         "Cota"               : "{:.4f}",
         "CDI diário (%)"     : "{:.4%}",
@@ -4367,7 +4394,8 @@ def simulate_nav_cota() -> None:
         out.rename(columns={
             "pnl_r$"      : "P&L (R$)",
             "ajuste_lft$" : "Ajuste LFT (R$)",
-            "ganho_total$": "Ganho total (R$)",
+            "custos_r$"   : "Custos (R$)",
+            "ganho_total$": "Ganho líquido (R$)",
             "ret_total"   : "Retorno diário (%)",
             "cdi_ret"     : "CDI diário (%)",
             "excess_ret"  : "Excesso vs CDI (%)"
@@ -4381,60 +4409,108 @@ def simulate_nav_cota() -> None:
     # ------------------------------------------------------------
     #  Retorno mensal (tabela + gráfico sem título, rótulos destaque)
     # ------------------------------------------------------------
+    #st.write("## Retorno Mensal da Carteira")
+
+    # 1) retornos mensais (já em ordem cronológica)
+    # ─── 1) dados mensais ------------------------------------------------
+    #ret_mensal_port = (1 + ret_total).resample("M").prod().sub(1)
+    #ret_mensal_cdi  = (1 + cdi_series).resample("M").prod().sub(1)
+    #ret_mensal_cdi  = ret_mensal_cdi.reindex(ret_mensal_port.index)
+#
+    #df_mensal = (pd.DataFrame({
+    #                "Mês"     : ret_mensal_port.index.strftime("%b / %y"),
+    #                "Carteira": ret_mensal_port.values,
+    #                "CDI"     : ret_mensal_cdi.values})
+    #            .melt(id_vars="Mês", var_name="Série", value_name="Retorno"))
+#
+    #ordem = df_mensal["Mês"].unique().tolist()     # eixo‑X cronológico
+#
+    ## ─── 2) gráfico ------------------------------------------------------
+    #barras = (
+    #    alt.Chart(df_mensal)
+    #    .mark_bar(size=26)                      # largura da barra
+    #    .encode(
+    #        x       = alt.X("Mês:O", sort=ordem, title=""),
+    #        xOffset = "Série:N",                # barras lado‑a‑lado
+    #        y       = alt.Y("Retorno:Q",
+    #                        title="",
+    #                        axis=alt.Axis(format=".1%")),
+    #        color   = alt.Color("Série:N",
+    #                            scale=alt.Scale(
+    #                                domain=["Carteira", "CDI"],
+    #                                range =["#084594", "#2ca02c"]))  # verde & laranja
+    #    )
+    #)
+#
+    #labels = (
+    #    barras.mark_text(
+    #            dy=-8, fontSize=11, fontWeight="bold", color="black")
+    #        .encode(text=alt.Text("Retorno:Q", format=".1%"))
+    #)
+#
+    #st.altair_chart(
+    #    (barras + labels)
+    #    .properties(height=320)
+    #    .configure_axis(labelFontSize=12),
+    #    use_container_width=True
+    #)
+
+    # ───────────────────── Retorno Mensal ───────────────────────
     st.write("## Retorno Mensal da Carteira")
+    ret_mensal_port = (1 + ret_total).resample("M").prod().sub(1)
+    ret_mensal_cdi = (1 + cdi_series).resample("M").prod().sub(1)
+    idx_fmt = ret_mensal_cdi.index.strftime("%b / %y")          # sempre completo
+    ret_mensal_cdi = ret_mensal_cdi.reindex(ret_mensal_port.index).fillna(0.0)
 
-    # 1) calcula retorno mensal em ordem
-    ret_mensal = (
-        ret_total
-        .resample("M")
-        .apply(lambda s: (1+s).prod() - 1)            # (1+r).prod-1
-        .sort_index()                                 # garante ordem cronológica
+    ordem   = [d.strftime("%b / %y") for d in ret_mensal_port.index]
+    df_port = pd.DataFrame({"Mês": ordem, "Retorno": ret_mensal_port.values})
+    df_cdi  = pd.DataFrame({"Mês": idx_fmt, "Retorno": ret_mensal_cdi.values})
+
+    # ────────── 2) Gráfico: barras (Carteira) + linha (CDI) ───
+    barras = (
+        alt.Chart(df_port)
+        .mark_bar(size=28, color="#084594")          # azul‑escuro
+        .encode(
+            x = alt.X("Mês:O", sort=ordem, title=""),
+            y = alt.Y("Retorno:Q", axis=alt.Axis(format=".1%"), title="")
+        )
     )
 
-    # 2) DataFrame para exibir / plotar
-    df_mensal = (
-        ret_mensal
-        .to_frame("Retorno %")
-        .reset_index()
+    linha = (
+        alt.Chart(df_cdi)
+        .mark_line(stroke="#000000", strokeWidth=3)  # linha preta
+        .encode(
+            x = alt.X("Mês:O", sort=ordem),
+            y = "Retorno:Q"
+        )
     )
-    df_mensal["Mês"] = df_mensal["index"].dt.strftime("%b / %y")  # “Jul / 25”
-    df_mensal = df_mensal.drop(columns="index")
 
-    if df_mensal.empty:
-        st.info("Sem dados no intervalo selecionado.")
-    else:
-        # lista ordenada p/ eixo-X
-        ordem = df_mensal["Mês"].tolist()
+    pontos = (
+        linha.mark_point(filled=True, size=60, color="#000000")  # pontos pretos
+    )
 
-        barras = (
-            alt.Chart(df_mensal)
-            .mark_bar()
-            .encode(
-                x=alt.X("Mês:O", sort=ordem, title=""),
-                y=alt.Y("Retorno %:Q", title="", axis=alt.Axis(format=".1%")),
-                color=alt.condition("datum['Retorno %'] >= 0",
-                                    alt.value("#2e7d32"),  # verde
-                                    alt.value("#c62828"))  # vermelho
-            )
-        )
+    lbl_barras = (
+        barras.mark_text(dy=-8, fontSize=11, fontWeight="bold", color="#084594")
+            .encode(text=alt.Text("Retorno:Q", format=".1%"))
+    )
 
-        labels = (
-            barras.mark_text(
-                    dy=-10, fontSize=13, fontWeight="bold"
-                )
-                .encode(text=alt.Text("Retorno %:Q", format=".1%"))
-        )
+    lbl_linha = (
+        pontos.mark_text(dy=12, fontSize=11, fontWeight="bold", color="#000000")
+            .encode(text=alt.Text("Retorno:Q", format=".1%"))
+    )
 
-        st.altair_chart(
-            (barras + labels)
-            .properties(height=340)
-            .configure_axis(labelFontSize=12),
-            use_container_width=True
-        )
+    chart = (barras + linha + pontos + lbl_barras + lbl_linha)\
+            .properties(height=320)\
+            .configure_axis(labelFontSize=12)
 
+    st.altair_chart(chart, use_container_width=True)
 
-
-
+    # ────────── 3) Legenda manual ─────────────────────────────
+    st.caption(
+        "<span style='color:#084594;font-weight:bold;'>■ Carteira</span> &nbsp;&nbsp; "
+        "<span style='color:#000000;font-weight:bold;'>— CDI</span>",
+        unsafe_allow_html=True
+    )
 
 # ==========================================================
 #   FUNÇÃO DA PÁGINA 1 (Dashboard Principal)

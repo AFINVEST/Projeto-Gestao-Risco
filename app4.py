@@ -3922,7 +3922,6 @@ def load_total_pl() -> tuple[float, str]:
 
     # ---------- 5. soma ----------------
     pl_total = float(df[data_ref].sum())
-    st.write(df)
 
     return pl_total, data_ref
 
@@ -4143,39 +4142,51 @@ def plot_ret_diario(ret: pd.Series) -> alt.Chart:
 
 import requests
 from datetime import date
-from bcb import sgs                 # <-- biblioteca oficial
 
 @st.cache_data(ttl=24*3600)         # consulta ao SGS no máx. 1 vez/dia
 def load_cdi_series(cache_csv: str = "Dados/cdi_cached.csv") -> pd.Series:
     """
-    Retorna Series do CDI diário (decimal) indexada por datetime.
+    Retorna Series diária do CDI (decimal) indexada por datetime.
 
-    1) tenta ler cache (csv) para evitar requisições repetidas;
-    2) se falhar, baixa do SGS usando bcb.sgs.get() e salva o cache.
+    1) Tenta ler o cache CSV (muito mais rápido).
+    2) Se não existir ou estiver vazio, faz download da série 12 do SGS
+       via requests e grava o cache.
     """
-
-    # ---------- 1. tenta cache ------------------------------------
+    # ───────── tenta cache ───────────────────────────────────────
     try:
         s = (pd.read_csv(cache_csv, parse_dates=["Data"])
                 .set_index("Data")["cdi"]
+                .astype(float)
                 .sort_index())
-        if len(s):
+        if not s.empty:
             return s
     except FileNotFoundError:
-        pass
+        pass                                          # segue para o download
 
-    # ---------- 2. baixa do SGS -----------------------------------
-    dt_ini = "2025-01-01"                          # qualquer data; bcb aceita ISO
-    dt_fim = date.today().strftime("%Y-%m-%d")     # hoje
+    # ───────── download via API do BCB ───────────────────────────
+    SGS_ID  = 12                      # CDI Over / Taxa DI
+    dt_ini  = "2000-01-01"            # pode ajustar
+    dt_fim  = dt.date.today().strftime("%Y-%m-%d")
 
-    # sgs.get devolve DataFrame já com datetime index e valores float
-    df = sgs.get(12, start=dt_ini, end=dt_fim)     # 12 = CDI Over
-    df.index.name = "Data"
-    df.rename(columns={"12": "cdi"}, inplace=True)   # coluna vira “cdi”
-    df["cdi"] = df["cdi"] / 100                    # para decimal (0.00017)
-    df.to_csv(cache_csv, index=True)               # salva cache
+    url = (f"https://api.bcb.gov.br/dados/serie/bcdata.sgs/{SGS_ID}/dados"
+           f"?formato=json&dataInicial={dt_ini}&dataFinal={dt_fim}")
 
-    return df["cdi"]
+    resp = requests.get(url, timeout=15)
+    resp.raise_for_status()           # dispara se 4xx/5xx
+
+    df = (pd.DataFrame(resp.json())          # [{'data':'01/07/2024','valor':'0.0155'}, …]
+            .rename(columns={"data": "Data", "valor": "cdi"})
+            .assign(Data=lambda d: pd.to_datetime(d["Data"], dayfirst=True),
+                    cdi =lambda d: pd.to_numeric(d["cdi"],
+                                                 errors="coerce") / 100)   # 1,55% → 0.0155
+            .dropna(subset=["cdi"]))
+
+    serie = df.set_index("Data")["cdi"].sort_index()
+
+    # guarda cache para os próximos 24 h
+    serie.to_csv(cache_csv, index=True)
+
+    return serie
 
 
 # ==========================================================

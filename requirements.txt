@@ -7,5 +7,4 @@ openpyxl
 psycopg2-binary
 supabase 
 plotnine
-bcb
 altair

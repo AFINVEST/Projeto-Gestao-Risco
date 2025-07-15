@@ -4277,8 +4277,6 @@ def simulate_nav_cota() -> None:
         .fillna(method="ffill")        # …e preenche datas faltantes
     )
 
-
-
     if pnl.empty:
         st.warning("Datas de P&L não batem com PL/LFT disponíveis.")
         return

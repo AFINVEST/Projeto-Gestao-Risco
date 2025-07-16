@@ -5973,7 +5973,6 @@ def main_page():
                         df_ajuste        = load_ajustes(),
                         basefundos       = load_basefundos()
                 )
-                st.write(df_final)
                 #Dropar coluna Total em cada um
                 df_final = df_final.drop(columns=['Total'], errors='ignore')
                 df_final_pl = df_final_pl.drop(columns=['Total'], errors='ignore')
@@ -5996,7 +5995,6 @@ def main_page():
                 df_final = df_final[sorted(df_final.columns, key=pd.to_datetime)]
                 df_final_pl = df_final_pl[sorted(
                     df_final_pl.columns, key=pd.to_datetime)]
-                st.write(df_final)
 
                 if tipo_filtro == "Semanal":
                     df_final_T = df_final.T  # Transpomos para ter datas como índice

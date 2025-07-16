@@ -3876,6 +3876,7 @@ def load_basefundos() -> dict[str, pd.DataFrame]:
         out[nome] = df
     return out
 
+
 @st.cache_data(show_spinner="Lendo PL…", ttl=3600)      # 1 h de validade
 def load_total_pl() -> tuple[float, str]:
     """
@@ -4017,6 +4018,15 @@ def analisar_dados_fundos2(
     df_ajuste.set_index("Assets", inplace=True)
 
     pnl_cash, pnl_bps = {}, {}
+    despesas_cash : dict[str, pd.Series] = {}        # novo!
+
+    DESPESAS_FIXAS = {
+        "DAP"     : 4.0,
+        "DI"      : 3.0,
+        "TREASURY": 10.0,
+        "WDO1"    : 1.0,
+    }
+
 
     # ───────── 2. loop fundos / operações
     for fundo, df_f in basefundos.items():
@@ -4029,7 +4039,7 @@ def analisar_dados_fundos2(
 
         for ativo, linha in df_f.iterrows():
             for col_q in cols_qtd:
-                qtd = linha[col_q]
+                qtd = float(linha[col_q])        # garante número
                 if pd.isna(qtd) or qtd == 0:
                     continue
 
@@ -4037,10 +4047,26 @@ def analisar_dados_fundos2(
                 p_compra = linha[col_q.replace("Quantidade", "Preco_Compra")]
                 pl_op    = linha[col_q.replace("Quantidade", "PL")]
 
-                # se PL = 0 ou NaN não dá para calcular bps
-                usa_bps = not pd.isna(pl_op) and pl_op != 0
+                # ------------------- DESPESA FIXA --------------------------
+                if fundo.upper() == "TOTAL":
+                    continue
+                else:
+                    # 2) ROOT do ativo
+                    raiz = ativo.split("_")[0]
+                    if raiz.startswith(("DAP", "DI")):   # normaliza
+                        raiz = raiz[:3]                  # “DAP30” → “DAP”,  “DI_27”→“DI”
+                        
+                    # 3) custo = valor fixo × |qtd|   ← multiplicado pelo nº de contratos
+                    custo_op = DESPESAS_FIXAS.get(raiz, 0.0) * abs(qtd)
 
-                p_ant = p_compra
+                    if custo_op:
+                        despesas_cash.setdefault("Despesas", pd.Series()).at[data_op] = \
+                            despesas_cash.get("Despesas", pd.Series()).get(data_op, 0.0) + custo_op
+
+                usa_bps = not pd.isna(pl_op) and pl_op != 0
+                p_ant   = p_compra
+
+
                 for data_fech in df_b3_fechamento.columns[1:]:
                     if data_fech < data_op:
                         continue
@@ -4076,6 +4102,12 @@ def analisar_dados_fundos2(
     # ───────── 3. saída limpa
     df_final    = pd.DataFrame(pnl_cash).T.fillna(0.0)
     df_final_pl = pd.DataFrame(pnl_bps ).T.fillna(0.0)
+    df_despesas = (pd.DataFrame(despesas_cash)
+                    .T                       # 1 linha (“Despesas”)
+                    .rename_axis("Conta")    # deixa claro
+    )
+    df_despesas.columns = pd.to_datetime(df_despesas.columns, errors="coerce")
+    df_despesas = df_despesas.loc[:, ~df_despesas.columns.isna()].fillna(0.0)
 
     # zera bps quando P&L ~ 0
     ZERO_EPS = 1e-9
@@ -4087,7 +4119,7 @@ def analisar_dados_fundos2(
     df_final = df_final[~df_final.index.str.contains("Total")]
     df_final_pl = df_final_pl[~df_final_pl.index.str.contains("Total")]
 
-    return df_final, df_final_pl
+    return df_final, df_final_pl, df_despesas
 
 # ---------------------------------------------------------------
 #  FUNÇÃO AUXILIAR – gráfico Altair da cota
@@ -4196,8 +4228,6 @@ def simulate_nav_cota() -> None:
     """Simula a cota usando PL diário + rendimento da LFT."""
     import numpy as np, pandas as pd
 
-    st.title("Simulação de Cota – % do PL Total")
-
     # ───────────────────────────── 1. % investido
     pct = st.sidebar.number_input(
         "Percentual do PL a investir",
@@ -4220,7 +4250,7 @@ def simulate_nav_cota() -> None:
     c2.metric("PL Risco", f"R$ {capital0:,.0f}", help=f"{pct*100:.1f} % do PL")
 
     # ───────────────────────────── 3. P&L diário (regra Portfólio)
-    df_pnl, _ = analisar_dados_fundos2(
+    df_pnl, _ , df_despesas = analisar_dados_fundos2(
         soma_pl_sem_pesos = pl_total,
         df_b3_fechamento  = load_b3_prices(),
         df_ajuste         = load_ajustes(),
@@ -4246,6 +4276,12 @@ def simulate_nav_cota() -> None:
         
                 '''
     )
+    # ---------------- Series de DESPESAS provenientes das operações ---------------
+    # df_despesas tem só 1 linha (“Despesas”); convertemos para Series
+    desp_series = (df_despesas.loc["Despesas"]        # vira Series
+                            .rename("desp_op"))
+    desp_series.index = pd.to_datetime(desp_series.index)
+    desp_series       = desp_series.sort_index()
 
     # ───────────────────────────── 4. alinhar datas
     common = (
@@ -4276,6 +4312,8 @@ def simulate_nav_cota() -> None:
         .reindex(common)               # garante mesmo índice…
         .fillna(method="ffill")        # …e preenche datas faltantes
     )
+    desp_series = desp_series.reindex(common).fillna(0.0)
+
 
     if pnl.empty:
         st.warning("Datas de P&L não batem com PL/LFT disponíveis.")
@@ -4309,18 +4347,19 @@ def simulate_nav_cota() -> None:
     custo_extra = capital_dia * rate_extra_dia
     custo_fixo  = pd.Series(custo_fixo_rs, index=capital_dia.index)
 
-    custo_total = custo_adm + custo_extra + custo_fixo
-
-
+    custo_total_parcial =  custo_adm + custo_extra + custo_fixo
+    custo_total = custo_adm + custo_extra + custo_fixo + desp_series
+    
 
     # ───────────────────────────── 5. ganho de ajuste com LFT
     ganho_lft    = capital_dia * lft_series        # já existia
     ganho_total  = pnl + ganho_lft - custo_total   # ▼ subtrai custos
-    ret_total    = ganho_total / capital_dia
+    capital_ini_dia = capital_dia.shift(1, fill_value=capital0)
+
+    ret_total    = ganho_total / capital_ini_dia
     cota         = (1 + ret_total).cumprod()
 
-    # ───────────────────────────── 6. métricas
-    # ─────────────── 6. métricas ──────────────────────────────
+
     ret_acum      = cota.iloc[-1] - 1                       # retorno da carteira
     vol_anual     = ret_total.std() * np.sqrt(252)          # vol-anual
     max_dd        = (cota / cota.cummax() - 1).min()        # drawdown
@@ -4337,178 +4376,499 @@ def simulate_nav_cota() -> None:
     sigma_excesso = excesso_diario.std()        # desvio-padrão diário
 
     sharpe_cdi = (mu_excesso / sigma_excesso) * np.sqrt(252)
-        # ───────────────────────────── 7. gráficos
-    st.altair_chart(plot_cota_altair(cota),  use_container_width=True)
-    st.altair_chart(plot_ret_diario(ret_total), use_container_width=True)
-
-    # ───────────────────────────── 8. cards de métricas
-    # ─────────────── 8. caixinhas de métricas ─────────────────
     c1, c2, c3, c4, c5, c6 = st.columns(6)
 
     c1.metric("Retorno carteira",  f"{ret_acum:,.2%}")
     c2.metric("Retorno CDI",       f"{ret_cdi_acum:,.2%}")
     c3.metric("% CDI",     f"{perc_cdi:,.2%}")
     c4.metric("Vol. anual",        f"{vol_anual:,.2%}")
-    c5.metric("Sharpe sobre CDI",  f"{sharpe_cdi:,.2f}")
+    c5.metric("Sharpe",  f"{sharpe_cdi:,.2f}")
     c6.metric("Máx. Drawdown",     f"{max_dd:,.2%}")
 
-    # ───────────────────────────── 9. download CSV
-    out = pd.DataFrame({
-        "pnl_r$"        : pnl,
-        "ajuste_lft$"   : ganho_lft,
-        "custos_r$"     : -custo_total,            # sinal negativo ⇒ saída de caixa
-        "ganho_total$"  : ganho_total,
-        "ret_total"     : ret_total,
-        "cota"          : cota,
-        "cdi_ret"       : cdi_series,
-        "excess_ret"    : ret_total - cdi_series,
-    })
-    out["cdi_ret"]      = cdi_series
-    out["excess_ret"]   = excesso_diario
-    #out["cdi_cum"]      = cdi_cum          # opcional
-    #out["excess_cum"]   = excesso_acum     # opcional
 
-    st.download_button("Baixar CSV",
-                       out.to_csv(index_label="data").encode(),
-                       file_name="cota_simulada.csv",
-                       mime="text/csv")
+    aba_cart, aba_attr = st.tabs(["Carteira", "Attribution"])
+    with aba_cart:
+        st.header("Simulação de Cota – Carteira")
 
-    # opcional: tabela-expander com as colunas
-    # ------------------------------------------------------------
-    #  Detalhe diário — nomes de colunas mais claros
-    # ------------------------------------------------------------
-    detalhe_fmt = {
-        "P&L (R$)"           : "R$ {:,.0f}",
-        "Ajuste LFT (R$)"    : "R$ {:,.0f}",
-        "Custos (R$)"        : "R$ {:,.0f}",
-        "Ganho líquido (R$)"   : "R$ {:,.0f}",
-        "Retorno diário (%)" : "{:.4%}",
-        "Cota"               : "{:.4f}",
-        "CDI diário (%)"     : "{:.4%}",
-        "Excesso vs CDI (%)" : "{:.4%}"
-    }
+        # ───────────────────────────── 6. métricas
+        # ─────────────── 6. métricas ──────────────────────────────
 
-    out_renomeado = (
-        out.rename(columns={
-            "pnl_r$"      : "P&L (R$)",
-            "ajuste_lft$" : "Ajuste LFT (R$)",
-            "custos_r$"   : "Custos (R$)",
-            "ganho_total$": "Ganho líquido (R$)",
-            "ret_total"   : "Retorno diário (%)",
-            "cdi_ret"     : "CDI diário (%)",
-            "excess_ret"  : "Excesso vs CDI (%)"
+        # ───────────────────────────── 7. gráficos
+        st.altair_chart(plot_cota_altair(cota),  use_container_width=True)
+        st.altair_chart(plot_ret_diario(ret_total), use_container_width=True)
+
+        # ───────────────────────────── 8. cards de métricas
+        # ─────────────── 8. caixinhas de métricas ─────────────────
+
+        # ───────────────────────────── 9. download CSV
+        out = pd.DataFrame({
+            "pnl_r$"        : pnl,
+            "ajuste_lft$"   : ganho_lft,
+            "custos_r$"     : -custo_total_parcial,            # sinal negativo ⇒ saída de caixa
+            "desp_op$"    : -desp_series,        #  ← novo
+            "ganho_total$"  : ganho_total,
+            "ret_total"     : ret_total,
+            "cota"          : cota,
+            "cdi_ret"       : cdi_series,
+            "excess_ret"    : ret_total - cdi_series,
         })
-    )
+        out["cdi_ret"]      = cdi_series
+        out["excess_ret"]   = excesso_diario
+        #out["cdi_cum"]      = cdi_cum          # opcional
+        #out["excess_cum"]   = excesso_acum     # opcional
 
-    with st.expander("Detalhe diário"):
-        st.dataframe(out_renomeado.style.format(detalhe_fmt))
 
-    # ───────────────────── 1) Retorno mensal ─────────────────────
-    # ------------------------------------------------------------
-    #  Retorno mensal (tabela + gráfico sem título, rótulos destaque)
-    # ------------------------------------------------------------
-    #st.write("## Retorno Mensal da Carteira")
+        # opcional: tabela-expander com as colunas
+        # ------------------------------------------------------------
+        #  Detalhe diário — nomes de colunas mais claros
+        # ------------------------------------------------------------
+        detalhe_fmt = {
+            "P&L (R$)"           : "R$ {:,.0f}",
+            "Ajuste LFT (R$)"    : "R$ {:,.0f}",
+            "Custos (R$)"        : "R$ {:,.0f}",
+            "Despesas (R$)"      : "R$ {:,.0f}",  # novo!
+            "Ganho líquido (R$)"   : "R$ {:,.0f}",
+            "Retorno diário (%)" : "{:.4%}",
+            "Cota"               : "{:.4f}",
+            "CDI diário (%)"     : "{:.4%}",
+            "Excesso vs CDI (%)" : "{:.4%}"
+        }
 
-    # 1) retornos mensais (já em ordem cronológica)
-    # ─── 1) dados mensais ------------------------------------------------
-    #ret_mensal_port = (1 + ret_total).resample("M").prod().sub(1)
-    #ret_mensal_cdi  = (1 + cdi_series).resample("M").prod().sub(1)
-    #ret_mensal_cdi  = ret_mensal_cdi.reindex(ret_mensal_port.index)
-#
-    #df_mensal = (pd.DataFrame({
-    #                "Mês"     : ret_mensal_port.index.strftime("%b / %y"),
-    #                "Carteira": ret_mensal_port.values,
-    #                "CDI"     : ret_mensal_cdi.values})
-    #            .melt(id_vars="Mês", var_name="Série", value_name="Retorno"))
-#
-    #ordem = df_mensal["Mês"].unique().tolist()     # eixo‑X cronológico
-#
-    ## ─── 2) gráfico ------------------------------------------------------
-    #barras = (
-    #    alt.Chart(df_mensal)
-    #    .mark_bar(size=26)                      # largura da barra
-    #    .encode(
-    #        x       = alt.X("Mês:O", sort=ordem, title=""),
-    #        xOffset = "Série:N",                # barras lado‑a‑lado
-    #        y       = alt.Y("Retorno:Q",
-    #                        title="",
-    #                        axis=alt.Axis(format=".1%")),
-    #        color   = alt.Color("Série:N",
-    #                            scale=alt.Scale(
-    #                                domain=["Carteira", "CDI"],
-    #                                range =["#084594", "#2ca02c"]))  # verde & laranja
-    #    )
-    #)
-#
-    #labels = (
-    #    barras.mark_text(
-    #            dy=-8, fontSize=11, fontWeight="bold", color="black")
-    #        .encode(text=alt.Text("Retorno:Q", format=".1%"))
-    #)
-#
-    #st.altair_chart(
-    #    (barras + labels)
-    #    .properties(height=320)
-    #    .configure_axis(labelFontSize=12),
-    #    use_container_width=True
-    #)
-
-    # ───────────────────── Retorno Mensal ───────────────────────
-    st.write("## Retorno Mensal da Carteira")
-    ret_mensal_port = (1 + ret_total).resample("M").prod().sub(1)
-    ret_mensal_cdi = (1 + cdi_series).resample("M").prod().sub(1)
-    idx_fmt = ret_mensal_cdi.index.strftime("%b / %y")          # sempre completo
-    ret_mensal_cdi = ret_mensal_cdi.reindex(ret_mensal_port.index).fillna(0.0)
-
-    ordem   = [d.strftime("%b / %y") for d in ret_mensal_port.index]
-    df_port = pd.DataFrame({"Mês": ordem, "Retorno": ret_mensal_port.values})
-    df_cdi  = pd.DataFrame({"Mês": idx_fmt, "Retorno": ret_mensal_cdi.values})
-
-    # ────────── 2) Gráfico: barras (Carteira) + linha (CDI) ───
-    barras = (
-        alt.Chart(df_port)
-        .mark_bar(size=28, color="#084594")          # azul‑escuro
-        .encode(
-            x = alt.X("Mês:O", sort=ordem, title=""),
-            y = alt.Y("Retorno:Q", axis=alt.Axis(format=".1%"), title="")
+        out_renomeado = (
+            out.rename(columns={
+                "pnl_r$"      : "P&L (R$)",
+                "ajuste_lft$" : "Ajuste LFT (R$)",
+                "custos_r$"   : "Custos (R$)",
+                "desp_op$"    : "Despesas (R$)",  # novo!
+                "ganho_total$": "Ganho líquido (R$)",
+                "ret_total"   : "Retorno diário (%)",
+                "cdi_ret"     : "CDI diário (%)",
+                "excess_ret"  : "Excesso vs CDI (%)"
+            })
         )
-    )
 
-    linha = (
-        alt.Chart(df_cdi)
-        .mark_line(stroke="#000000", strokeWidth=3)  # linha preta
-        .encode(
-            x = alt.X("Mês:O", sort=ordem),
-            y = "Retorno:Q"
+
+
+        # ───────────────────── 1) Retorno mensal ─────────────────────
+        # ------------------------------------------------------------
+        #  Retorno mensal (tabela + gráfico sem título, rótulos destaque)
+        # ------------------------------------------------------------
+        #st.write("## Retorno Mensal da Carteira")
+
+        # 1) retornos mensais (já em ordem cronológica)
+        # ─── 1) dados mensais ------------------------------------------------
+        #ret_mensal_port = (1 + ret_total).resample("M").prod().sub(1)
+        #ret_mensal_cdi  = (1 + cdi_series).resample("M").prod().sub(1)
+        #ret_mensal_cdi  = ret_mensal_cdi.reindex(ret_mensal_port.index)
+    #
+        #df_mensal = (pd.DataFrame({
+        #                "Mês"     : ret_mensal_port.index.strftime("%b / %y"),
+        #                "Carteira": ret_mensal_port.values,
+        #                "CDI"     : ret_mensal_cdi.values})
+        #            .melt(id_vars="Mês", var_name="Série", value_name="Retorno"))
+    #
+        #ordem = df_mensal["Mês"].unique().tolist()     # eixo‑X cronológico
+    #
+        ## ─── 2) gráfico ------------------------------------------------------
+        #barras = (
+        #    alt.Chart(df_mensal)
+        #    .mark_bar(size=26)                      # largura da barra
+        #    .encode(
+        #        x       = alt.X("Mês:O", sort=ordem, title=""),
+        #        xOffset = "Série:N",                # barras lado‑a‑lado
+        #        y       = alt.Y("Retorno:Q",
+        #                        title="",
+        #                        axis=alt.Axis(format=".1%")),
+        #        color   = alt.Color("Série:N",
+        #                            scale=alt.Scale(
+        #                                domain=["Carteira", "CDI"],
+        #                                range =["#084594", "#2ca02c"]))  # verde & laranja
+        #    )
+        #)
+    #
+        #labels = (
+        #    barras.mark_text(
+        #            dy=-8, fontSize=11, fontWeight="bold", color="black")
+        #        .encode(text=alt.Text("Retorno:Q", format=".1%"))
+        #)
+    #
+        #st.altair_chart(
+        #    (barras + labels)
+        #    .properties(height=320)
+        #    .configure_axis(labelFontSize=12),
+        #    use_container_width=True
+        #)
+
+        # ───────────────────── Retorno Mensal ───────────────────────
+        st.write("## Retorno Mensal da Carteira")
+        ret_mensal_port = (1 + ret_total ).resample("M").prod().sub(1)
+        ret_mensal_cdi  = (1 + cdi_series).resample("M").prod().sub(1)          \
+                                        .reindex(ret_mensal_port.index)      \
+                                        .fillna(method="ffill")
+
+        # rótulos sempre em ordem cronológica
+        idx   = ret_mensal_port.index
+        rotul = idx.strftime("%b / %y")            # ex.:  Jul / 25
+        ordem = rotul.tolist()                     # lista SEM duplicatas
+
+        # DataFrame LONG sem duplicar rótulos
+        df_mensal_long = pd.concat([
+            pd.DataFrame({"Mês": rotul, "Série": "Carteira",
+                        "Ret":  ret_mensal_port.values}),
+            pd.DataFrame({"Mês": rotul, "Série": "CDI",
+                        "Ret":  ret_mensal_cdi.values})
+        ])
+
+        # ------------------------------------------------------------------
+        # 2) gráfico  (barras Carteira  +  linha CDI)
+        # ------------------------------------------------------------------
+        import plotly.graph_objects as go
+
+        fig = go.Figure()
+
+        # — Carteira
+        fig.add_trace(
+            go.Bar(
+                x=ordem,
+                y=ret_mensal_port.values,
+                name="Carteira",
+                marker_color="#084594",
+                text=[f"{v:.1%}" for v in ret_mensal_port.values],
+                textposition="outside",
+                textfont=dict(color="#084594", size=11),
+            )
         )
-    )
 
-    pontos = (
-        linha.mark_point(filled=True, size=60, color="#000000")  # pontos pretos
-    )
+        # — CDI
+        fig.add_trace(
+            go.Bar(
+                x=ordem,
+                y=ret_mensal_cdi.values,
+                name="CDI",
+                marker_color="#6d91f5",
+                text=[f"{v:.1%}" for v in ret_mensal_cdi.values],
+                textposition="outside",
+                textfont=dict(color="#6d91f5", size=11),
+            )
+        )
 
-    lbl_barras = (
-        barras.mark_text(dy=-8, fontSize=11, fontWeight="bold", color="#084594")
-            .encode(text=alt.Text("Retorno:Q", format=".1%"))
-    )
+        # — layout geral
+        fig.update_layout(
+            height=460,
+            barmode="group",          # <-- barras lado‑a‑lado
+            bargap=0.25,
+            yaxis=dict(title="", tickformat=".1%"),
+            xaxis=dict(title="", tickangle=0),
+            legend=dict(orientation="h", y=-0.25, x=0.5, xanchor="center"),
+            margin=dict(l=20, r=20, t=10, b=70),
+            plot_bgcolor="white",
+        )
 
-    lbl_linha = (
-        pontos.mark_text(dy=12, fontSize=11, fontWeight="bold", color="#000000")
-            .encode(text=alt.Text("Retorno:Q", format=".1%"))
-    )
+        # grade horizontal suave
+        fig.update_yaxes(showgrid=True, gridcolor="rgba(0,0,0,0.05)")
 
-    chart = (barras + linha + pontos + lbl_barras + lbl_linha)\
-            .properties(height=320)\
-            .configure_axis(labelFontSize=12)
+        st.plotly_chart(fig, use_container_width=True)
+        with st.expander("Detalhe diário"):
+            st.dataframe(out_renomeado.style.format(detalhe_fmt))
 
-    st.altair_chart(chart, use_container_width=True)
 
-    # ────────── 3) Legenda manual ─────────────────────────────
-    st.caption(
-        "<span style='color:#084594;font-weight:bold;'>■ Carteira</span> &nbsp;&nbsp; "
-        "<span style='color:#000000;font-weight:bold;'>— CDI</span>",
-        unsafe_allow_html=True
-    )
+    with aba_attr:
+
+        #Gráfico de Waterfall plot
+        st.header("Performance por Estratégia")
+
+        # 1) ------------- mapeia cada linha do df_pnl ----------------
+        MAPA_ESTRAT = {
+            "DI"      : "Juros Nominais BR",
+            "DAP"     : "Juros Reais BR",
+            #"NTNB"    : "Juros Reais BR",
+            "TREASURY": "Juros US",
+            "WDO"    : "Moedas",
+            #NTNB"    : "Juros Reais BR",
+
+        }
+
+        # fatia o df_pnl somente nas datas filtradas
+        cols_dt = pd.to_datetime(df_pnl.columns, errors="coerce")
+        df_pnl.columns = cols_dt                 # agora as datas são datetime64
+        df_pnl = df_pnl.loc[:, ~df_pnl.columns.isna()]   # remove colunas que viraram NaT
+
+        df_pnl_clip = df_pnl.loc[:, df_pnl.columns.intersection(common)]
+
+        # cria colunas auxiliares
+        aux = (df_pnl_clip
+                .assign(Ativo = df_pnl_clip.index.str.split(" - ").str[0])
+                .assign(Estratégia = lambda d:
+                        d["Ativo"].str.extract(r"^([A-Z]+)", expand=False)     # DI / DAP / …
+                        .replace({"DAP\d*":"DAP", "DI":"DI",}, regex=True)
+                        .map(MAPA_ESTRAT)
+                        .fillna("Outros"))
+            )
+
+        # ------------- soma P&L por estratégia -----------------------
+        pnl_estrat = (aux.drop(columns=["Ativo"])       # só números + “Estratégia”
+                        .groupby("Estratégia")
+                        .sum())                      # linhas = estratégia
+        
+        df_strat = pnl_estrat.T            # datas nas linhas
+        df_strat.index.name = "Data"
+
+        df_comp = pd.DataFrame({
+            "Ajuste LFT" : ganho_lft,
+            "Custos Fixos": -custo_total_parcial,   # já negativo
+            "Despesas Op" : -desp_series
+        })
+
+        df_full = pd.concat([df_strat, df_comp], axis=1).fillna(0.0)
+
+        # ---------------------------------------------------------------
+        # 2. Seletor de horizonte
+        # ---------------------------------------------------------------
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### Horizonte para *attribution*")
+
+        opcao = st.sidebar.selectbox(
+            "Tipo de recorte",
+            ("Dia", "Mês", "Período"),
+            index=1           # ← “Mês” como default
+        )
+
+        # ----------------------------------------------------------------------------
+        # lista de todas as datas válidas já filtradas pelo restante do app
+        # (common já é DatetimeIndex ordenado)
+        datas_disponiveis = common
+
+        # =============================== DIA ========================================
+        if opcao == "Dia":
+            dia_escolhido = st.sidebar.date_input(
+                "Escolha o dia",
+                value=datas_disponiveis[-1].date(),              # default = último
+                min_value=datas_disponiveis[0].date(),
+                max_value=datas_disponiveis[-1].date()
+            )
+            dia_escolhido = pd.to_datetime(dia_escolhido)
+
+            # se o usuário escolheu dia sem P&L, ajusta para o dia útil anterior
+            if dia_escolhido not in datas_disponiveis:
+                dia_escolhido = datas_disponiveis[datas_disponiveis.get_loc(
+                    dia_escolhido, method="pad")]
+
+            ini = fim = dia_escolhido
+
+        # =============================== MÊS ========================================
+        elif opcao == "Mês":
+            # gera lista de meses disponíveis
+            meses_idx = (datas_disponiveis.to_period("M")
+                                    .unique()
+                                    .sort_values())
+
+            mes_strs  = [m.strftime("%b / %Y") for m in meses_idx]
+            mes_map   = dict(zip(mes_strs, meses_idx))
+
+            mes_sel_str = st.sidebar.selectbox(
+                "Escolha o mês",
+                mes_strs,
+                index=len(mes_strs)-1          # default = último mês
+            )
+            mes_sel = mes_map[mes_sel_str]
+
+            ini = mes_sel.to_timestamp("D")                # 1º dia do mês
+            fim = (mes_sel + 1).to_timestamp("D") - pd.Timedelta(days=1)
+
+            # garante que ini/fim caem dentro das datas disponíveis
+            ini_pos = datas_disponiveis.get_indexer([ini], method="bfill")[0]
+            ini     = datas_disponiveis[ini_pos]
+
+            fim_pos = datas_disponiveis.get_indexer([fim], method="ffill")[0]
+            fim     = datas_disponiveis[fim_pos]
+
+        # ============================ PERÍODO =======================================
+        else:   # “Período”
+            ini = st.sidebar.date_input(
+                "Início",
+                value=datas_disponiveis[0].date(),
+                min_value=datas_disponiveis[0].date(),
+                max_value=datas_disponiveis[-1].date(),
+                key="per_ini"
+            )
+            fim = st.sidebar.date_input(
+                "Fim",
+                value=datas_disponiveis[-1].date(),
+                min_value=datas_disponiveis[0].date(),
+                max_value=datas_disponiveis[-1].date(),
+                key="per_fim"
+            )
+            if ini > fim:
+                st.sidebar.error("Data inicial > final.")
+                st.stop()
+
+            ini = pd.to_datetime(ini)
+            fim = pd.to_datetime(fim)
+
+            # ajusta para datas efetivamente disponíveis
+            ini_pos = datas_disponiveis.get_indexer([ini], method="bfill")[0]
+            ini     = datas_disponiveis[ini_pos]
+
+            fim_pos = datas_disponiveis.get_indexer([fim], method="ffill")[0]
+            fim     = datas_disponiveis[fim_pos]
+
+        # ─────────── intervalo escolhido pronto ───────────
+        st.sidebar.success(f"Intervalo: {ini:%d/%m/%Y} → {fim:%d/%m/%Y}")
+
+        # aplica corte
+        mask = (df_full.index >= ini) & (df_full.index <= fim)
+        df_periodo = df_full.loc[mask]
+
+        # ---------------------------------------------------------------
+        # 3. Contribuição em p.p. de retorno
+        # ---------------------------------------------------------------
+        # utilitário – devolve a data existente mais próxima (<= alvo)
+        def nearest_left(idx: pd.DatetimeIndex, alvo: pd.Timestamp) -> pd.Timestamp:
+            pos = idx.searchsorted(alvo, side="right") - 1
+            if pos < 0:                                 # alvo antes da 1.ª data
+                raise KeyError(f"{alvo} fora do intervalo")
+            return idx[pos]
+
+        # ─── substitua estas duas linhas que quebraram ───────────────────
+        # capital_ini = capital_dia.loc[ini]
+        # ret_port    = (cota.loc[fim] / cota.loc[ini]) - 1
+        # ─────────────────────────────────────────────────────────────────
+        ini_eff  = nearest_left(cota.index, ini)
+        fim_eff  = nearest_left(cota.index, fim)
+
+        capital_ini = capital_dia.loc[ini_eff]
+        ret_port    = (cota.loc[fim_eff] / cota.loc[ini_eff]) - 1
+
+        # ---------------------------------------------------------------
+        # 3. Contribuição em p.p. de retorno
+        # ---------------------------------------------------------------
+        contrib = (df_periodo.sum() / capital_ini).copy()          # Series
+
+        # 3‑B) renomeia / consolida componentes ------------------------
+        mapa = {"Ajuste LFT":  "Caixa",
+                "Custos Fixos": "Custos/Despesas",
+                "Despesas Op":  "Custos/Despesas"}
+        
+        contrib = (contrib
+                .groupby(lambda x: mapa.get(x, x))   # aplica o mapa
+                .sum())                              # soma Custos + Despesas
+
+        # 3‑C)  ► acrescenta CDI e impõe a ordem final ------------------
+        ret_cdi_periodo = (cdi_cum.loc[fim_eff] / cdi_cum.loc[ini_eff]) - 1
+
+        df_wf = contrib.reset_index().rename(columns={"index": "Componente",
+                                                    0:      "ret_pl"})
+
+        # ‑‑ Performance (total)
+        if "Performance" not in df_wf["Componente"].values:
+            df_wf = pd.concat([df_wf,
+                            pd.DataFrame({"Componente": ["Performance"],
+                                            "ret_pl":    [df_wf["ret_pl"].sum()]})],
+                            ignore_index=True)
+
+        # ‑‑ CDI (benchmark)
+        df_wf = pd.concat([df_wf,
+                        pd.DataFrame({"Componente": ["CDI"],
+                                        "ret_pl":    [ret_cdi_periodo]})],
+                        ignore_index=True)
+
+        # ordem: Caixa ▸ Custos/Despesas ▸ outros ▸ Performance ▸ CDI
+        ordem_fix   = ["Caixa", "Custos/Despesas"]
+        resto       = [c for c in df_wf["Componente"]
+                        if c not in ordem_fix + ["Performance", "CDI"]]
+        ordem_final = ordem_fix + resto + ["Performance", "CDI"]
+
+        df_wf["Componente"] = pd.Categorical(df_wf["Componente"],
+                                            categories=ordem_final,
+                                            ordered=True)
+        df_wf = df_wf.sort_values("Componente").reset_index(drop=True)
+
+        # ---------------------------------------------------------------
+        # 4. Waterfall (Plotly)
+        # ---------------------------------------------------------------
+        # medidas: relative (padrão) | total | absolute (CDI)
+        df_wf["measure"] = np.select(
+                [df_wf["Componente"] == "Performance",
+                df_wf["Componente"] == "CDI"],
+                ["total", "absolute"],
+                default="relative")
+
+        df_wf["text"] = df_wf["ret_pl"].map(lambda x: f"{x:+.2%}")
+
+        # cores
+        cores = dict(Positive="#1a7519",     # verde
+                    Negative="#d62728",     # vermelho
+                    Total   ="#000080",     # azul‑escuro
+                    Bench   ="#7f7f7f")     # cinza – CDI
+
+        def cor(v, c):
+            if c == "Performance": return cores["Total"]
+            if c == "CDI":         return cores["Bench"]
+            return cores["Positive"] if v > 0 else cores["Negative"]
+
+        colors = [cor(v, c) for v, c in zip(df_wf["ret_pl"], df_wf["Componente"])]
+
+        # remove barras ~0 (salvo Performance │ CDI)
+        tol = 1e-9
+        df_wf = df_wf.loc[
+            ~((df_wf["Componente"].isin(["Performance", "CDI"]) == False)
+            & (df_wf["ret_pl"].abs() < tol))
+        ]
+
+        # gráfico -------------------------------------------------------
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Waterfall(
+                x       = df_wf.query("Componente != 'CDI'")["Componente"],
+                y       = df_wf.query("Componente != 'CDI'")["ret_pl"],
+                measure = df_wf.query("Componente != 'CDI'")["measure"],
+                text    = df_wf.query("Componente != 'CDI'")["text"],
+                textposition="outside",
+                connector = dict(line=dict(color="grey")),
+                increasing = dict(marker=dict(color="#1a7519")),  # verde
+                decreasing = dict(marker=dict(color="#d62728")),  # vermelho
+                totals     = dict(marker=dict(color="#000080")),  # azul‑escuro
+                name="Atribuição"
+            )
+        )
+
+        # ───── segunda trace: CDI isolado ───────────────────────────────────
+        cdi_val = df_wf.loc[df_wf["Componente"]=="CDI","ret_pl"].values[0]
+        fig.add_trace(
+            go.Waterfall(
+                x       = ["CDI"],
+                y       = [cdi_val],
+                measure = ["absolute"],
+                text    = [f"{cdi_val:+.2%}"],
+                textposition="outside",
+                increasing = dict(marker=dict(color="#7f7f7f")),  # cinza
+                name="CDI"
+            )
+        )
+
+        # ───── layout (o mesmo de antes) ────────────────────────────────────
+        fig.update_layout(
+            height = 460,
+            title  = dict(text=f"Atribuição de Performance {ini_eff:%d/%m/%Y} – "
+                            f"{fim_eff:%d/%m/%Y}",
+                        x=0.5, xanchor="center", font=dict(size=18)),
+            yaxis_tickformat = ".2%",
+            plot_bgcolor="white", paper_bgcolor="white",
+            margin=dict(l=60, r=40, t=60, b=60),
+            showlegend=False
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # tabela opcional ----------------------------------------------
+        with st.expander("Detalhe do período"):
+            st.dataframe(df_wf.set_index("Componente")[["ret_pl"]]
+                        .rename(columns={"ret_pl": "pontos‑percentuais"})
+                        .style.format({"pontos‑percentuais": "{:+.2%}"}))
+        # ------------- gráfico Waterfall plot ------------------------
+    
+    
 
 # ==========================================================
 #   FUNÇÃO DA PÁGINA 1 (Dashboard Principal)
@@ -4533,6 +4893,7 @@ def main_page():
         'MANACA INFRA FIRF': 1,
         'AF DEB INCENTIVADAS': 3
     }
+
     Weights = list(dict_pesos.values())
 
     st.sidebar.write("## Pesos dos Fundos")

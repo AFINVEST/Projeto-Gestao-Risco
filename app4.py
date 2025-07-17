@@ -4776,6 +4776,7 @@ def simulate_nav_cota() -> None:
         ordem_fix   = ["Caixa", "Custos/Despesas"]
         resto       = [c for c in df_wf["Componente"]
                         if c not in ordem_fix + ["Performance", "CDI"]]
+        
         ordem_final = ordem_fix + resto + ["Performance", "CDI"]
 
         df_wf["Componente"] = pd.Categorical(df_wf["Componente"],

@@ -4082,8 +4082,9 @@ def analisar_dados_fundos2(
                             PU_atual = preco_lookup.at[ativo, data_op]
                         except KeyError:
                             PU_atual = preco_lookup.at[ativo, df_b3_fechamento.columns[-1]]
-
-                        custo_op = (PU_atual) * 10 *  0.02 * abs(qtd) * 0.005
+                        #st.write(f"PU atual: {PU_atual:.2f} para {ativo} no dia {data_op}")
+                        #custo_op = (PU_atual) * 10 *  0.02 * abs(qtd) * 0.005
+                        custo_op = (PU_atual) *  0.02 * abs(qtd) * 0.005
                         #st.write(f"Despesa DI: {custo_op:.2f} para {ativo} no dia {data_op}")
                         #st.write(f"PU atual: {PU_atual:.2f}, PU final: {PU_FINAL:.2f}, qtd: {qtd}")
                         #st.write(preco_lookup)

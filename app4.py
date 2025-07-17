@@ -4020,8 +4020,16 @@ def analisar_dados_fundos2(
     pnl_cash, pnl_bps = {}, {}
     despesas_cash : dict[str, pd.Series] = {}        # novo!
 
+    PU_FINAL = 100_000  # já existia
+    #Tenho os valores atuais dos ativos em df_b3_fechamento
+    #Formula pra calcular a desepesas do DI vai ser:
+    # despesas = (PU_final - PU_atual) * 0.03 * qtd * 0.005
+    # Onde PU_final é 100000, PU_atual é o valor atual do ativo, qtd é a quantidade de contratos
+    #Contratos de DAP e TREASURY são fixos, então não entram na fórmula
+    #Contrato de dolar também é fixo, então não entra na fórmula
+
     DESPESAS_FIXAS = {
-        "DAP"     : 4.0,
+        "DAP"     : 3.0,
         "DI"      : 3.0,
         "TREASURY": 10.0,
         "WDO1"    : 1.0,
@@ -4056,8 +4064,22 @@ def analisar_dados_fundos2(
                     if raiz.startswith(("DAP", "DI")):   # normaliza
                         raiz = raiz[:3]                  # “DAP30” → “DAP”,  “DI_27”→“DI”
                         
-                    # 3) custo = valor fixo × |qtd|   ← multiplicado pelo nº de contratos
-                    custo_op = DESPESAS_FIXAS.get(raiz, 0.0) * abs(qtd)
+                    # 3) calcula despesa
+                    if raiz == "DI":
+                        try:
+                            # preço na data da operação (melhor) – se não houver, usa último fechamento
+                            PU_atual = preco_lookup.at[ativo, data_op]
+                        except KeyError:
+                            PU_atual = preco_lookup.at[ativo, df_b3_fechamento.columns[-1]]
+
+                        custo_op = (PU_FINAL - PU_atual) * 0.03 * abs(qtd) * 0.005
+                        #st.write(f"Despesa DI: {custo_op:.2f} para {ativo} no dia {data_op}")
+                        #st.write(f"PU atual: {PU_atual:.2f}, PU final: {PU_FINAL:.2f}, qtd: {qtd}")
+                        #st.write(preco_lookup)
+
+                    else:
+                        # custo fixo por contrato
+                        custo_op = DESPESAS_FIXAS.get(raiz, 0.0) * abs(qtd)
 
                     if custo_op:
                         despesas_cash.setdefault("Despesas", pd.Series()).at[data_op] = \

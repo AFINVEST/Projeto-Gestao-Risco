@@ -34,7 +34,6 @@ for file in files:
 
 print('Conversão finalizada')
 
-df = pd.read_parquet('Dados/portifolio_posições.parquet')
 
 file_pl = "Dados/pl_fundos.parquet"
 df2 = pd.read_parquet(file_pl)

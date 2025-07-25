@@ -3710,7 +3710,6 @@ def calcular_retorno_sobre_pl(df_fundos, df2, pl_parquet_path="Dados/pl_fundos_t
 
     # Cria a coluna de resultado
     df2['Retorno_sobre_PL'] = pl_totais
-
     return df2
 
 
@@ -3932,38 +3931,68 @@ _ALLOW_FUNDS = {
     'MANACA INFRA FIRF', 'REAL FIM', 'TOPAZIO INFRA'
 }
 
+TAXA_MAP = {
+    "GLOBAL BONDS":            0.0050,
+    "HORIZONTE":               0.0100,
+    "JERA2026":                0.0028,
+    "REAL FIM":                0.0033,
+    "BH FIRF INFRA":           0.0020,
+    "BORDEAUX INFRA":          0.0005,
+    "TOPAZIO INFRA":           0.0054,
+    "MANACA INFRA FIRF":       0.0005,
+    "AF DEB INCENTIVADAS":     0.0100,
+}
+
 @st.cache_data(ttl=3600)
-def load_pl_series() -> pd.Series:
+def load_pl_series(return_fee=True, dias_ano=252):
     """
-    Lê `Dados/pl_fundos_teste.parquet` e devolve uma *Series*
-    indexada pela data (datetime64) com o **PL total** diário
-    SOMENTE dos fundos da lista _ALLOW_FUNDS.
+    Lê o parquet e retorna:
+      - pl_series:  PL total diário (Series)
+      - fee_series: taxa total cobrada no dia (Series), usando capitalização diária:
+                    rate_adm_dia = (1 + taxa_anual) ** (1/dias_ano) - 1
     """
     df = pd.read_parquet("Dados/pl_fundos_teste.parquet")
-
-    # mantém apenas os fundos autorizados
     df = df[df["Fundos/Carteiras Adm"].isin(_ALLOW_FUNDS)].copy()
 
-    # converte cada coluna-data ("YYYY-MM-DD") para float
-    cols_data = [c for c in df.columns
-                 if c not in ("Fundos/Carteiras Adm", "Último Valor")]
+    cols_data = [c for c in df.columns if c not in ("Fundos/Carteiras Adm", "Último Valor")]
 
-    def _to_float(col):
-        return (df[col].astype(str)
-                    .str.replace(r"[R$\s\.]", "", regex=True)
-                    .str.replace(",", ".", regex=False)
-                    .replace({"": np.nan, "--": np.nan})
-                    .astype(float)
-                    .fillna(0.0))
+    def _to_float(s):
+        return (s.astype(str)
+                 .str.replace(r"[R$\s\.]", "", regex=True)
+                 .str.replace(",", ".", regex=False)
+                 .replace({"": np.nan, "--": np.nan})
+                 .astype(float)
+                 .fillna(0.0))
 
-    pl_totais = {c: _to_float(c).sum() for c in cols_data}
+    for c in cols_data:
+        df[c] = _to_float(df[c])
 
-    pl_series = (pd.Series(pl_totais)
-                   .rename("PL_total")
-                   .sort_index())
-    pl_series.index = pd.to_datetime(pl_series.index)
+    # PL por fundo (linhas = fundos, colunas = datas)
+    pl_by_fund = df.set_index("Fundos/Carteiras Adm")[cols_data]
+    pl_by_fund.columns = pd.to_datetime(pl_by_fund.columns)
 
-    return pl_series
+    # Série total
+    pl_series = pl_by_fund.sum(axis=0).sort_index()
+    pl_series.name = "PL_total"
+
+    if not return_fee:
+        return pl_series
+
+    # Taxa anual -> diária composta
+    taxas_anual = pd.Series(TAXA_MAP, name="taxa_anual").reindex(pl_by_fund.index).fillna(0.0)
+    rate_adm_dia = (1 + taxas_anual)**(1/dias_ano) - 1  # <- AQUI
+
+    # Taxa cobrada no dia (R$): PL_dia_fundo * rate_adm_dia_fundo
+    pl_by_fund = pl_by_fund * 0.01
+    fee_by_fund = pl_by_fund.mul(rate_adm_dia, axis=0)
+
+
+    # Soma por dia
+    fee_series = fee_by_fund.sum(axis=0).sort_index()
+    fee_series.name = "taxa_total_dia"
+
+    return pl_series, fee_series
+
 
 @st.cache_data(ttl=24*3600)          # só renova 1 vez por dia
 def load_lft_series() -> pd.Series:
@@ -4271,7 +4300,7 @@ def simulate_nav_cota() -> None:
       ) / 100        # vira decimal
 
     # ───────────────────────────── 2. séries auxiliares
-    pl_series  = load_pl_series()           # PL total por dia (float)
+    pl_series, taxa_adm_off  = load_pl_series()           # PL total por dia (float)
     lft_series = load_lft_series()          # retorno LFT diário (decimal)
 
     ref_date = pl_series.index[-1]          # penúltima data válida no PL
@@ -4341,6 +4370,7 @@ def simulate_nav_cota() -> None:
     pnl        = pnl.loc[common]
     pl_series  = pl_series.loc[common]
     lft_series = lft_series.loc[common]
+    taxa_adm_off = taxa_adm_off.loc[common]
     cdi_series = (
         load_cdi_series()                # já decimal diário
         .reindex(common)               # garante mesmo índice…
@@ -4369,27 +4399,77 @@ def simulate_nav_cota() -> None:
         "Custo fixo diário (R$)", min_value=0.0, value=0.0, step=10.0
     )
 
+    # NOVO: taxa de performance
+    perf_on = st.sidebar.checkbox("Cobrar taxa de performance sobre o que exceder o CDI?", value=False)
+    perf_pct = st.sidebar.number_input("Taxa de performance (%)", min_value=0.0, max_value=50.0,
+                                       value=20.0, step=1.0, format="%.1f") / 100.0
+
     # ------------- converte para custo diário --------------------
     rate_adm_dia  = (1.02**(1/252) - 1) if taxa_adm_on else 0.0
     rate_extra_dia = ((1 + custo_pct_aa)**(1/252) - 1) if custo_pct_aa else 0.0
+
+    
 
     # capital efetivamente investido em cada dia (mesmo % do PL)
     capital_dia = pct * pl_series
 
     # após definir capital_dia …
-    custo_adm   = capital_dia * rate_adm_dia
+    if taxa_adm_on:
+        custo_adm   = capital_dia * rate_adm_dia
+    else:
+        custo_adm = taxa_adm_off
     custo_extra = capital_dia * rate_extra_dia
     custo_fixo  = pd.Series(custo_fixo_rs, index=capital_dia.index)
 
     custo_total_parcial =  custo_adm + custo_extra + custo_fixo
-    custo_total = custo_adm + custo_extra + custo_fixo + desp_series
+    custo_total_sem_perf = custo_adm + custo_extra + custo_fixo + desp_series
     
 
     # ───────────────────────────── 5. ganho de ajuste com LFT
     ganho_lft    = capital_dia * lft_series        # já existia
-    ganho_total  = pnl + ganho_lft - custo_total   # ▼ subtrai custos
+    ganho_total_pre_perf  = pnl + ganho_lft - custo_total_sem_perf   # ▼ subtrai custos
     capital_ini_dia = capital_dia.shift(1, fill_value=capital0)
 
+    ret_preperf    = ganho_total_pre_perf / capital_ini_dia
+
+    # ----------------- PERF FEE (20% do excesso vs CDI c/ estorno) -----------------
+    if perf_on and perf_pct > 0:
+        perf_fee = []
+        estoque  = []          # <<< NOVO: série do estoque (provisão acumulada)
+        prov_acum = 0.0        # provisão acumulada (R$)
+
+        for d in common:
+            # excesso vs CDI **do retorno pré-performance**
+            excess_day = ret_preperf.loc[d] - cdi_series.loc[d]
+
+            # base para cálculo = capital no início do dia
+            base_r = capital_ini_dia.loc[d]
+
+            if excess_day > 0:
+                # provisiona 20% do excedente
+                fee_day = perf_pct * excess_day * base_r
+                prov_acum += fee_day
+                perf_fee.append(fee_day)
+            else:
+                # estorno (no máximo o que tem de provisão)
+                estorno_teorico = perf_pct * (-excess_day) * base_r
+                release = min(prov_acum, estorno_teorico)
+                prov_acum -= release
+                perf_fee.append(-release)
+
+            estoque.append(prov_acum)
+
+        perf_fee    = pd.Series(perf_fee, index=common, name="perf_fee$")
+        perf_stock  = pd.Series(estoque,  index=common, name="perf_stock$")
+    else:
+        perf_fee   = pd.Series(0.0, index=common, name="perf_fee$")
+        perf_stock = pd.Series(0.0, index=common, name="perf_stock$")
+
+    # custo total FINAL inclui a taxa de performance
+    custo_total = custo_total_sem_perf + perf_fee
+
+    # ganho líquido final
+    ganho_total  = pnl + ganho_lft - custo_total
     ret_total    = ganho_total / capital_ini_dia
     cota         = (1 + ret_total).cumprod()
 
@@ -4438,14 +4518,17 @@ def simulate_nav_cota() -> None:
         out = pd.DataFrame({
             "pnl_r$"        : pnl,
             "ajuste_lft$"   : ganho_lft,
-            "custos_r$"     : -custo_total_parcial,            # sinal negativo ⇒ saída de caixa
-            "desp_op$"    : -desp_series,        #  ← novo
+            "custos_r$"     : -(custo_total_sem_perf - desp_series),
+            "desp_op$"      : -desp_series,
+            "perf_fee$"     : -perf_fee,          # taxa de performance do dia (R$)
+            "perf_stock$"   : perf_stock,         # <<< NOVO: estoque acumulado (R$)
             "ganho_total$"  : ganho_total,
             "ret_total"     : ret_total,
             "cota"          : cota,
             "cdi_ret"       : cdi_series,
             "excess_ret"    : ret_total - cdi_series,
         })
+
         out["cdi_ret"]      = cdi_series
         out["excess_ret"]   = excesso_diario
         #out["cdi_cum"]      = cdi_cum          # opcional
@@ -4457,28 +4540,78 @@ def simulate_nav_cota() -> None:
         #  Detalhe diário — nomes de colunas mais claros
         # ------------------------------------------------------------
         detalhe_fmt = {
-            "P&L (R$)"           : "R$ {:,.0f}",
-            "Ajuste LFT (R$)"    : "R$ {:,.0f}",
-            "Custos (R$)"        : "R$ {:,.0f}",
-            "Despesas (R$)"      : "R$ {:,.0f}",  # novo!
-            "Ganho líquido (R$)"   : "R$ {:,.0f}",
-            "Retorno diário (%)" : "{:.4%}",
-            "Cota"               : "{:.4f}",
-            "CDI diário (%)"     : "{:.4%}",
-            "Excesso vs CDI (%)" : "{:.4%}"
+            "P&L (R$)"                     : "R$ {:,.0f}",
+            "Ajuste LFT (R$)"              : "R$ {:,.0f}",
+            "Custos (R$)"                  : "R$ {:,.0f}",
+            "Despesas (R$)"                : "R$ {:,.0f}",
+            "Taxa de performance (R$)"     : "R$ {:,.0f}",
+            "Estoque taxa perf. (R$)"      : "R$ {:,.0f}",   # <<< NOVO
+            "Ganho líquido (R$)"           : "R$ {:,.0f}",
+            "Retorno diário (%)"           : "{:.4%}",
+            "Cota"                         : "{:.4f}",
+            "CDI diário (%)"               : "{:.4%}",
+            "Excesso vs CDI (%)"           : "{:.4%}"
         }
 
         out_renomeado = (
             out.rename(columns={
-                "pnl_r$"      : "P&L (R$)",
-                "ajuste_lft$" : "Ajuste LFT (R$)",
-                "custos_r$"   : "Custos (R$)",
-                "desp_op$"    : "Despesas (R$)",  # novo!
-                "ganho_total$": "Ganho líquido (R$)",
-                "ret_total"   : "Retorno diário (%)",
-                "cdi_ret"     : "CDI diário (%)",
-                "excess_ret"  : "Excesso vs CDI (%)"
+                "pnl_r$"        : "P&L (R$)",
+                "ajuste_lft$"   : "Ajuste LFT (R$)",
+                "custos_r$"     : "Custos (R$)",
+                "desp_op$"      : "Despesas (R$)",
+                "perf_fee$"     : "Taxa de performance (R$)",
+                "perf_stock$"   : "Estoque taxa perf. (R$)",   # <<< NOVO
+                "ganho_total$"  : "Ganho líquido (R$)",
+                "ret_total"     : "Retorno diário (%)",
+                "cdi_ret"       : "CDI diário (%)",
+                "excess_ret"    : "Excesso vs CDI (%)"
             })
+        )
+        
+        from io import BytesIO
+
+        # 1) DataFrame CRU para exportação (sem formatação de R$, % etc.)
+        out_xlsx = out.copy()
+        out_xlsx.index.name = "Data"
+
+        # (opcional) renomear para nomes sem símbolos
+        col_rename = {
+            "pnl_r$"       : "pnl_rs",
+            "ajuste_lft$"  : "ajuste_lft_rs",
+            "custos_r$"    : "custos_rs",
+            "desp_op$"     : "despesas_operacionais_rs",
+            "perf_fee$"    : "taxa_performance_rs",
+            "perf_stock$"  : "estoque_taxa_performance_rs",
+            "ganho_total$" : "ganho_total_rs",
+            "ret_total"    : "retorno_diario",
+            "cota"         : "cota",
+            "cdi_ret"      : "cdi_diario",
+            "excess_ret"   : "excesso_vs_cdi"
+        }
+        out_xlsx.rename(columns=col_rename, inplace=True)
+
+        # 2) Excel em memória
+        buf = BytesIO()
+        with pd.ExcelWriter(buf, engine="xlsxwriter") as writer:
+            out_xlsx.reset_index().to_excel(writer, sheet_name="simulacao", index=False)
+        buf.seek(0)
+
+        # 3) Botões de download
+        st.download_button(
+            label="⬇️ Baixar planilha (Excel)",
+            data=buf,
+            file_name=f"simulacao_{common[0]:%Y%m%d}_{common[-1]:%Y%m%d}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+
+        # (opcional) CSV
+        st.download_button(
+            label="⬇️ Baixar CSV",
+            data=out_xlsx.reset_index().to_csv(index=False).encode("utf-8"),
+            file_name=f"simulacao_{common[0]:%Y%m%d}_{common[-1]:%Y%m%d}.csv",
+            mime="text/csv",
+            use_container_width=True
         )
 
 
@@ -4648,9 +4781,10 @@ def simulate_nav_cota() -> None:
         df_strat.index.name = "Data"
 
         df_comp = pd.DataFrame({
-            "Ajuste LFT" : ganho_lft,
-            "Custos Fixos": -custo_total_parcial,   # já negativo
-            "Despesas Op" : -desp_series
+            "Ajuste LFT"   : ganho_lft,
+            "Custos Fixos" : -custo_total_parcial,
+            "Despesas Op"  : -desp_series,
+            "Taxa Perf"    : -perf_fee,          # <<< NOVO
         })
 
         df_full = pd.concat([df_strat, df_comp], axis=1).fillna(0.0)
@@ -4779,9 +4913,12 @@ def simulate_nav_cota() -> None:
         contrib = (df_periodo.sum() / capital_ini).copy()          # Series
 
         # 3‑B) renomeia / consolida componentes ------------------------
-        mapa = {"Ajuste LFT":  "Caixa",
-                "Custos Fixos": "Custos/Despesas",
-                "Despesas Op":  "Custos/Despesas"}
+        mapa = {
+            "Ajuste LFT":   "Caixa",
+            "Custos Fixos": "Custos/Despesas",
+            "Despesas Op":  "Custos/Despesas",
+            "Taxa Perf":    "Custos/Despesas",   # <<< NOVO
+        }
         
         contrib = (contrib
                 .groupby(lambda x: mapa.get(x, x))   # aplica o mapa
@@ -6219,128 +6356,232 @@ def main_page():
                             "AF DEB INCENTIVADAS": "#E0115F"   # magenta
                         }
 
-                        def gg_rendimento_diario_fundos(
-                            df_fundos_long: pd.DataFrame,
+                        from typing import Optional, Tuple
+
+                        def _looks_like_long_fundos(df: pd.DataFrame) -> bool:
+                            return {"date", "Rendimento_diario"}.issubset(df.columns)
+
+                        def _ensure_fundo_col(df: pd.DataFrame) -> pd.DataFrame:
+                            if "fundo" in df.columns:
+                                return df.rename(columns={"fundo": "fundo"})
+                            # tenta alternativas usuais
+                            for c in ("estratégia", "estrategia", "classe", "categoria"):
+                                if c in df.columns:
+                                    return df.rename(columns={c: "fundo"})
+                            # senão, usa a primeira coluna categórica
+                            first_cat = [c for c in df.columns if c not in {"date", "Rendimento_diario"}]
+                            if not first_cat:
+                                raise ValueError("Não encontrei coluna que identifique o 'fundo'.")
+                            return df.rename(columns={first_cat[0]: "fundo"})
+
+                        def _fix_long_fundos_bps(df_long: pd.DataFrame,
+                                                total_label: str = "Total") -> pd.DataFrame:
+                            df = df_long.copy()
+                            df = df.reset_index()
+                            df = _ensure_fundo_col(df)
+                            df["fundo"] = df["fundo"].astype(str)
+
+                            # datas
+                            df["date"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce")
+                            df = df.dropna(subset=["date"])
+
+                            # numéricos, trata NaN/inf
+                            df["Rendimento_diario"] = (
+                                pd.to_numeric(df["Rendimento_diario"], errors="coerce")
+                                .replace([np.inf, -np.inf], np.nan)
+                                .fillna(0.0)
+                            )
+
+                            # remove total antigo se houver
+                            df = df[df["fundo"].str.upper() != total_label.upper()]
+
+                            # recalcula total (se fizer sentido para você manter o Total)
+                            total = (
+                                df.groupby("date", as_index=False)["Rendimento_diario"]
+                                .sum()
+                                .assign(fundo=total_label)
+                            )
+                            df_out = pd.concat([df, total], ignore_index=True)
+
+                            return df_out[["fundo", "date", "Rendimento_diario"]]
+
+                        def _fix_wide_fundos_bps(df_wide: pd.DataFrame,
+                                                total_label: str = "Total") -> pd.DataFrame:
+                            df = df_wide.copy()
+                            df = df.reset_index()
+                    
+
+                            first_col = df.columns[0]
+                            df = df.rename(columns={first_col: "fundo"})
+                            df["fundo"] = df["fundo"].astype(str)
+
+                            # identifica/garante a linha total
+                            mask_total = df["fundo"].str.strip().str.upper() == total_label.upper()
+                            if not mask_total.any():
+                                df = pd.concat([df, pd.DataFrame({"fundo": [total_label]})], ignore_index=True)
+                                mask_total = df["fundo"].str.strip().str.upper() == total_label.upper()
+
+                            # colunas de datas (ignora coluna chamada 'Total' se existir)
+                            date_cols = [c for c in df.columns[1:] if c.strip().upper() != "TOTAL"]
+
+                            # numérico + limpeza
+                            df[date_cols] = (
+                                df[date_cols]
+                                .apply(pd.to_numeric, errors="coerce")
+                                .replace([np.inf, -np.inf], np.nan)
+                                .fillna(0.0)
+                            )
+
+                            # recalcula total
+                            df.loc[mask_total, date_cols] = df.loc[~mask_total, date_cols].sum(axis=0).values
+
+                            # já assumimos que os números JÁ estão em bps (como você pediu)
+                            # se não estiverem, multiplique aqui (ex: df[date_cols] *= 10_000)
+
+                            # para long
+                            df_long = (
+                                df.melt(id_vars="fundo", value_vars=date_cols, var_name="date", value_name="Rendimento_diario")
+                                .assign(date=lambda d: pd.to_datetime(d["date"], dayfirst=True, errors="coerce"))
+                                .dropna(subset=["date"])
+                            )
+                            return df_long[["fundo", "date", "Rendimento_diario"]]
+
+                        def consertar_df_final_grafico_fundos_bps(df_raw: pd.DataFrame,
+                                                                total_label: str = "Total") -> pd.DataFrame:
+                            """
+                            Aceita df wide (datas nas colunas) ou long (fundo, date, Rendimento_diario).
+                            Considera que os valores JÁ estão em bps.
+                            Retorna SEMPRE long: ['fundo', 'date', 'Rendimento_diario'] (em bps).
+                            """
+                            if _looks_like_long_fundos(df_raw):
+                                return _fix_long_fundos_bps(df_raw, total_label=total_label)
+                            else:
+                                return _fix_wide_fundos_bps(df_raw, total_label=total_label)
+
+
+                        # ============================================================
+                        # GRÁFICOS EM PLOTLY (bps)
+                        # ============================================================
+                        import plotly.express as px
+
+                        PALETTE_FUNDOS = {
+                            "GLOBAL BONDS": "#003366",      # azul‑escuro
+                            "HORIZONTE": "#B03A2E",         # vermelho tijolo
+                            "JERA2026": "#138D75",          # verde
+                            "REAL FIM": "#7F3C8D",          # roxo
+                            "BH FIRF INFRA": "#D35400",     # laranja queimado
+                            "BORDEAUX INFRA": "#1ABC9C",    # turquesa
+                            "TOPAZIO INFRA": "#34495E",     # cinza‑azulado
+                            "MANACA INFRA FIRF": "#C27E00", # mostarda
+                            "AF DEB INCENTIVADAS": "#E0115F",
+                            "Total": "#000000"
+                        }
+
+                        def gg_rendimento_diario_fundos_plotly(
+                            df_fundos_long_bps: pd.DataFrame,
                             tol: float = 0,
+                            palette: Optional[dict] = None
                         ):
-                            # -------------------------------------------------- PREPARO DOS DADOS
+                            """
+                            Barras de rendimento diário por fundo, **em bps**.
+                            `tol` também em bps.
+                            Retorna uma figura Plotly (para usar direto no Dash).
+                            """
+                            if palette is None:
+                                palette = PALETTE_FUNDOS
+                            
+                            #Tirar o fundo 'Total' se existir
+                            df_fundos_long_bps = df_fundos_long_bps[df_fundos_long_bps['fundo'].str.upper() != 'TOTAL']
+
                             df_plot = (
-                                df_fundos_long
+                                df_fundos_long_bps
                                 .copy()
-                                # 1️⃣  Converte qualquer coisa que pareça data
-                                .assign(
-                                    date=pd.to_datetime(
-                                        df_fundos_long["date"],      # aceita “Mar 2025” ou “01/03/2025”
-                                        dayfirst=True,               # 03/04/2025 → 3-abr-2025
-                                        errors="coerce",             # se não der pra converter vira NaT
-                                    )
-                                )
-                                # 2️⃣  Mantém só linhas que têm data válida e rendimento ≠ 0 (ou acima de tol)
+                                .assign(date=pd.to_datetime(df_fundos_long_bps["date"], dayfirst=True, errors="coerce"))
                                 .dropna(subset=["date", "Rendimento_diario"])
                                 .loc[lambda d: d["Rendimento_diario"].abs() > tol]
                             )
 
                             if df_plot.empty:
-                                raise ValueError("Nenhuma linha com Rendimento_diario diferente de zero.")
+                                raise ValueError("Nenhuma linha com Rendimento_diario (bps) diferente de zero acima do tol.")
 
-                            # -------------------------------------------------- ORDENAÇÃO DAS DATAS
-                            ordered_dates = df_plot["date"].sort_values().unique()
-                            ordered_labels = [d.strftime("%d-%b") for d in ordered_dates]  # 01-Mar
+                            # Ordena cronologicamente
+                            df_plot = df_plot.sort_values("date")
 
-                            df_plot["date_str"] = pd.Categorical(
-                                df_plot["date"].dt.strftime("%d-%b"),
-                                categories=ordered_labels,
-                                ordered=True,
+                            fig = px.bar(
+                                df_plot,
+                                x="date",
+                                y="Rendimento_diario",
+                                color="fundo",
+                                barmode="group",
+                                color_discrete_map=palette,
+                                labels={
+                                    "date": "Data",
+                                    "Rendimento_diario": "Rendimento Diário (bps)",
+                                    "fundo": "Fundo"
+                                },
+                                title="Rendimento Diário por Fundo (bps)"
                             )
 
-                            # -------------------------------------------------- GRÁFICO
-                            p = (
-                                ggplot(df_plot, aes("date_str", "Rendimento_diario", fill="fundo"))
-                                + geom_col(position="dodge", width=.8)
-                                + labs(
-                                    title="Rendimento Diário por Fundo",
-                                    x="Data",
-                                    y="Rendimento Diário",
-                                )
-                                + scale_fill_manual(values=palette_fundos)
-                                + theme_minimal()
-                                + theme(
-                                    figure_size=(14, 6),
-                                    axis_text_x=element_text(rotation=45, ha="right"),
-                                    axis_title_x=element_text(weight="bold"),
-                                    axis_title_y=element_text(weight="bold"),
-                                    legend_position="bottom",
-                                    legend_direction="horizontal",
-                                    legend_title=element_text(weight="bold"),
-                                    plot_title=element_text(colour="#003366", size=13),
-                                )
+                            fig.update_layout(
+                                xaxis_title="Data",
+                                yaxis_title="Rendimento Diário (bps)",
+                                legend_title="Fundo",
+                                bargap=0.15,
+                                bargroupgap=0.05,
+                                template="plotly_white",
+                                height=500
                             )
-                            return p
+                            fig.update_xaxes(tickformat="%d-%b", tickangle=45)
+                            return fig
 
-                        # --------------------------------------------------------------------------- #
-                        # 2)  CURVA ACUMULADA POR FUNDO  (linha)
-                        # --------------------------------------------------------------------------- #
 
-                        def gg_curva_capital_fundos(df_fundos_long: pd.DataFrame):
-                            df = df_fundos_long.copy()
-                            df["date"] = pd.to_datetime(df["date"], dayfirst=True)
+                        def gg_curva_capital_fundos_plotly(
+                            df_fundos_long_bps: pd.DataFrame,
+                            palette: Optional[dict] = None
+                        ):
+                            """
+                            Curva de capital acumulada por fundo **em bps** (soma dos bps diários).
+                            Retorna figura Plotly.
+                            """
+                            if palette is None:
+                                palette = PALETTE_FUNDOS
+                            #Tirar o fundo 'Total' se existir
+                            df_fundos_long_bps = df_fundos_long_bps[df_fundos_long_bps['fundo'].str.upper() != 'TOTAL']
+                            df = df_fundos_long_bps.copy()
+                            df["date"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce")
+                            df = df.dropna(subset=["date", "Rendimento_diario"])
                             df.sort_values(["fundo", "date"], inplace=True)
-                            df["acumulado"] = df.groupby(
-                                "fundo")["Rendimento_diario"].cumsum()
+                            df["acumulado"] = df.groupby("fundo")["Rendimento_diario"].cumsum()
 
-                            # paleta personalizada – uma cor distinta para cada fundo
-                            palette_fundos = {
-                                "GLOBAL BONDS": "#003366",  # azul‑escuro
-                                "HORIZONTE": "#B03A2E",  # vermelho tijolo
-                                "JERA2026": "#138D75",  # verde
-                                "REAL FIM": "#7F3C8D",  # roxo
-                                "BH FIRF INFRA": "#D35400",  # laranja queimado
-                                "BORDEAUX INFRA": "#1ABC9C",  # turquesa
-                                "TOPAZIO INFRA": "#34495E",  # cinza‑azulado
-                                "MANACA INFRA FIRF": "#C27E00",  # mostarda
-                                "AF DEB INCENTIVADAS": "#E0115F"   # magenta
-                            }
-
-                            p = (
-                                ggplot(df,
-                                    aes("date", "acumulado",
-                                        colour="fundo", group="fundo"))
-                                + geom_line(size=1.2)
-                                + labs(title="Rendimento Acumulado – Curva de Capital por Fundo",
-                                    x="Data",
-                                    y="Valor Acumulado")
-                                + scale_color_manual(values=palette_fundos)
-                                + scale_x_datetime(date_breaks="1 days",
-                                                date_labels="%d‑%b")
-                                + theme_minimal()
-                                + theme(
-                                    figure_size=(14, 6),
-                                    plot_background=element_rect(
-                                        fill="white", colour=None),
-                                    panel_background=element_rect(
-                                        fill="white", colour="black"),
-                                    panel_grid_major=element_line(
-                                        colour="#CCCCCC"),
-                                    panel_grid_minor=element_line(
-                                        colour="#CCCCCC", linetype="dotted"),
-                                    axis_text_x=element_text(
-                                        rotation=45, ha="right"),
-                                    axis_title_x=element_text(weight="bold"),
-                                    axis_title_y=element_text(weight="bold"),
-                                    legend_position="bottom",
-                                    legend_direction="horizontal",
-                                    legend_title=element_text(weight="bold"),
-                                    plot_title=element_text(
-                                        colour="#003366", size=13)
-                                )
+                            fig = px.line(
+                                df,
+                                x="date",
+                                y="acumulado",
+                                color="fundo",
+                                color_discrete_map=palette,
+                                labels={
+                                    "date": "Data",
+                                    "acumulado": "Acumulado (bps)",
+                                    "fundo": "Fundo"
+                                },
+                                title="Rendimento Acumulado – Curva de Capital por Fundo (bps)"
                             )
-                            return p
+
+                            fig.update_layout(
+                                xaxis_title="Data",
+                                yaxis_title="Acumulado (bps)",
+                                legend_title="Fundo",
+                                template="plotly_white",
+                                height=500
+                            )
+                            fig.update_xaxes(tickformat="%d-%b", tickangle=45)
+                            return fig
                     
                     # Exibe o gráfico com o Streamlit, passando a figura
                     # gráfico de barras
-                    fig_diario = gg_rendimento_diario_fundos(df_fundos_long).draw()
+                    #fig_diario = gg_rendimento_diario_fundos(df_fundos_long).draw()
                     # curva acumulada
-                    fig_acum = gg_curva_capital_fundos(df_fundos_long).draw()
+                    #fig_acum = gg_curva_capital_fundos(df_fundos_long).draw()
                     df_final = df_final_pl
 
                     if fundos_lista:
@@ -6367,11 +6608,17 @@ def main_page():
                         df_fundos_copy.iloc[-1, -1] = total_fundos / \
                             soma_pl_sem_pesos * 10000
 
-                        df_copia_fundos = df_fundos_copy.copy()
 
                         # ------------------------------------------------------------------------------
                         # Mostra “0.00 bps” sempre que o valor real for zero (ou perto de zero)
                         ZERO_EPS = 0.0005     # 0,00005 bps  → ≈ 1 centavo em PL de 20 MM
+
+
+                        df_fundos_copy2 = df_fundos_copy.copy()
+                        df_fundos_copy2 = consertar_df_final_grafico_fundos_bps(df_fundos_copy2)
+                        fig_diario = gg_rendimento_diario_fundos_plotly(df_fundos_copy2)
+                        # curva acumulada
+                        fig_acum = gg_curva_capital_fundos_plotly(df_fundos_copy2)
 
                         for col in df_fundos_copy.columns:
                             df_fundos_copy[col] = df_fundos_copy[col].apply(
@@ -6383,15 +6630,14 @@ def main_page():
                         df_combinado = df_fundos_grana + " / " + df_fundos_copy
 
                         df_combinado.loc['Total'] = df_combinado.loc['Total'].str.split('/').str[0].str.strip()
-
                         # Dropar linha do total
                         # df_combinado = df_combinado.drop('Total', axis=0)
                         st.write('### Tabela de Rendimento Diário por Estratégia')
                         st.table(df_combinado)
                         st.write('### Gráficos de Rendimento Diário e Acumulado')
-                        st.pyplot(fig_diario)
+                        st.plotly_chart(fig_diario, use_container_width=True)
                         st.write('### Graficos de Curva de Capital')
-                        st.pyplot(fig_acum)
+                        st.plotly_chart(fig_acum, use_container_width=True)
 
                 elif visao == "Estratégia":
                     lista_estrategias = {
@@ -6492,6 +6738,7 @@ def main_page():
 
                         df_resultado = calcular_retorno_sobre_pl(
                             df_final, df_estrategias_long)
+                        
                         df_final22 = df_estrategias_long.copy()
                         df_final22['Rendimento_diario'] = df_resultado['Retorno_sobre_PL']
 
@@ -6515,143 +6762,241 @@ def main_page():
                         # 1)  GRÁFICO DE BARRAS – Rendimento Diário por Estratégia
                         # --------------------------------------------------------------------------- #
 
-                        def gg_rendimento_diario(df_estrategias_long: pd.DataFrame, tol: float = 0):
+                        # --------------------------------------------------------------------------------------
+                        # 1) Patch – conserta o df (funciona para df wide OU long) e garante saída em bps (long)
+                        # --------------------------------------------------------------------------------------
+                        from typing import Tuple
+
+                        def _looks_like_long(df: pd.DataFrame) -> bool:
+                            return {"date", "Rendimento_diario"}.issubset(df.columns)
+
+                        def _maybe_to_bps(series: pd.Series, multiplier: int = 1) -> Tuple[pd.Series, bool]:
                             """
-                            Plota barras de rendimento diário.
-                            • Mostra no eixo‑X apenas as datas que têm pelo menos um valor |rendimento| > tol.
-                            • Converte datas para eixo categórico, mantendo ordenação cronológica.
+                            Se os valores parecerem estar em retornos (ex.: 0.0012 = 12 bps),
+                            converte para bps. Se já parecem bps (valores ~ dezenas/centenas),
+                            não faz nada.
+                            Heurística simples: se 95% do |valor| < 1, consideramos fração e multiplicamos.
                             """
-                            from plotnine import (
-                                ggplot, aes, geom_col, geom_line, labs,
-                                scale_fill_brewer, scale_color_manual, scale_x_datetime,
-                                theme_minimal, theme,
-                                element_text, element_rect, element_line
+                            s = pd.to_numeric(series, errors="coerce")
+                            mask = s.notna()
+                            if mask.sum() == 0:
+                                return s, False
+                            pct_small = (s[mask].abs() < 1).mean()
+                            if pct_small >= 0.95:
+                                return s * multiplier, True
+                            return s, False
+
+                        def _fix_long(df_long: pd.DataFrame, total_label: str = "Total") -> pd.DataFrame:
+                            df = df_long.copy()
+
+                            # Normaliza nome da coluna de estratégia
+                            if "estratégia" not in df.columns:
+                                if "fundo" in df.columns:
+                                    df = df.rename(columns={"fundo": "estratégia"})
+                                else:
+                                    # se não achar, pega a primeira coluna não 'date' e não 'Rendimento_diario'
+                                    first_cat = [c for c in df.columns if c not in {"date", "Rendimento_diario"}]
+                                    if not first_cat:
+                                        raise ValueError("Não encontrei uma coluna de estratégia/fundo no df_long.")
+                                    df = df.rename(columns={first_cat[0]: "estratégia"})
+
+                            # Tipos corretos
+                            df["estratégia"] = df["estratégia"].astype(str)
+                            df["date"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce")
+                            df = df.dropna(subset=["date"])
+
+                            # Trata NaN/inf
+                            df["Rendimento_diario"] = pd.to_numeric(df["Rendimento_diario"], errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
+                            # Converte para bps se necessário
+                            df["Rendimento_diario"], _ = _maybe_to_bps(df["Rendimento_diario"], 10_000)
+
+                            # Recalcula TOTAL por data (remove eventual total antigo)
+                            df = df[df["estratégia"].str.upper() != total_label.upper()]
+                            total = (
+                                df.groupby("date", as_index=False)["Rendimento_diario"]
+                                .sum()
+                                .assign(estratégia=total_label)
                             )
-                            # ---------------------------------------------------------- prepara dados
+                            df_out = pd.concat([df, total], ignore_index=True)
+
+                            return df_out
+
+                        def _fix_wide(df_wide: pd.DataFrame, multiplier: int = 1, total_label: str = "Total") -> pd.DataFrame:
+                            df = df_wide.copy()
+
+                            # Primeira coluna vira 'estratégia'
+                            df = df.reset_index()
+                            first_col = df.columns[0]
+                            df = df.rename(columns={first_col: "estratégia"})
+                            df["estratégia"] = df["estratégia"].astype(str)
+
+                            # identifica/garante a linha total
+                            mask_total = df["estratégia"].str.strip().str.upper() == total_label.upper()
+                            if not mask_total.any():
+                                df = pd.concat([df, pd.DataFrame({"estratégia": [total_label]})], ignore_index=True)
+                                mask_total = df["estratégia"].str.strip().str.upper() == total_label.upper()
+
+                            # Colunas que são datas (exclui coluna "Total" que às vezes vem ao final)
+                            date_cols = [c for c in df.columns[1:] if c.strip().upper() != "TOTAL"]
+
+                            # Numeric + limpeza
+                            df[date_cols] = (
+                                df[date_cols]
+                                .apply(pd.to_numeric, errors="coerce")
+                                .replace([np.inf, -np.inf], np.nan)
+                                .fillna(0.0)
+                            )
+
+                            # Recalcula Total
+                            df.loc[mask_total, date_cols] = df.loc[~mask_total, date_cols].sum(axis=0).values
+
+                            # Converte para bps (assume que veio em fração)
+                            df[date_cols] = df[date_cols] * multiplier
+
+                            # Para long
+                            df_long = (
+                                df.melt(id_vars="estratégia", value_vars=date_cols, var_name="date", value_name="Rendimento_diario")
+                                .assign(date=lambda d: pd.to_datetime(d["date"], dayfirst=True, errors="coerce"))
+                                .dropna(subset=["date"])
+                            )
+                            return df_long
+
+                        def consertar_df_final_grafico(df_raw: pd.DataFrame,
+                                                    multiplier: int = 1,
+                                                    total_label: str = "Total") -> pd.DataFrame:
+                            """
+                            - Aceita df wide (datas nas colunas) OU df long (colunas: estratégia/fundo, date, Rendimento_diario).
+                            - Corrige linha Total.
+                            - Limpa NaN/inf.
+                            - Garante saída em bps e em formato long.
+                            """
+                            if _looks_like_long(df_raw):
+                                return _fix_long(df_raw, total_label=total_label)
+                            else:
+                                return _fix_wide(df_raw, multiplier=multiplier, total_label=total_label)
+
+
+                        # --------------------------------------------------------------------------------------
+                        # 2) Gráficos em BPS
+                        # --------------------------------------------------------------------------------------
+                        from plotnine import (
+                            ggplot, aes, geom_col, geom_line, labs,
+                            scale_fill_manual, scale_color_manual,
+                            theme_minimal, theme,
+                            element_text, element_rect, element_line
+                        )
+                        import plotly.express as px
+
+
+                        PALETTE_CURVAS = {
+                            "JUROS NOMINAIS BRASIL": "#B03A2E",
+                            "JUROS REAIS BRASIL":    "#003366",
+                            "MOEDAS":                "#138D75",
+                            "JUROS US":              "#7F3C8D",
+                            "Total":                 "#000000"
+                        }
+
+                        def gg_rendimento_diario_plotly(
+                            df_estrategias_long: pd.DataFrame,
+                            tol: float = 0,
+                            palette: dict | None = None
+                        ):
+                            """
+                            Barras de rendimento diário **em bps** (usa Plotly).
+                            `tol` também em bps.
+                            Filtra fora a estratégia 'Total'.
+                            """
+                            if palette is None:
+                                palette = PALETTE_CURVAS
+
                             df_plot = (
                                 df_estrategias_long
                                 .copy()
-                                .assign(date=pd.to_datetime(df_estrategias_long["date"], dayfirst=True))
-                                # 1. só dados não-nulos
-                                .dropna(subset=["Rendimento_diario"])
-                                # 2. remove linhas com rendimento ‘nulo’ (zero ou dentro do limite tol)
+                                .query("estratégia != 'Total'")
+                                .assign(date=lambda d: pd.to_datetime(d["date"], dayfirst=True, errors="coerce"))
+                                .dropna(subset=["date", "Rendimento_diario"])
                                 .loc[lambda d: d["Rendimento_diario"].abs() > tol]
+                                .sort_values("date")
                             )
 
-                            # Se nada sobrar, evita erro
                             if df_plot.empty:
-                                raise ValueError(
-                                    "Nenhuma linha com Rendimento_diario diferente de zero.")
+                                raise ValueError("Nenhuma linha com Rendimento_diario (bps) diferente de zero acima do tol.")
 
-                            # -------------------------------------------------- eixo X categórico
-                            # ordem cronológica
-                            ordered_dates = sorted(df_plot["date"].unique())
-                            df_plot["date_str"] = pd.Categorical(
-                                df_plot["date"].dt.strftime(
-                                    "%d‑%b"),                  # rótulo
-                                categories=[d.strftime("%d‑%b")
-                                            for d in ordered_dates],
-                                ordered=True
+                            fig = px.bar(
+                                df_plot,
+                                x="date",
+                                y="Rendimento_diario",
+                                color="estratégia",
+                                barmode="group",
+                                color_discrete_map=palette,
+                                labels={
+                                    "date": "Data",
+                                    "Rendimento_diario": "Rendimento Diário (bps)",
+                                    "estratégia": "Estratégia"
+                                },
+                                title="Rendimento Diário por Estratégia (bps)"
                             )
 
-                            palette_curvas = {
-                                "JUROS NOMINAIS BRASIL": "#B03A2E",
-                                "JUROS REAIS BRASIL": "#003366",
-                                "MOEDAS": "#138D75",
-                                "JUROS US": "#7F3C8D"
-                            }
-
-                            # --------------------------------------------------------- gráfico
-                            p = (
-                                ggplot(df_plot, aes(
-                                    "date_str", "Rendimento_diario", fill="estratégia"))
-                                + geom_col(position="dodge", width=.8)
-                                + labs(title="Rendimento Diário por Estratégia",
-                                    x="Data", y="Rendimento Diário")
-                                + scale_color_manual(values=palette_curvas)
-                                + theme_minimal()
-                                + theme(
-                                    figure_size=(14, 6),
-                                    plot_background=element_rect(
-                                        fill="white", colour=None),
-                                    panel_background=element_rect(
-                                        fill="white", colour="black"),
-                                    panel_grid_major=element_line(
-                                        colour="#CCCCCC"),
-                                    panel_grid_minor=element_line(
-                                        colour="#CCCCCC", linetype="dotted"),
-                                    axis_text_x=element_text(
-                                        rotation=90, ha="right"),
-                                    axis_title_x=element_text(weight="bold"),
-                                    axis_title_y=element_text(weight="bold"),
-                                    legend_position="bottom",
-                                    legend_direction="horizontal",
-                                    legend_box_margin=0,
-                                    plot_title=element_text(
-                                        colour="#003366", size=13)
-                                )
+                            fig.update_layout(
+                                xaxis_title="Data",
+                                yaxis_title="Rendimento Diário (bps)",
+                                legend_title="Estratégia",
+                                bargap=0.15,
+                                bargroupgap=0.05,
+                                template="plotly_white",
+                                height=500
                             )
-                            return p
+                            fig.update_xaxes(tickformat="%d-%b", tickangle=90)
+                            return fig
 
-                        # --------------------------------------------------------------------------- #
-                        # 2)  GRÁFICO DE LINHA – Curva de Capital (rendimento acumulado)
-                        # --------------------------------------------------------------------------- #
 
-                        def gg_curva_capital(df_long: pd.DataFrame):
-                            from plotnine import (
-                                ggplot, aes, geom_col, geom_line, labs,
-                                scale_fill_brewer, scale_color_manual, scale_x_datetime,
-                                theme_minimal, theme,
-                                element_text, element_rect, element_line
+                        def gg_curva_capital_plotly(
+                            df_long: pd.DataFrame,
+                            palette: dict | None = None
+                        ):
+                            """
+                            Curva de capital acumulada **em bps** (usa Plotly).
+                            Filtra fora a estratégia 'Total'.
+                            """
+                            if palette is None:
+                                palette = PALETTE_CURVAS
+
+                            df = (
+                                df_long
+                                .copy()
+                                .query("estratégia != 'Total'")
+                                .assign(date=lambda d: pd.to_datetime(d["date"], dayfirst=True, errors="coerce"))
+                                .dropna(subset=["date", "Rendimento_diario"])
+                                .sort_values(["estratégia", "date"])
                             )
-                            df = df_long.copy()
-                            df["date"] = pd.to_datetime(df["date"], dayfirst=True)
-                            df.sort_values(["estratégia", "date"], inplace=True)
-                            df["acumulado"] = df.groupby("estratégia")[
-                                "Rendimento_diario"].cumsum()
+                            df["acumulado"] = df.groupby("estratégia")["Rendimento_diario"].cumsum()
 
-                            palette_curvas = {
-                                "JUROS NOMINAIS BRASIL": "#B03A2E",
-                                "JUROS REAIS BRASIL": "#003366",
-                                "MOEDAS": "#138D75",
-                                "JUROS US": "#7F3C8D"
-                            }
-
-                            p = (
-                                ggplot(df,
-                                    aes("date", "acumulado", colour="estratégia", group="estratégia"))
-                                + geom_line(size=1.2)
-                                + labs(title="Rendimento Acumulado – Curva de Capital",
-                                    x="Data",
-                                    y="Valor Acumulado")
-                                + scale_color_manual(values=palette_curvas)
-                                # ← 2 dias
-                                + scale_x_datetime(date_breaks="2 days",
-                                                date_labels="%d‑%b")
-                                + theme_minimal()
-                                + theme(
-                                    figure_size=(14, 6),
-                                    plot_background=element_rect(
-                                        fill="white", colour=None),
-                                    panel_background=element_rect(
-                                        fill="white", colour="black"),
-                                    panel_grid_major=element_line(
-                                        colour="#CCCCCC"),
-                                    panel_grid_minor=element_line(
-                                        colour="#CCCCCC", linetype="dotted"),
-                                    axis_text_x=element_text(
-                                        rotation=90, ha="right"),
-                                    axis_title_x=element_text(weight="bold"),
-                                    axis_title_y=element_text(weight="bold"),
-                                    legend_position="bottom",          # legenda central abaixo
-                                    legend_direction="horizontal",
-                                    legend_box_margin=0,
-                                    plot_title=element_text(
-                                        colour="#003366", size=13)
-                                )
+                            fig = px.line(
+                                df,
+                                x="date",
+                                y="acumulado",
+                                color="estratégia",
+                                color_discrete_map=palette,
+                                labels={
+                                    "date": "Data",
+                                    "acumulado": "Acumulado (bps)",
+                                    "estratégia": "Estratégia"
+                                },
+                                title="Rendimento Acumulado – Curva de Capital (bps)"
                             )
-                            return p
-                        # plt.show()
+
+                            fig.update_layout(
+                                xaxis_title="Data",
+                                yaxis_title="Acumulado (bps)",
+                                legend_title="Estratégia",
+                                template="plotly_white",
+                                height=500
+                            )
+                            fig.update_xaxes(tickformat="%d-%b", tickangle=90)
+                            return fig
+
+                                                                        # plt.show()
 
                         # --- se estiver no Streamlit --------------------------------------------------
                         # import streamlit as st
@@ -6724,6 +7069,7 @@ def main_page():
 
                     # Mudar a celula da linha 'Total' e da coluna 'Total' para coluna_totais.sum()
                     df_final22.iloc[-1, -1] = coluna_totais.sum()
+                    df_final_grafico = df_final22.copy()
 
                     for col in df_final22.columns:
                         df_final22[col] = df_final22[col].apply(
@@ -6735,17 +7081,18 @@ def main_page():
                     # df_combinado = df_combinado.drop('Total', axis=0)
                     # df_combinado.drop(columns=['Total'], inplace=True)
                     # Teste
-                    p_barras = gg_rendimento_diario(df_estrategias_long)
-                    fig1 = p_barras.draw()          # converte o ggplot em Figure
-                    p_curva = gg_curva_capital(df_estrategias_long)
-                    fig2 = p_curva.draw()
+                    df_final_grafico = consertar_df_final_grafico(df_final_grafico)
+                    p_barras = gg_rendimento_diario_plotly(df_final_grafico)
+                    fig1 = p_barras          # converte o ggplot em Figure
+                    p_curva = gg_curva_capital_plotly(df_final_grafico)
+                    fig2 = p_curva
 
                     st.write('### Tabela de Rendimento Diário por Estratégia')
                     st.table(df_combinado)
                     st.write('### Gráficos de Rendimento Diário por Estratégia')
-                    st.pyplot(fig1)
+                    st.plotly_chart(fig1)
                     st.write('### Graficos de Curva de Capital')
-                    st.pyplot(fig2)
+                    st.plotly_chart(fig2)
                     # st.pyplot(fig2)
 
                 elif visao == "Ativo":

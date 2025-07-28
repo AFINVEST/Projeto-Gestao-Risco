@@ -9,3 +9,5 @@ supabase
 plotnine
 altair
 plotly
+io
+typing

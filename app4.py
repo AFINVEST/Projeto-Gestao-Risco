@@ -54,7 +54,7 @@ def process_portfolio(df_pl, Weights):
     df_pl['PL_atualizado'] = df_pl['PL'] * df_pl['Weights']
     df_pl['Adm'] = ['SANTANDER', 'BTG', 'SANTANDER',
                     'SANTANDER', 'BTG', 'BTG', 'BTG', 'BTG', 'BTG']
-
+    
     return df_pl, df_pl['PL_atualizado'].sum(), soma_sem_pesos
 
 
@@ -117,6 +117,18 @@ def process_returns(df, assets):
     df_retorno.dropna(inplace=True)
     df_retorno = df_retorno.astype(float)
     df_retorno = df_retorno.tail(756).reset_index(drop=True)
+    df_retorno = np.log(df_retorno / df_retorno.shift(1))
+    return df_retorno
+
+def process_returns2(df, assets):
+    #Colocar a coluna 'Date' como índice
+    if 'Date' in df.columns:
+        df.set_index('Date', inplace=True)
+    df_retorno = df.copy()
+    df_retorno = df_retorno[assets]
+    df_retorno.dropna(inplace=True)
+    df_retorno = df_retorno.astype(float)
+    df_retorno = df_retorno.tail(756)
     df_retorno = np.log(df_retorno / df_retorno.shift(1))
     return df_retorno
 
@@ -1437,6 +1449,15 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos, op1, o
     else:
         st.write("Nenhum fundo selecionado / Nenhum contrato cadastrado")
         return
+
+def _pl_ref(pl_total: pd.Series, data: pd.Timestamp) -> float:
+    """
+    1 % do PL total para a data escolhida.
+    """
+    try:
+        return float(pl_total.loc[data] * 0.01)  # 1 %
+    except KeyError as e:
+        raise KeyError(f"PL total não encontrado para a data {data}") from e
 
 
 def calcular_metricas_de_fundo_analise(assets, quantidades, df_contratos, fundos, op1, op2):
@@ -3925,6 +3946,7 @@ def load_total_pl() -> tuple[float, str]:
 
     return pl_total, data_ref
 
+
 _ALLOW_FUNDS = {
     'AF DEB INCENTIVADAS', 'BH FIRF INFRA', 'BORDEAUX INFRA',
     'GLOBAL BONDS', 'HORIZONTE', 'JERA2026',
@@ -3942,6 +3964,7 @@ TAXA_MAP = {
     "MANACA INFRA FIRF":       0.0005,
     "AF DEB INCENTIVADAS":     0.0100,
 }
+
 
 @st.cache_data(ttl=3600)
 def load_pl_series(return_fee=True, dias_ano=252):
@@ -4283,6 +4306,214 @@ def load_cdi_series(cache_csv: str = "Dados/cdi_cached.csv") -> pd.Series:
 
     return serie
 
+# ----------------- helpers de datas -----------------
+def _ensure_dt_index_series(s: pd.Series) -> pd.Series:
+    """Garante DatetimeIndex (tenta 'date' no index name; normaliza e ordena)."""
+    s2 = s.copy()
+    if not isinstance(s2.index, pd.DatetimeIndex):
+        s2.index = pd.to_datetime(s2.index, dayfirst=True, errors="coerce")
+    s2 = s2[~s2.index.isna()].sort_index()
+    # normaliza para meia-noite p/ evitar comparação com horas
+    s2.index = s2.index.normalize()
+    return s2
+
+def _ensure_dt_index_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Garante DatetimeIndex no DataFrame (usa coluna 'date' se existir)."""
+    d = df.copy()
+    if not isinstance(d.index, pd.DatetimeIndex):
+        # tenta coluna 'date' / 'Date' / 'DATA'
+        cand = None
+        for c in ("date", "Date", "DATA"):
+            if c in d.columns:
+                cand = c
+                break
+        if cand is not None:
+            d[cand] = pd.to_datetime(d[cand], dayfirst=True, errors="coerce")
+            d = d.dropna(subset=[cand]).set_index(cand)
+        else:
+            d.index = pd.to_datetime(d.index, dayfirst=True, errors="coerce")
+            d = d[~d.index.isna()]
+    d = d.sort_index()
+    d.index = d.index.normalize()
+    return d
+
+def _choose_effective_date(candidate: pd.Timestamp | str | None,
+                           common_idx: pd.DatetimeIndex) -> pd.Timestamp:
+    """Escolhe a data efetiva: última data ≤ candidate; se None, usa a última do índice comum."""
+    if common_idx.empty:
+        raise ValueError("Não há interseção de datas entre pl_series e df_retorno.")
+    if candidate is None:
+        return common_idx.max()
+    candidate = pd.to_datetime(candidate, dayfirst=True, errors="coerce")
+    if pd.isna(candidate):
+        return common_idx.max()
+    # normaliza
+    candidate = candidate.normalize()
+    # pega última data <= candidate
+    left = common_idx[common_idx <= candidate]
+    if left.size == 0:
+        # se não há <= candidate, usa a menor disponível
+        return common_idx.min()
+    return left.max()
+
+# ----------------- helpers de risco -----------------
+def _pl_ref(pl_series: pd.Series, data: pd.Timestamp) -> float:
+    """Retorna 1% do PL total na data."""
+    return float(pl_series.loc[data] * 0.01)
+
+def _var_cvar(series_ret: pd.Series, alpha: float = 0.05) -> tuple[float, float]:
+    """VaR e CVaR históricos (magnitudes positivas)."""
+    s = pd.to_numeric(series_ret, errors="coerce").dropna()
+    if s.empty:
+        return 0.0, 0.0
+    var_q = np.quantile(s, alpha)
+    cvar = s[s <= var_q].mean() if (s <= var_q).any() else var_q
+    return abs(var_q), abs(cvar)
+
+def _stress_percent(valor_R: float, pl_ref_R: float) -> float:
+    return 0.0 if pl_ref_R == 0 else (valor_R / pl_ref_R * 10_000)
+
+# ----------------- função principal (versão corrigida) -----------------
+
+def calcular_metricas_por_pl(
+    pl_series: pd.Series,
+    data: pd.Timestamp | str | None = None,
+    alpha: float = 0.05,
+    tick_val: float = 100.0,
+    debug: bool = False,
+) -> dict:
+    """
+    Calcula métricas (VaR, CVaR, Stress) usando 1% do PL total do dia.
+    - pl_series: Series com índice de datas e valores de PL total agregado (R$).
+    - data: data alvo (se None, usa a última data comum entre pl_series e df_retorno).
+    - alpha: nível para VaR/CVaR histórico.
+    - tick_val: conversor R$/pt em stress DV01 (ajuste conforme o contrato).
+    """
+
+    # 1) Dados do portfólio
+    default_assets, quantidade_inicial, portifolio_default = processar_dados_port()
+    df_base = pd.read_parquet('Dados/df_inicial.parquet')
+    df_precos, df_completo = load_and_process_excel(df_base, default_assets)
+    df_retorno = process_returns2(df_completo, default_assets)
+
+    # 2) Garanta índices de data
+    pl_series   = _ensure_dt_index_series(pl_series)
+    df_retorno  = _ensure_dt_index_df(df_retorno)
+    df_completo = _ensure_dt_index_df(df_completo)
+
+    # df_retorno tem como indice a coluna "Date" que contem todas as datas cadastradas
+    # (df_precos/df_precos_ajustados não precisam de DatetimeIndex para este erro específico)
+
+    # 3) Data efetiva segura (interseção)
+    common_idx = df_retorno.index.intersection(pl_series.index)
+    data_eff = _choose_effective_date(data, common_idx)
+
+    # 4) VaR dos ativos e preços ajustados
+    df_retorno_hist = df_retorno.loc[df_retorno.index <= data_eff].copy()
+    var_ativos = var_not_parametric(df_retorno_hist).abs()
+    df_precos_ajustados = adjust_prices_with_var(df_precos, var_ativos)
+
+    # 5) Quantidades agregadas (todos os fundos)
+    df_contratos_2 = read_atual_contratos_cached()
+    if 'Fundo' in df_contratos_2.columns:
+        df_contratos_2 = df_contratos_2.set_index('Fundo')
+
+    # padroniza colunas "Contratos X"
+    asset_cols = [c for c in df_contratos_2.columns if c.startswith("Contratos ")]
+    if not asset_cols:
+        df_contratos_2 = df_contratos_2.rename(columns={c: f"Contratos {c}" for c in df_contratos_2.columns})
+        asset_cols = list(df_contratos_2.columns)
+
+    df_contratos_2 = df_contratos_2.apply(pd.to_numeric, errors='coerce').fillna(0.0)
+    df_contratos_2 = df_contratos_2.loc[[i for i in df_contratos_2.index if str(i).strip().upper() != "TOTAL"]]
+
+    s_quant = df_contratos_2[asset_cols].sum(axis=0)
+    assets_from_contracts = [c.replace("Contratos ", "") for c in s_quant.index]
+    quantidades = pd.Series(s_quant.values, index=assets_from_contracts).astype(float)
+
+    # Universo de ativos = união (para não perder histórico)
+    assets_universe = sorted(set(default_assets).union(set(quantidades.index)))
+
+    # 6) Recalcula retornos com universo final e reimpõe índices de data
+    df_precos_u, df_completo_u = load_and_process_excel(df_base, assets_universe)
+    df_retorno_u = process_returns(df_completo_u, assets_universe)
+    df_retorno_u = _ensure_dt_index_df(df_retorno_u)
+    df_completo_u = _ensure_dt_index_df(df_completo_u)
+    #st.write(df_retorno_hist)
+
+    # Ajusta histórico até data_eff
+    df_retorno_hist = df_retorno_u.loc[df_retorno_u.index <= data_eff].copy()
+    if df_retorno_hist.empty:
+        pl_ref = _pl_ref(pl_series, data_eff)
+        return {
+            "PL_ref (R$)"       : pl_ref,
+            "VaR (bps)"         : 0.0,
+            "CVaR (bps)"        : 0.0,
+            "VaR (R$)"          : 0.0,
+            "CVaR (R$)"         : 0.0,
+            "Stress DV01 (R$)"  : 0.0,
+            "Stress DV01 (bps)" : 0.0,
+        }
+
+    # 7) Pesos (quantidade × preço)
+    if "Valor Fechamento Ajustado pelo Var" in df_precos_ajustados.columns:
+        precos_ult = df_precos_ajustados["Valor Fechamento Ajustado pelo Var"].reindex(assets_universe)
+    else:
+        precos_ult = df_completo_u[assets_universe].ffill().loc[:data_eff].iloc[-1]
+
+    quantidades = quantidades.reindex(assets_universe).fillna(0.0)
+    vp = (precos_ult * quantidades.abs()).fillna(0.0)
+    vp_soma = float(vp.sum())
+    #st.write(df_retorno_hist)
+    if vp_soma > 0:
+        # alinha colunas
+        cols = [c for c in assets_universe if c in df_retorno_hist.columns]
+        vp = vp.reindex(cols).fillna(0.0)
+        pesos = (vp / float(vp.sum())).values
+        df_retorno_hist = df_retorno_hist[cols]
+
+    else:
+        cols = list(df_retorno_hist.columns)
+        pesos = np.ones(len(cols)) / len(cols) if cols else np.array([])
+    # 8) Retorno do portfólio e métricas
+    port_ret = (df_retorno_hist * pesos).sum(axis=1) if len(pesos) else pd.Series(dtype=float)
+    #st.write(f"Retorno do portfólio ({data_eff.date()}): {port_ret.sum():.4f} ({port_ret.mean():.4f} médio)")
+    #st.write(port_ret)
+    var, cvar = _var_cvar(port_ret, alpha=alpha)
+
+    pl_ref = _pl_ref(pl_series, data_eff)
+    var_R  = var  * pl_ref
+    cvar_R = cvar * pl_ref
+    var_bps  = var  * 10_000
+    cvar_bps = cvar * 10_000
+
+    # 9) Stress DV01 (simplificado)
+    try:
+        df_divone, _, _ = load_and_process_divone('Dados/BBG - ECO DASH.xlsx', df_completo_u)
+        cols_intersec = [a for a in df_retorno_hist.columns if a in df_divone.columns]
+        if cols_intersec:
+            dv01_row = df_divone[cols_intersec].iloc[0].astype(float).fillna(0.0)
+            # pesos alinhados
+            pesos_alinh = pd.Series(pesos, index=cols_intersec)
+            dv01_port = float((dv01_row * pesos_alinh).sum())
+            stress_R = abs(dv01_port) * float(tick_val)
+        else:
+            stress_R = 0.0
+    except Exception:
+        stress_R = 0.0
+
+    stress_bps = _stress_percent(stress_R, pl_ref)
+    #st.write(f"Stress DV01 (R$): {stress_R:.2f} | Stress DV01 (bps): {stress_bps:.2f}")
+
+    return {
+        "PL_ref (R$)"       : float(pl_ref),
+        "VaR (bps)"         : float(var_bps),
+        "CVaR (bps)"        : float(cvar_bps),
+        "VaR (R$)"          : float(var_R),
+        "CVaR (R$)"         : float(cvar_R),
+        "Stress DV01 (R$)"  : float(stress_R),
+        "Stress DV01 (bps)" : float(stress_bps),
+    }
 
 # ==========================================================
 #   PÁGINA – Simular Cota
@@ -4378,6 +4609,8 @@ def simulate_nav_cota() -> None:
     )
     desp_series = desp_series.reindex(common).fillna(0.0)
 
+    #st.write(pl_series)
+    calcular_metricas_por_pl(pl_series)
 
     if pnl.empty:
         st.warning("Datas de P&L não batem com PL/LFT disponíveis.")
@@ -4500,7 +4733,7 @@ def simulate_nav_cota() -> None:
     c6.metric("Máx. Drawdown",     f"{max_dd:,.2%}")
 
 
-    aba_cart, aba_attr = st.tabs(["Carteira", "Attribution"])
+    aba_cart, aba_attr,aba_div01 = st.tabs(["Carteira", "Attribution","Analise Risco"])
     with aba_cart:
         st.header("Simulação de Cota – Carteira")
 
@@ -4596,23 +4829,6 @@ def simulate_nav_cota() -> None:
             out_xlsx.reset_index().to_excel(writer, sheet_name="simulacao", index=False)
         buf.seek(0)
 
-        # 3) Botões de download
-        st.download_button(
-            label="⬇️ Baixar planilha (Excel)",
-            data=buf,
-            file_name=f"simulacao_{common[0]:%Y%m%d}_{common[-1]:%Y%m%d}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
-
-        # (opcional) CSV
-        st.download_button(
-            label="⬇️ Baixar CSV",
-            data=out_xlsx.reset_index().to_csv(index=False).encode("utf-8"),
-            file_name=f"simulacao_{common[0]:%Y%m%d}_{common[-1]:%Y%m%d}.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
 
 
 
@@ -4737,7 +4953,13 @@ def simulate_nav_cota() -> None:
         st.plotly_chart(fig, use_container_width=True)
         with st.expander("Detalhe diário"):
             st.dataframe(out_renomeado.style.format(detalhe_fmt))
-
+            st.download_button(
+            label="⬇️ Baixar planilha (Excel)",
+            data=buf,
+            file_name=f"simulacao_{common[0]:%Y%m%d}_{common[-1]:%Y%m%d}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+                )
 
     with aba_attr:
 
@@ -5038,7 +5260,14 @@ def simulate_nav_cota() -> None:
             st.dataframe(df_wf.set_index("Componente")[["ret_pl"]]
                         .rename(columns={"ret_pl": "pontos‑percentuais"})
                         .style.format({"pontos‑percentuais": "{:+.2%}"}))
+        # 3) Botões de download
+
         # ------------- gráfico Waterfall plot ------------------------
+    with aba_div01:
+        st.header("Análise de Risco")
+
+        # 1) Carrega e processa os dados de risco
+        
     
     
 
@@ -5755,15 +5984,35 @@ def main_page():
             # limpa linhas/colunas a gosto, depois…
             df_fmt2 = df_fmt.copy()
             df_fmt2 = df_fmt2.drop(columns=["P&L"])
-            st.table(df_fmt2)
+            ###############
+            ###############
+            #TIRANDO A TABELA DE QUANTIDADE
+
+            #st.table(df_fmt2)
+            st.sidebar.write("---")
+            st.sidebar.write("## Limite do Var do Portifólio")
+            var_bps = st.sidebar.slider(
+                "VaR do Portfólio (bps)", min_value=1.0, max_value=20.0, value=1.0, step=0.5
+            )
+            var_bps = var_bps / 10000
+            var_din = st.sidebar.checkbox("Exibir Limite de VaR em dinheiro")
+            if var_din:
+                var_lim_din = st.sidebar.number_input(
+                    "Valor do VaR em dinheiro:", min_value=0.0, value=float(var_port_dinheiro), step=1.0
+                )
+            else:
+                var_limite = st.sidebar.slider(
+                    "Limite para VaR gasto do Portfólio", min_value=0.1, max_value=1.0, value=1.0, step=0.01
+                )
+            
             df_b3_fechamento = load_b3_prices()
             ultimo_dia_dados_b3 = df_b3_fechamento.columns[-1]
             ultimo_dia_dados_b3 = datetime.datetime.strptime(
                 ultimo_dia_dados_b3, "%Y-%m-%d")
 
-            st.write(
-                f"OBS: O preço de compra é o preço médio de compra do ativo -- Atualizado em {ultimo_dia_dados_b3.strftime('%d/%m/%Y')}")
-            st.write("---")
+            #st.write(
+            #    f"OBS: O preço de compra é o preço médio de compra do ativo -- Atualizado em {ultimo_dia_dados_b3.strftime('%d/%m/%Y')}")
+            #st.write("---")
             # print(df_portifolio_default_copy)
             quantidade = []
             df_contratos = read_atual_contratos_cached()
@@ -5823,26 +6072,18 @@ def main_page():
                 df_contratos_2 = df_contratos_2.apply(
                     pd.to_numeric, errors='coerce')  # O mesmo para df_contratos_2
 
-                st.write("## Analise por Fundo")
-                st.write("### Selecione os filtros")
-                lista_fundos = df_contratos.index.tolist()
-                lista_fundos = [
-                    str(x) for x in df_contratos.index.tolist() if str(x) != 'Total']
-                colll1, colll2 = st.columns([4.9, 4.9])
-                with colll1:
-                    fundos = st.multiselect(
-                        "Selecione os fundos que deseja analisar", lista_fundos, default=lista_fundos)
-                with colll2:
-                    op1 = st.checkbox("CoVaR / % Risco Total", value=True)
-                    op2 = st.checkbox("Div01 / Stress", value=True)
+                
 
-                fundos0 = fundos.copy()
-                if fundos0:
-                    st.write("## Portfólio Atual")
-                    soma_pl_sem_pesos2 = calcular_metricas_de_fundo_analise(
-                        default_assets, quantidade, df_contratos_2, fundos0, op1, op2)
-                # Transforma em lista para poder usar no cálculo
-                # Valor do Portfólio (soma simples)
+                # ------------------------------------------------
+                #   TABELA DF_PL (FILTROS) & Contratos por Fundo
+                # ------------------------------------------------
+                #st.write("---")
+                st.write("## Quantidade de Contratos por Fundo")
+                df_precos_ajustados = calculate_portfolio_values(
+                    df_precos_ajustados, df_pl_processado, var_bps)
+                df_pl_processado = calculate_contracts_per_fund(
+                    df_pl_processado, df_precos_ajustados)
+                
                 vp = df_precos_ajustados['Valor Fechamento'] * abs(quantidade)
                 vp_soma = vp.sum()
 
@@ -5858,42 +6099,13 @@ def main_page():
                 var_port = abs(var_port)
                 var_port_dinheiro = vp_soma * var_port
 
-                st.sidebar.write("---")
-                st.sidebar.write("## Limite do Var do Portifólio")
-                var_bps = st.sidebar.slider(
-                    "VaR do Portfólio (bps)", min_value=1.0, max_value=20.0, value=1.0, step=0.5
-                )
-                var_bps = var_bps / 10000
-                var_din = st.sidebar.checkbox("Exibir Limite de VaR em dinheiro")
-                if var_din:
-                    var_lim_din = st.sidebar.number_input(
-                        "Valor do VaR em dinheiro:", min_value=0.0, value=float(var_port_dinheiro), step=1.0
-                    )
-                else:
-                    var_limite = st.sidebar.slider(
-                        "Limite para VaR gasto do Portfólio", min_value=0.1, max_value=1.0, value=1.0, step=0.01
-                    )
+
                 df_precos_ajustados = calculate_portfolio_values(
                     df_precos_ajustados, df_pl_processado, var_bps)
                 df_pl_processado = calculate_contracts_per_fund(
                     df_pl_processado, df_precos_ajustados)
 
-                # st.session_state["posicoes_temp"] = quantidade_inicial
-                # st.session_state["ativos_temp"] = list(
-                #     quantidade_inicial.keys())
-
-                # # Botão com callback (1 clique = troca de página)
-                # st.button(
-                #     "Ir para a tela de Preços de Compra/Venda",
-                #     on_click=switch_to_page2,
-                #     key="go_page2"
-                # )
-
-                # ------------------------------------------------
-                #   TABELA DF_PL (FILTROS) & Contratos por Fundo
-                # ------------------------------------------------
-                st.write("---")
-                st.write("## Quantidade de Contratos por Fundo")
+                # st.session_state["posicoes_temp"] = quantidade_inicia
 
                 # Formatações
                 df_precos_ajustados['Valor Fechamento'] = df_precos_ajustados['Valor Fechamento'].apply(
@@ -6066,8 +6278,44 @@ def main_page():
                                 lambda x: f"{x:.0f}")
                     st.table(filtered_df[columns])
                     st.write("OBS: Os contratos estão arrendodandos para inteiros.")
+                    st.write("---")
+
+
+                    
                 else:
                     st.write("Selecione ao menos uma coluna para exibir os dados.")
+                
+                st.write("## Analise por Fundo")
+                st.write("### Selecione os filtros")
+
+                lista_fundos = df_contratos.index.tolist()
+                lista_fundos = [
+                    str(x) for x in df_contratos.index.tolist() if str(x) != 'Total']
+                colll1, colll2 = st.columns([4.9, 4.9])
+                with colll1:
+                    fundos = st.multiselect(
+                        "Selecione os fundos que deseja analisar", lista_fundos, default=lista_fundos)
+                with colll2:
+                    op1 = st.checkbox("CoVaR / % Risco Total", value=True)
+                    op2 = st.checkbox("Div01 / Stress", value=True)
+
+                fundos0 = fundos.copy()
+                if fundos0:
+                    st.write("## Portfólio Atual")
+                    soma_pl_sem_pesos2 = calcular_metricas_de_fundo_analise(
+                        default_assets, quantidade, df_contratos_2, fundos0, op1, op2)
+                # Transforma em lista para poder usar no cálculo
+                # Valor do Portfólio (soma simples)
+
+                # st.session_state["ativos_temp"] = list(
+                #     quantidade_inicial.keys())
+
+                # # Botão com callback (1 clique = troca de página)
+                # st.button(
+                #     "Ir para a tela de Preços de Compra/Venda",
+                #     on_click=switch_to_page2,
+                #     key="go_page2"
+                # )
 
                 lista_estrategias = {
                     'DI': 'Juros Nominais Brasil',

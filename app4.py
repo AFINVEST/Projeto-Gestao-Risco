@@ -7037,17 +7037,12 @@ def main_page():
                     fundo = idx
                     check = 0
                     for asset in default_assets:
-                        try:
-                            if int(row[asset]) != 0:
-                                check = 1
-                        except KeyError:
-                            st.error(f"Erro: Ativo {asset} não encontrado no DataFrame de contratos.")
+                        if int(row[asset]) != 0:
+                            check = 1
                     if check == 0:
-                        dict_pesos[fundo] = 0                        
+                        dict_pesos[fundo] = 0
 
             Weights = list(dict_pesos.values())
-            st.write("## Pesos dos Fundos")
-            st.write(dict_pesos)
             df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(
                 df_pl, Weights)
             for asset in default_assets:

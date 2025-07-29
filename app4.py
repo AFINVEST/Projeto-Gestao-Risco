@@ -880,8 +880,395 @@ def att_portifosições():
     add_data(df_portifolio.to_dict(orient="records"))
     return
 
+def calcular_metricas_de_fundo3(assets, df_contratos, fundos, op1=True, op2=True):
 
-def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos, op1, op2):
+    # ---------------- helpers locais ----------------
+    def _ativos_por(assets, quantidade_nomes, *contains):
+        out = []
+        for a in assets:
+            if any(s in a for s in contains) and float(quantidade_nomes.get(a, 0)) != 0:
+                out.append(a)
+        return out
+
+    def _get_or_zero(series_like, key):
+        try:
+            if isinstance(series_like, pd.Series):
+                return float(series_like.get(key, 0.0))
+            elif isinstance(series_like, pd.DataFrame):
+                if key in series_like.index:
+                    return float(series_like.loc[key].squeeze())
+                return 0.0
+            else:
+                return float(series_like)
+        except Exception:
+            return 0.0
+
+    # ---------------- pré-processamento ----------------
+    df_tira = df_contratos.copy()
+    df_tira.reset_index(inplace=True)
+    df_tira = df_tira[df_tira.columns.drop(list(df_tira.filter(regex='Max|Adm')))]
+    df_tira.rename(columns={'index': 'Fundo'}, inplace=True)
+
+    lista_remove = []
+    for fundo2 in fundos[:]:
+        linha = df_tira[df_tira['Fundo'] == fundo2].select_dtypes(include=['number'])
+        if not linha.empty and (linha == 0).all(axis=1).values[0]:
+            lista_remove.append(fundo2)
+    for f in lista_remove:
+        if f in fundos:
+            fundos.remove(f)
+
+    if not fundos:
+        st.write("Nenhum fundo selecionado / Nenhum contrato cadastrado")
+        return
+
+    # ---------------- cargas e pesos ----------------
+    file_pl = "Dados/pl_fundos.parquet"
+    df_pl = pd.read_parquet(file_pl)
+    file_bbg = "Dados/BBG - ECO DASH.xlsx"
+
+    dict_pesos = {
+        'GLOBAL BONDS': 4, 'HORIZONTE': 1, 'JERA2026': 1, 'REAL FIM': 1,
+        'BH FIRF INFRA': 1, 'BORDEAUX INFRA': 1, 'TOPAZIO INFRA': 1,
+        'MANACA INFRA FIRF': 1, 'AF DEB INCENTIVADAS': 3
+    }
+
+    for idx, row in df_contratos.iterrows():
+        if str(idx).strip().upper() == 'TOTAL':
+            continue
+        check = 0
+        for asset in assets:
+            col = f'Contratos {asset}'
+            if col in row.index and pd.notna(row[col]) and int(row[col]) != 0:
+                check = 1
+                break
+        if check == 0 and idx in dict_pesos:
+            dict_pesos[idx] = 0
+
+    Weights = list(dict_pesos.values())
+
+    df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(df_pl, Weights)
+
+    df = pd.read_parquet('Dados/df_inicial.parquet')
+    df_precos, df_completo = load_and_process_excel(df, assets)
+    df_retorno = process_returns(df_completo, assets)
+    var_ativos = var_not_parametric(df_retorno).abs()
+    df_precos_ajustados = adjust_prices_with_var(df_precos, var_ativos)
+
+    quantidade_nomes = {}
+    tabela_dados_fundos = pd.DataFrame()
+    tabela_dados_riscos = pd.DataFrame()
+    df_portfolio_final = pd.DataFrame()
+
+    # ---------------- loop nos fundos ----------------
+    for idx, row in df_contratos.iterrows():
+        if idx not in fundos:
+            continue
+
+        df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio_especifico(df_pl, Weights, idx)
+        soma_pl = soma_pl * 0.01  # converte para porcentagem
+        # >>> NOVO: 1% do PL do fundo como base (pl_ref) <<<
+        pl_ref = (soma_pl_sem_pesos or 0.0) * 0.01  # evita None
+
+        quantidade_nomes = {}
+        for a in assets:
+            col = f'Contratos {a}'
+            quantidade_nomes[a] = row[col] if col in row.index and pd.notna(row[col]) else 0.0
+
+        quantidade = np.array([quantidade_nomes[a] for a in assets], dtype=float)
+
+        if "Valor Fechamento" not in df_precos_ajustados.columns:
+            st.write("Coluna 'Valor Fechamento' não encontrada em df_precos_ajustados.")
+            continue
+
+        vp = df_precos_ajustados['Valor Fechamento'].reindex(assets).fillna(0.0).values * np.abs(quantidade)
+        vp_soma = float(np.nansum(vp))
+        if vp_soma == 0:
+            continue
+
+        pesos = (quantidade * df_precos_ajustados['Valor Fechamento'].reindex(assets).fillna(0.0).values) / vp_soma
+        st.write(pesos)
+
+        df_returns_portifolio = (df_retorno.reindex(columns=assets).fillna(0.0)
+                                 * pd.Series(pesos, index=assets)).copy()
+        df_returns_portifolio['Portifolio'] = df_returns_portifolio.sum(axis=1)
+
+        var_port = abs(var_not_parametric(df_returns_portifolio['Portifolio']))
+        st.write(var_port)
+        var_port_dinheiro = vp_soma * var_port
+
+        var_bps = 1.0 / 10000.0
+        var_limite = 1.0
+
+        vol_port_retornos = df_returns_portifolio['Portifolio'].std()
+        vol_port_analitica = vol_port_retornos * np.sqrt(252)
+
+        df_retorno['Portifolio'] = df_returns_portifolio['Portifolio']
+        cov = df_retorno.cov()
+        cov_port = cov['Portifolio'].drop('Portifolio')
+        df_beta = cov_port / (vol_port_retornos**2 if vol_port_retornos != 0 else np.nan)
+        df_mvar = df_beta * var_port
+        df_mvar_dinheiro = df_mvar * df_precos_ajustados['Valor Fechamento'].reindex(df_mvar.index).fillna(0.0)
+
+        covar = df_mvar.reindex(df_precos_ajustados.index).fillna(0.0) \
+                * pd.Series(pesos, index=assets).reindex(df_mvar.index).fillna(0.0).values \
+                * vp_soma
+        covar_perc = covar / covar.sum() if covar.sum() != 0 else covar
+
+        cvar = abs(df_retorno[df_retorno['Portifolio'] < var_not_parametric(df_retorno['Portifolio'])]['Portifolio'].mean())
+        cvar_dinheiro = vp_soma * cvar
+
+        # -------------- DV01 / Stress --------------
+        df_divone, dolar, treasury = load_and_process_divone(file_bbg, df_completo)
+
+        lista_juros_interno      = _ativos_por(assets, quantidade_nomes, "DI")
+        lista_juros_interno_real = _ativos_por(assets, quantidade_nomes, "DAP", "NTNB")
+        lista_juros_externo      = _ativos_por(assets, quantidade_nomes, "TREASURY")
+        lista_dolar              = _ativos_por(assets, quantidade_nomes, "WDO1")
+
+        base_idx = df_divone.index
+        zero_series = pd.Series(0.0, index=base_idx)
+
+        if lista_juros_interno:
+            q_nom = np.array([quantidade_nomes[a] for a in lista_juros_interno], dtype=float)
+            df_divone_juros_nominais = (df_divone[lista_juros_interno] * q_nom).sum(axis=1)
+        else:
+            df_divone_juros_nominais = zero_series.copy()
+
+        if lista_juros_interno_real:
+            q_real = np.array([quantidade_nomes[a] for a in lista_juros_interno_real], dtype=float)
+            df_divone_juros_real = (df_divone[lista_juros_interno_real] * q_real).sum(axis=1)
+        else:
+            df_divone_juros_real = zero_series.copy()
+
+        if lista_juros_externo:
+            q_ext = np.array([quantidade_nomes[a] for a in lista_juros_externo], dtype=float)
+            df_divone_juros_externo = (df_divone[lista_juros_externo] * q_ext).sum(axis=1)
+            valor_acumulado_treasury = (1 + df_retorno['TREASURY']).cumprod()
+            pico_max_treasury = valor_acumulado_treasury.max()
+            drawndown_treasury = (valor_acumulado_treasury - pico_max_treasury) / pico_max_treasury
+            drawndown_treasury = drawndown_treasury.min()
+            drawndown_treasury = df_retorno['TREASURY'].min()
+            stress_test_juros_externo = abs(drawndown_treasury) * treasury * dolar / 10000 * float(q_ext.sum())
+        else:
+            df_divone_juros_externo = zero_series.copy()
+            stress_test_juros_externo = 0.0
+
+        if lista_dolar:
+            quantidade_dolar = float(quantidade_nomes[lista_dolar[0]])
+            valor_acumulado = (1 + df_retorno['WDO1']).cumprod()
+            pico_max = valor_acumulado.max()
+            drawndown_dolar = (valor_acumulado - pico_max) / pico_max
+            drawndown_dolar = drawndown_dolar.min()
+            drawndown_dolar = df_retorno['WDO1'].min()
+            df_divone_dolar = abs(drawndown_dolar) * dolar * quantidade_dolar
+            stress_dolar = float(df_divone_dolar)
+        else:
+            df_divone_dolar = 0.0
+            stress_dolar = 0.0
+
+        # >>> NOVO: normalização por 1% do PL do fundo (pl_ref) <<<
+        denom = pl_ref if pl_ref not in (None, 0) else np.nan
+
+        stress_test_juros_interno_Nominais = df_divone_juros_nominais * 100
+        stress_test_juros_interno_Reais    = df_divone_juros_real * 50
+
+        if np.isnan(denom):
+            stress_test_juros_interno_Nominais_percent = zero_series.copy()
+            stress_test_juros_interno_Reais_percent    = zero_series.copy()
+            stress_test_juros_externo_percent          = 0.0
+            stress_dolar_percent                       = 0.0
+        else:
+            stress_test_juros_interno_Nominais_percent = stress_test_juros_interno_Nominais / denom * 10000
+            stress_test_juros_interno_Reais_percent    = stress_test_juros_interno_Reais / denom * 10000
+            stress_test_juros_externo_percent          = stress_test_juros_externo / denom * 10000
+            stress_dolar_percent                       = stress_dolar / denom * 10000
+
+        df_divone_juros_externo_certo = df_divone_juros_externo
+
+        df_stress_div01 = pd.DataFrame({
+            'DIV01': [
+                f"R${abs(_get_or_zero(df_divone_juros_nominais, 'FUT_TICK_VAL')):,.2f}",
+                f"R${abs(_get_or_zero(df_divone_juros_real,     'FUT_TICK_VAL')):,.2f}",
+                f"R${abs(_get_or_zero(df_divone_juros_externo_certo, 'FUT_TICK_VAL')):,.2f}",
+                f"R${abs(df_divone_dolar):,.2f}" if lista_dolar else 0
+            ],
+            'Stress (R$)': [
+                f"R${abs(_get_or_zero(stress_test_juros_interno_Nominais, 'FUT_TICK_VAL')):,.2f}",
+                f"R${abs(_get_or_zero(stress_test_juros_interno_Reais,     'FUT_TICK_VAL')):,.2f}",
+                f"R${abs(stress_test_juros_externo):,.2f}",
+                f"R${abs(stress_dolar):,.2f}"
+            ],
+            # >>> NOVO: bps sobre 1% do PL (pl_ref) <<<
+            'Stress (bps)': [
+                f"{abs(_get_or_zero(stress_test_juros_interno_Nominais_percent, 'FUT_TICK_VAL')):,.2f}bps",
+                f"{abs(_get_or_zero(stress_test_juros_interno_Reais_percent,     'FUT_TICK_VAL')):,.2f}bps",
+                f"{abs(stress_test_juros_externo_percent):,.2f}bps",
+                f"{abs(stress_dolar_percent):,.2f}bps"
+            ]
+        }, index=['Juros Nominais Brasil', 'Juros Reais Brasil', 'Juros US', 'Moedas'])
+
+        sum_row = pd.DataFrame({
+            'DIV01': [
+                f"R${abs(_get_or_zero(df_divone_juros_nominais, 'FUT_TICK_VAL'))
+                   + abs(_get_or_zero(df_divone_juros_real, 'FUT_TICK_VAL'))
+                   + abs(_get_or_zero(df_divone_juros_externo_certo, 'FUT_TICK_VAL'))
+                   + (abs(df_divone_dolar) if lista_dolar else 0):,.2f}"
+            ],
+            'Stress (R$)': [
+                f"R${abs(_get_or_zero(stress_test_juros_interno_Nominais, 'FUT_TICK_VAL'))
+                   + abs(_get_or_zero(stress_test_juros_interno_Reais, 'FUT_TICK_VAL'))
+                   + abs(stress_test_juros_externo)
+                   + abs(stress_dolar):,.2f}"
+            ],
+            'Stress (bps)': [
+                f"{abs(_get_or_zero(stress_test_juros_interno_Nominais_percent, 'FUT_TICK_VAL'))
+                   + abs(_get_or_zero(stress_test_juros_interno_Reais_percent, 'FUT_TICK_VAL'))
+                   + abs(stress_test_juros_externo_percent)
+                   + abs(stress_dolar_percent):,.2f}bps"
+            ]
+        }, index=['Total'])
+        df_stress_div01 = pd.concat([df_stress_div01, sum_row])
+
+        # --- métricas agregadas por fundo (bps sobre 1% do PL) ---
+        var_limite_comparativo = soma_pl * var_bps * var_limite  # em R$
+        dados_fundo = {
+            'PL_Sem_Peso (R$)': f"R${soma_pl_sem_pesos:,.0f}",
+            # >>> NOVO: divide por pl_ref
+            'VaR Limite (bps)':     f"{(var_limite_comparativo / pl_ref * 10000):,.2f}bps" if pl_ref else "0.00bps",
+            'VaR Portfólio (bps)':  f"{(var_port_dinheiro    / pl_ref * 10000):,.2f}bps" if pl_ref else "0.00bps",
+            'CVaR (bps)':           f"{(abs(cvar * vp_soma)  / pl_ref * 10000):,.2f}bps" if pl_ref else "0.00bps",
+            'Volatilidade': f"{vol_port_analitica:.2%}",
+            '% Risco Total': f"{abs(covar.sum()/ var_limite_comparativo):.2%}" if var_limite_comparativo else "0.00%"
+        }
+        df_portfolio_final = pd.concat([df_portfolio_final, pd.DataFrame(dados_fundo, index=[idx])])
+
+        # ---------- tabela de risco por ativo (mantida) ----------
+        df_dados = pd.DataFrame({
+            'Beta': df_beta,
+            'MVar(R$)': df_mvar_dinheiro,
+            'CoVaR(R$)': covar,
+            'CoVaR(%)': covar_perc,
+            'Var': var_ativos[assets],
+            '% do Risco Total': covar_perc * abs(covar.sum() / var_limite_comparativo) if var_limite_comparativo else 0.0
+        })
+
+        dados_formatados = {}
+        for ativo in df_dados.index.tolist():
+            linha = df_dados.loc[ativo]
+            valores_formatados = " / ".join([
+                f"{linha['CoVaR(%)'] * 100:.2f}%",
+                f"{linha['% do Risco Total']* 100:.2f}%",
+            ])
+            dados_formatados[ativo] = [valores_formatados]
+
+        dados_formatados['Total'] = [" / ".join([
+            f"{df_dados['CoVaR(%)'].sum() * 100:.2f}%",
+            f"{(df_dados['% do Risco Total']).sum() * 100:.2f}%",
+        ])]
+
+        tabela_dados_risco = pd.DataFrame(dados_formatados, index=[idx])
+        tabela_dados_riscos = pd.concat([tabela_dados_riscos, tabela_dados_risco], axis=0)
+
+        colunas_selecionadas = ['Beta', 'MVar(R$)', 'CoVaR(R$)', 'CoVaR(%)', 'Var', '% do Risco Total']
+        if 'CoVaR(R$)' in colunas_selecionadas:
+            df_dados['CoVaR(R$)'] = df_dados['CoVaR(R$)'].apply(lambda x: f"R${x:,.0f}")
+        if 'MVar(R$)' in colunas_selecionadas:
+            df_dados['MVar(R$)'] = df_dados['MVar(R$)'].apply(lambda x: f"R${x:,.0f}")
+        if 'CoVaR(%)' in colunas_selecionadas:
+            df_dados['CoVaR(%)'] = df_dados['CoVaR(%)'].apply(lambda x: f"{x:.2%}")
+        if 'Beta' in colunas_selecionadas:
+            df_dados['Beta'] = df_dados['Beta'].apply(lambda x: f"{x:.4f}")
+        if 'Var' in colunas_selecionadas:
+            df_dados['Var'] = df_dados['Var'].apply(lambda x: f"{x:.4f}%")
+        if '% do Risco Total' in colunas_selecionadas:
+            df_dados['% do Risco Total'] = df_dados['% do Risco Total'].apply(lambda x: f"{x:.2%}")
+
+        # ----- tabela de estratégias (DIV01 bps / Stress bps) -----
+        dados = {
+            'Juros Nominais Brasil': [
+                f"{abs(_get_or_zero(df_divone_juros_nominais, 'FUT_TICK_VAL') / (pl_ref or 1) * 10000):,.2f}bps / "
+                f"{abs(_get_or_zero(stress_test_juros_interno_Nominais_percent, 'FUT_TICK_VAL')):,.2f}bps"
+            ],
+            'Juros Reais Brasil': [
+                f"{abs(_get_or_zero(df_divone_juros_real, 'FUT_TICK_VAL') / (pl_ref or 1) * 10000):,.2f}bps / "
+                f"{abs(_get_or_zero(stress_test_juros_interno_Reais_percent, 'FUT_TICK_VAL')):,.2f}bps"
+            ],
+            'Juros US': [
+                f"{abs(_get_or_zero(df_divone_juros_externo_certo, 'FUT_TICK_VAL') / (pl_ref or 1) * 10000):,.2f}bps / "
+                f"{abs(stress_test_juros_externo_percent):,.2f}bps"
+            ],
+            'Moedas': [
+                f"{(abs(df_divone_dolar) / (pl_ref or 1) * 10000) if lista_dolar else 0:,.2f}bps / "
+                f"{abs(stress_dolar_percent):,.2f}bps"
+            ]
+        }
+        tabela_dados_fundo = pd.DataFrame(dados, index=[idx])
+        tabela_dados_fundos = pd.concat([tabela_dados_fundos, tabela_dados_fundo], axis=0)
+
+    # ---------------- pós-loop: totais/relatórios ----------------
+    st.table(df_portfolio_final)
+
+    tabela_dados_fundos_p1 = tabela_dados_fundos.applymap(lambda x: x.replace('bps', '') if isinstance(x, str) else x)
+    tabela_dados_fundos_p1 = tabela_dados_fundos_p1.applymap(lambda x: x.split('/')[0] if isinstance(x, str) and '/' in x else x).astype(float)
+    tabela_dados_fundos_p1['Total'] = tabela_dados_fundos_p1.sum(axis=1).round(2)
+
+    tabela_dados_fundos_p2 = tabela_dados_fundos.applymap(lambda x: x.replace('bps', '') if isinstance(x, str) else x)
+    tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(lambda x: x.split('/')[1] if isinstance(x, str) and '/' in x else x)
+    tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(lambda x: float(x) if isinstance(x, str) and x != '0' else 0)
+    tabela_dados_fundos_p2['Total'] = tabela_dados_fundos_p2[['Juros Nominais Brasil', 'Juros Reais Brasil', 'Moedas', 'Juros US']].sum(axis=1).round(2)
+
+    tabela_dados_fundos['Total'] = tabela_dados_fundos_p1['Total'].astype(str) + 'bps / ' + tabela_dados_fundos_p2['Total'].astype(str) + 'bps'
+
+    mapeamento_categorias = {
+        "Juros Nominais Brasil": [col for col in tabela_dados_riscos.columns if "DI" in col],
+        "Juros Reais Brasil":    [col for col in tabela_dados_riscos.columns if ("DAP" in col) or ("NTNB" in col)],
+        "Juros US":              ["TREASURY"],
+        "Moedas":                ["WDO1"]
+    }
+
+    nova_tabela = pd.DataFrame()
+    nova_tabela["Fundos"] = tabela_dados_riscos.index
+    soma_total_antes, soma_total_depois = [], []
+
+    for categoria, colunas in mapeamento_categorias.items():
+        valores_antes, valores_depois = [], []
+        for _, row in tabela_dados_riscos.iterrows():
+            soma_antes = 0.0; soma_depois = 0.0
+            for col in colunas:
+                if col in tabela_dados_riscos.columns and isinstance(row[col], str) and " / " in row[col]:
+                    partes = row[col].split(" / ")
+                    try:
+                        soma_antes  += float(partes[0].replace("%", ""))
+                        soma_depois += float(partes[1].replace("%", ""))
+                    except Exception:
+                        pass
+            valores_antes.append(soma_antes)
+            valores_depois.append(soma_depois)
+
+        nova_tabela[categoria] = [f"{a:.2f}% / {b:.2f}%" for a, b in zip(valores_antes, valores_depois)]
+
+        if not soma_total_antes:
+            soma_total_antes = valores_antes
+            soma_total_depois = valores_depois
+        else:
+            soma_total_antes  = [x + y for x, y in zip(soma_total_antes, valores_antes)]
+            soma_total_depois = [x + y for x, y in zip(soma_total_depois, valores_depois)]
+
+    nova_tabela["Total"] = [f"{a:.2f}% / {b:.2f}%" for a, b in zip(soma_total_antes, soma_total_depois)]
+    nova_tabela.set_index("Fundos", inplace=True)
+
+    if op1:
+        st.write("### Analise Risco por Categoria")
+        st.table(nova_tabela)
+        st.markdown("<p style='font-size: 13px; font-style: italic;'>(CoVaR bps / % Risco Total)</p>", unsafe_allow_html=True)
+
+    if op2:
+        st.write("### Analise Estratégias")
+        st.table(tabela_dados_fundos)
+        st.markdown("<p style='font-size: 13px; font-style: italic;'>(Div01 bps / Stress bps)</p>", unsafe_allow_html=True)
+
+def calcular_metricas_de_fundo2(assets, df_contratos, fundos, op1 = True, op2 = True):
     df_tira = df_contratos.copy()
     df_tira.reset_index(inplace=True)
     # Tirar colunas que contenham o nome 'Max' ou 'Adm'
@@ -891,8 +1278,7 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos, op1, o
     lista_remove = []
     for fundo2 in fundos[:]:
         # Filtrar a linha do fundo
-        linha = df_tira[df_tira['Fundo'] == fundo2].select_dtypes(include=[
-                                                                  'number'])
+        linha = df_tira[df_tira['Fundo'] == fundo2].select_dtypes(include=['number'])
 
         # Verificar se todas as colunas são zero
         # `axis=1` verifica todas as colunas na linha
@@ -938,6 +1324,7 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos, op1, o
         df = pd.read_parquet('Dados/df_inicial.parquet')
         df_precos, df_completo = load_and_process_excel(df, assets)
         df_retorno = process_returns(df_completo, assets)
+
         var_ativos = var_not_parametric(df_retorno).abs()
         df_precos_ajustados = adjust_prices_with_var(df_precos, var_ativos)
         quantidade_nomes = {}
@@ -1016,8 +1403,579 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos, op1, o
                     df_divone_juros_nominais = df_divone_juros_nominais.sum(
                         axis=1)
 
-                    lista_juros_interno_real = [
-                        asset for asset in assets if 'DAP' or 'NTNB' in asset]
+                    lista_juros_interno_real = [a for a in assets if ('DAP' in a) or ('NTNB' in a)]
+
+                    df_divone_juros_real = df_divone[lista_juros_interno_real]
+
+                    lista_quantidade = [quantidade_nomes[asset]
+                                        for asset in lista_juros_interno_real]
+
+                    df_divone_juros_real = df_divone_juros_real * \
+                        np.array(lista_quantidade)
+
+                    df_divone_juros_real = df_divone_juros_real.sum(axis=1)
+
+                    lista_juros_externo = [
+                        asset for asset in assets if 'TREASURY' in asset]
+
+                    df_divone_juros_externo = df_divone[lista_juros_externo]
+
+                    lista_quantidade = [quantidade_nomes[asset]
+                                        for asset in lista_juros_externo]
+
+                    df_divone_juros_externo = df_divone_juros_externo * \
+                        np.array(lista_quantidade)
+
+                    df_divone_juros_externo = df_divone_juros_externo.sum(
+                        axis=1)
+
+                    stress_test_juros_interno_Nominais = df_divone_juros_nominais * 100
+                    stress_test_juros_interno_Nominais_percent = stress_test_juros_interno_Nominais / \
+                        soma_pl_sem_pesos * 10000
+
+                    stress_test_juros_interno_Reais = df_divone_juros_real * 50
+                    stress_test_juros_interno_Reais_percent = stress_test_juros_interno_Reais / \
+                        soma_pl_sem_pesos * 10000
+
+                    df_divone_juros_externo_certo = df_divone_juros_externo
+
+                    if lista_juros_externo:
+                        valor_acumulado_treasury = (
+                            1+df_retorno['TREASURY']).cumprod()
+                        pico_max_treasury = valor_acumulado_treasury.max()
+                        drawndown_treasury = (valor_acumulado_treasury - pico_max_treasury) / \
+                            pico_max_treasury
+                        drawndown_treasury = drawndown_treasury.min()
+                        drawndown_treasury = df_retorno['TREASURY'].min()
+                        df_divone_juros_externo = drawndown_treasury
+                        df_divone_juros_externo = abs(
+                            df_divone_juros_externo) * treasury * dolar / 10000
+                        df_divone_juros_externo = df_divone_juros_externo * \
+                            np.array(lista_quantidade)
+                        df_divone_juros_externo = df_divone_juros_externo.sum()
+
+                    stress_test_juros_externo = df_divone_juros_externo
+
+                    stress_test_juros_externo_percent = stress_test_juros_externo / \
+                        soma_pl_sem_pesos * 10000
+
+                    lista_dolar = [
+                        asset for asset in assets if 'WDO1' in asset]
+                    if lista_dolar:
+                        quantidade_dolar = quantidade_nomes[lista_dolar[0]]
+                        stress_dolar = quantidade_dolar * dolar * 0.02
+                        valor_acumulado = (1+df_retorno['WDO1']).cumprod()
+                        pico_max = valor_acumulado.max()
+                        drawndown_dolar = (
+                            valor_acumulado - pico_max) / pico_max
+                        drawndown_dolar = drawndown_dolar.min()
+                        #st.write(f"Drawndown Dolar: {drawndown_dolar}")
+                        drawndown_dolar = df_retorno['WDO1'].min()
+                        #st.write(f"Drawndown Dolar: {drawndown_dolar}")
+                        df_divone_dolar = drawndown_dolar
+                        df_divone_dolar = df_divone_dolar * quantidade_dolar
+                        df_divone_dolar = abs(df_divone_dolar) * dolar
+                        stress_dolar = df_divone_dolar
+                        stress_dolar_percent = stress_dolar / soma_pl_sem_pesos * 10000
+                        df_divone_dolar = df_divone[lista_dolar] * \
+                            np.array(quantidade_dolar)
+                        df_divone_dolar = df_divone_dolar.sum()
+
+                    else:
+                        stress_dolar = 0
+                        df_divone_dolar = 0
+
+                    stress_dolar_percent = stress_dolar / soma_pl_sem_pesos * 10000
+                    df_stress_div01 = pd.DataFrame({
+                        'DIV01': [
+                            f"R${abs(df_divone_juros_nominais.iloc[0]):,.2f}",
+                            f"R${abs(df_divone_juros_real.iloc[0]):,.2f}",
+                            f"R${abs(df_divone_juros_externo_certo.iloc[0]):,.2f}",
+                            f'R${abs(df_divone_dolar.iloc[0]):,.2f}' if lista_dolar else 0
+                        ],
+                        'Stress (R$)': [
+                            f"R${abs(stress_test_juros_interno_Nominais['FUT_TICK_VAL']):,.2f}",
+                            f"R${abs(stress_test_juros_interno_Reais['FUT_TICK_VAL']):,.2f}",
+                            f"R${abs(stress_test_juros_externo):,.2f}" if lista_juros_externo else f"R${abs(stress_test_juros_externo['FUT_TICK_VAL']):,.2f}",
+                            f"R${abs(stress_dolar):,.2f}"
+                        ],
+                        'Stress (bps)': [
+                            f"{abs(stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL']):,.2f}bps",
+                            f"{abs(stress_test_juros_interno_Reais_percent['FUT_TICK_VAL']):,.2f}bps",
+                            f"{abs(stress_test_juros_externo_percent):,.2f}bps" if lista_juros_externo else f"{abs(stress_test_juros_externo_percent['FUT_TICK_VAL']):,.2f}bps",
+                            f"{abs(stress_dolar_percent):,.2f}bps"
+                        ]
+                    }, index=['Juros Nominais Brasil', 'Juros Reais Brasil', 'Juros US', 'Moedas'])
+
+                    sum_row = pd.DataFrame({
+                        'DIV01': [f"R${abs(df_divone_juros_nominais.iloc[0]) + abs(df_divone_juros_real[0]) + abs(df_divone_juros_externo_certo.iloc[0]) + abs(df_divone_dolar.iloc[0]):,.2f}"] if lista_dolar else [f"R${abs(df_divone_juros_nominais.iloc[0]) + abs(df_divone_juros_real[0]) + abs(df_divone_juros_externo_certo.iloc[0]):,.2f}"],
+                        'Stress (R$)': [f"R${abs(stress_test_juros_interno_Nominais['FUT_TICK_VAL']) + abs(stress_test_juros_interno_Reais['FUT_TICK_VAL']) + abs(stress_test_juros_externo) + abs(stress_dolar):,.2f}"] if lista_juros_externo else [f"R${abs(stress_test_juros_interno_Nominais['FUT_TICK_VAL']) + abs(stress_test_juros_interno_Reais['FUT_TICK_VAL']) + abs(stress_test_juros_externo['FUT_TICK_VAL']) + abs(stress_dolar):,.2f}"],
+                        'Stress (bps)': [f"{abs(stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL']) + abs(stress_test_juros_interno_Reais_percent['FUT_TICK_VAL']) + abs(stress_test_juros_externo_percent) + abs(stress_dolar_percent):,.2f}bps" if lista_juros_externo else f"{abs(stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL']) + abs(stress_test_juros_interno_Reais_percent['FUT_TICK_VAL']) + abs(stress_test_juros_externo_percent['FUT_TICK_VAL']) + abs(stress_dolar_percent):,.2f}bps"]
+                    }, index=['Total'])
+                    df_stress_div01 = pd.concat([df_stress_div01, sum_row])
+                    # --- Layout ---
+        #            st.write("## Dados do Portfólio")
+        #            st.write(f"**PL: R$ {soma_pl_sem_pesos:,.0f}**")
+        #
+                    var_limite_comparativo = soma_pl * var_bps * var_limite
+        #            st.write(
+        #                f"**VaR Limite** (Peso de {var_limite:.1%}): R${var_limite_comparativo:,.0f}"
+        #            )
+        #
+        #            st.write(
+        #                f"**VaR do Portfólio**: R${var_port_dinheiro:,.0f} : **{var_port_dinheiro/soma_pl_sem_pesos * 10000:.2f}bps**"
+        #            )
+        #            st.write(
+        #                f"**CVaR**: R${abs(cvar * vp_soma):,.0f} : **{abs(cvar * vp_soma)/soma_pl_sem_pesos * 10000:.2f}bps**"
+        #            )
+        #            st.write(f"**Volatilidade**: {vol_port_analitica:.2%}")
+        #            st.table(df_stress_div01)
+        #
+        #            st.write("---")
+        #            st.write(
+        #                f"### {abs(covar.sum()/ var_limite_comparativo):.2%} do risco total")
+
+                    # Coletar dados formatados para cada fundo
+                    dados_fundo = {
+                        'PL_Sem_Peso (R$)': f"R${soma_pl_sem_pesos:,.0f}",
+                        'VaR Limite (bps)': f"{var_limite_comparativo/soma_pl_sem_pesos * 10000:,.2f}bps",
+                        'VaR Portfólio (bps)': f"{var_port_dinheiro/soma_pl_sem_pesos * 10000:.2f}bps",
+                        'CVaR (bps)': f"{abs(cvar * vp_soma)/soma_pl_sem_pesos * 10000:.2f}bps",
+                        'Volatilidade': f"{vol_port_analitica:.2%}",
+                        '% Risco Total': f"{abs(covar.sum()/ var_limite_comparativo):.2%}"
+                    }
+        #            dados_fundo = {
+        #                'PL_Sem_Peso (R$)': f"R${soma_pl_sem_pesos:,.0f}",
+        #                'VaR Limite (R$)': f"R${var_limite_comparativo:,.0f}",
+        #                'VaR Portfólio (R$/bps)': f"R${var_port_dinheiro:,.0f} / {var_port_dinheiro/soma_pl_sem_pesos * 10000:.2f}bps",
+        #                'CVaR (R$/bps)': f"R${abs(cvar * vp_soma):,.0f} / {abs(cvar * vp_soma)/soma_pl_sem_pesos * 10000:.2f}bps",
+        #                'Volatilidade': f"{vol_port_analitica:.2%}",
+        #                '% Risco Total': f"{abs(covar.sum()/ var_limite_comparativo):.2%}"
+        #            }
+
+                    # Adicionar como nova linha ao DataFrame
+                    df_portfolio_final = pd.concat([
+                        df_portfolio_final,
+                        pd.DataFrame(dados_fundo, index=[idx])
+                    ])
+
+                    # Exiba a tabela formatada no Streamlit:
+                    # Supondo que df_dados já está criado com múltiplos índices (ativos)
+                    df_dados = pd.DataFrame({
+                        'Beta': df_beta,
+                        'MVar(R$)': df_mvar_dinheiro,
+                        'CoVaR(R$)': covar,
+                        'CoVaR(%)': covar_perc,
+                        'Var': var_ativos[assets],
+                        '% do Risco Total': covar_perc * abs(covar.sum() / var_limite_comparativo)
+                    })
+
+                    # Lista de ativos (nomes das colunas)
+                    lista_ativos = df_dados.index.tolist()
+
+                    # Dicionário para armazenar os valores formatados de cada ativo
+                    dados_formatados = {}
+
+                    # Iterar sobre cada ativo (linha do df_dados)
+                    for ativo in lista_ativos:
+                        # Extrair dados do ativo
+                        linha = df_dados.loc[ativo]
+
+                        # Formatar os valores em uma string com "/"
+                        valores_formatados = " / ".join([
+                            # f"{linha['Beta']:.6f}",                   # Beta
+                            # f"R${linha['MVar(R$)']:,.2f}",            # MVar(R$)
+                            # f"R${linha['CoVaR(R$)']:,.2f}",           # CoVaR(R$)
+                            # CoVaR(%)
+                            f"{linha['CoVaR(%)'] * 100:.2f}%",
+                            # f"R${linha['Var']:,.2f}",                 # Var
+                            # % do Risco Total
+                            f"{linha['% do Risco Total']* 100:.2f}%",
+                        ])
+
+                        # Adicionar ao dicionário (chave = nome do ativo)
+                        dados_formatados[ativo] = [valores_formatados]
+                    # Criar uma coluna de Total
+                    dados_formatados['Total'] = [
+                        " / ".join([
+                            # f"{df_beta.sum():.6f}",                   # Beta
+                            # f"R${df_mvar_dinheiro.sum():,.2f}",       # MVar(R$)
+                            # f"R${covar.sum():,.2f}",                  # CoVaR(R$)
+                            # CoVaR(%)
+                            f"{covar_perc.sum() * 100:.2f}%",
+                            # f"R${var_ativos[assets].sum():,.2f}",      # Var
+                            # % do Risco Total
+                            f"{(covar_perc * abs(covar.sum() / var_limite_comparativo)).sum() * 100:.2f}%",
+                        ])
+                    ]
+                    # Criar DataFrame com idx como única linha
+                    tabela_dados_risco = pd.DataFrame(
+                        dados_formatados,  # Colunas = ativos, Valores = strings formatadas
+                        index=[idx]        # Única linha = idx
+                    )
+                    colunas_selecionadas = []
+                    colunas_selecionadas.append('Beta')
+                    colunas_selecionadas.append('MVar(R$)')
+                    colunas_selecionadas.append('CoVaR(R$)')
+                    colunas_selecionadas.append('CoVaR(%)')
+                    colunas_selecionadas.append('Var')
+                    colunas_selecionadas.append('% do Risco Total')
+
+                    # Concatenando os dados se houver mais de uma iteração
+                    tabela_dados_riscos = pd.concat(
+                        [tabela_dados_riscos, tabela_dados_risco], axis=0)
+
+                    # st.write("## Risco")
+                    if 'CoVaR(R$)' in colunas_selecionadas:
+                        df_dados['CoVaR(R$)'] = df_dados['CoVaR(R$)'].apply(
+                            lambda x: f"R${x:,.0f}")
+                    if 'MVar(R$)' in colunas_selecionadas:
+                        df_dados['MVar(R$)'] = df_dados['MVar(R$)'].apply(
+                            lambda x: f"R${x:,.0f}")
+                    if 'CoVaR(%)' in colunas_selecionadas:
+                        df_dados['CoVaR(%)'] = df_dados['CoVaR(%)'].apply(
+                            lambda x: f"{x:.2%}")
+                    if 'Beta' in colunas_selecionadas:
+                        df_dados['Beta'] = df_dados['Beta'].apply(
+                            lambda x: f"{x:.4f}")
+                    if 'Var' in colunas_selecionadas:
+                        df_dados['Var'] = df_dados['Var'].apply(
+                            lambda x: f"{x:.4f}%")
+                    if '% do Risco Total' in colunas_selecionadas:
+                        df_dados['% do Risco Total'] = df_dados['% do Risco Total'].apply(
+                            lambda x: f"{x:.2%}")
+
+                # Display the filtered table
+                    if colunas_selecionadas:
+                        # st.write("Tabela de Dados Selecionados:")
+                        tabela_filtrada = df_dados[colunas_selecionadas]
+
+                        # Adicionar uma linha de soma
+                        sum_row = tabela_filtrada.select_dtypes(
+                            include='number').sum()
+                        sum_row['Beta'] = df_beta.sum()
+                        sum_row['MVar(R$)'] = df_mvar_dinheiro.sum()
+                        sum_row['CoVaR(R$)'] = covar.sum()
+                        sum_row['CoVaR(%)'] = covar_perc.sum()
+                        sum_row['Var'] = var_ativos[assets].sum()
+                        sum_row['% do Risco Total'] = (
+                            covar_perc * abs(covar.sum() / var_limite_comparativo)).sum()
+                        sum_row = sum_row.to_frame().T
+                        sum_row['Beta'] = sum_row['Beta'].apply(
+                            lambda x: f"{x:.4f}")
+                        sum_row['MVar(R$)'] = sum_row['MVar(R$)'].apply(
+                            lambda x: f"R${x:,.0f}")
+                        sum_row['CoVaR(R$)'] = sum_row['CoVaR(R$)'].apply(
+                            lambda x: f"R${x:,.0f}")
+                        sum_row['CoVaR(%)'] = sum_row['CoVaR(%)'].apply(
+                            lambda x: f"{x:.2%}")
+                        sum_row['Var'] = sum_row['Var'].apply(
+                            lambda x: f"{x:.4f}")
+                        sum_row['% do Risco Total'] = sum_row['% do Risco Total'].apply(
+                            lambda x: f"{x:.2%}")
+
+                        sum_row = sum_row[colunas_selecionadas]
+                        # Adicionar índice 'Total'
+                        sum_row.index = ['Total']
+                        # Adicionar a linha de soma na tabela filtrada
+                        tabela_filtrada_com_soma = pd.concat(
+                            [tabela_filtrada, sum_row])
+                        # Preciso criar uma linha com dados nas colunas de todos os fundos
+                        # Criando um dicionário para armazenar os valores formatados corretamente
+                        dados = {
+                            'Juros Nominais Brasil': [
+                                f"{abs(df_divone_juros_nominais.iloc[0] / soma_pl_sem_pesos * 10000):,.2f}bps / "
+                                f"{abs(stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL']):,.2f}bps"
+                            ],
+                            'Juros Reais Brasil': [
+                                f"{abs(df_divone_juros_real.iloc[0]/ soma_pl_sem_pesos * 10000):,.2f}bps / "
+                                f"{abs(stress_test_juros_interno_Reais_percent['FUT_TICK_VAL']):,.2f}bps"
+                            ],
+                            'Juros US': [
+                                f"{abs(df_divone_juros_externo_certo.iloc[0]/ soma_pl_sem_pesos * 10000):,.2f}bps / "
+                                f"{abs(stress_test_juros_externo_percent):,.2f}bps" if lista_juros_externo else f"{abs(stress_test_juros_externo_percent['FUT_TICK_VAL']):,.2f}bps"
+                            ],
+                            'Moedas': [
+                                f"{abs(df_divone_dolar.iloc[0]/ soma_pl_sem_pesos * 10000):,.2f}bps /"
+                                f"{abs(stress_dolar_percent):,.2f}bps" if lista_dolar else f"{abs(stress_dolar_percent):,.2f}bps"
+                            ]
+                        }
+
+                        # Criando a linha "Total"
+                        # dados['Total'] = [
+                        #    f"R${abs(df_divone_juros_nominais.iloc[0]) + abs(df_divone_juros_real.iloc[0]) + abs(df_divone_juros_externo_certo.iloc[0]) + (abs(df_divone_dolar.iloc[0]) if lista_dolar else 0):,.2f} / "
+                        #    f"R${abs(stress_test_juros_interno_Nominais['FUT_TICK_VAL']) + abs(stress_test_juros_interno_Reais['FUT_TICK_VAL']) + abs(stress_test_juros_externo) + abs(stress_dolar):,.2f}" if lista_juros_externo else f"R${abs(stress_test_juros_interno_Nominais['FUT_TICK_VAL']) + abs(stress_test_juros_interno_Reais['FUT_TICK_VAL']) + abs(stress_test_juros_externo['FUT_TICK_VAL']) + abs(stress_dolar):,.2f} / "
+                        #    f"{abs(stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL']) + abs(stress_test_juros_interno_Reais_percent['FUT_TICK_VAL']) + abs(stress_test_juros_externo_percent) + abs(stress_dolar_percent):,.2f}bps" if lista_juros_externo else f"{abs(stress_test_juros_interno_Nominais_percent['FUT_TICK_VAL']) + abs(stress_test_juros_interno_Reais_percent['FUT_TICK_VAL']) + abs(stress_test_juros_externo_percent['FUT_TICK_VAL']) + abs(stress_dolar_percent):,.2f}bps"
+                        # ]
+
+                        # Criando o DataFrame
+                        tabela_dados_fundo = pd.DataFrame(dados, index=[idx])
+
+                        # Concatenando os dados se houver mais de uma iteração
+                        tabela_dados_fundos = pd.concat(
+                            [tabela_dados_fundos, tabela_dados_fundo], axis=0)
+
+                    #st.table(tabela_filtrada_com_soma)
+                    st.write("## Dados de cada Fundo")
+                    st.table(df_portfolio_final)
+        # Criar coluna de Total
+        # sum_row = pd.DataFrame({
+        #    'PL_Sem_Peso (R$)': f"R${soma_pl_sem_pesos:,.0f}",
+        #    'VaR Limite (bps)': f"{var_limite_comparativo/ soma_pl_sem_pesos *10000 :,.2f}bps",
+        #    'VaR Portfólio (bps)': f"{var_port_dinheiro/soma_pl_sem_pesos * 10000:.2f}bps",
+        #    'CVaR (bps)': f"{abs(cvar * vp_soma)/soma_pl_sem_pesos * 10000:.2f}bps",
+        #    'Volatilidade': f"{vol_port_analitica:.2%}",
+        #    '% Risco Total': f"{abs(covar.sum()/ var_limite_comparativo):.2%}"
+        # }, index=['Total'])
+        # df_portfolio_final = pd.concat([df_portfolio_final, sum_row])
+        # Criar coluna de Total
+        # Tirar bps e / de cada célula
+        # Processar tabela_dados_fundos_p1 (valor antes de '/')
+        tabela_dados_fundos_p1 = tabela_dados_fundos.copy()
+        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.applymap(
+            lambda x: x.replace('bps', '') if isinstance(x, str) else x)
+        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.applymap(
+            lambda x: x.split('/')[0] if isinstance(x, str) and '/' in x else x)
+        # Converter os valores para float
+        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.astype(float)
+        # Adicionar a coluna 'Total' somando as colunas
+        tabela_dados_fundos_p1['Total'] = tabela_dados_fundos_p1.sum(
+            axis=1).round(2)  # Soma por linha (axis=1)
+
+        # Processar tabela_dados_fundos_p2 (valor após '/')
+        tabela_dados_fundos_p2 = tabela_dados_fundos.copy()
+        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(
+            lambda x: x.replace('bps', '') if isinstance(x, str) else x)
+        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(
+            lambda x: x.split('/')[1] if isinstance(x, str) and '/' in x else x)
+
+        # Aqui, é necessário tratar os valores corretamente
+        # Se o valor for '0', defina como 0, caso contrário converta para float
+        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(
+            lambda x: float(x) if isinstance(x, str) and x != '0' else 0)
+
+        # Somar as colunas específicas para obter o total
+        try:
+            tabela_dados_fundos_p2['Total'] = tabela_dados_fundos_p2[[
+                'Juros Nominais Brasil', 'Juros Reais Brasil', 'Moedas', 'Juros US']].sum(axis=1).round(2)  # Soma por linha (axis=1)
+
+            # Concatenar a informação de 'Total' nas duas tabelas (tabela_dados_fundos_p1 e tabela_dados_fundos_p2)
+            tabela_dados_fundos_p1['Total'] = tabela_dados_fundos_p1['Total'].astype(
+                str) + 'bps / ' + tabela_dados_fundos_p2['Total'].astype(str) + 'bps'
+
+            # Copiar a coluna 'Total' para a tabela final
+            tabela_dados_fundos['Total'] = tabela_dados_fundos_p1['Total']
+            # Preciso juntar as colunas que sejam Juros Nominais Brasil, Juros Reais Brasil, Moedas e Juros US
+            # Identificar categorias por colunas
+            mapeamento_categorias = {
+                "Juros Nominais Brasil": [col for col in tabela_dados_riscos.columns if "DI" in col],
+                "Juros Reais Brasil": [col for col in tabela_dados_riscos.columns if "DAP" in col],
+                "Juros US": ["TREASURY"],
+                "Moedas": ["WDO1"]
+            }
+            # Criar novo DataFrame com as categorias
+            # Criar novo DataFrame com as categorias
+            nova_tabela = pd.DataFrame()
+            nova_tabela["Fundos"] = tabela_dados_riscos.index
+
+            # Dicionário para armazenar valores da soma total
+            soma_total_antes = []
+            soma_total_depois = []
+
+            for categoria, colunas in mapeamento_categorias.items():
+                valores_antes = []
+                valores_depois = []
+
+                for _, row in tabela_dados_riscos.iterrows():
+                    soma_antes = 0
+                    soma_depois = 0
+
+                    for col in colunas:
+                        if col in tabela_dados_riscos.columns:
+                            partes = row[col].split(" / ")
+                            soma_antes += float(partes[0].replace("%", ""))
+                            soma_depois += float(partes[1].replace("%", ""))
+
+                    valores_antes.append(soma_antes)
+                    valores_depois.append(soma_depois)
+
+                # Adicionar ao DataFrame
+                nova_tabela[categoria] = [
+                    f"{antes:.2f}% / {depois:.2f}%" for antes, depois in zip(valores_antes, valores_depois)]
+
+                # Acumulando valores para a coluna Total
+                if not soma_total_antes:
+                    soma_total_antes = valores_antes
+                    soma_total_depois = valores_depois
+                else:
+                    soma_total_antes = [
+                        x + y for x, y in zip(soma_total_antes, valores_antes)]
+                    soma_total_depois = [
+                        x + y for x, y in zip(soma_total_depois, valores_depois)]
+
+            # Criar coluna Total
+            nova_tabela["Total"] = [
+                f"{antes:.2f}% / {depois:.2f}%" for antes, depois in zip(soma_total_antes, soma_total_depois)]
+            nova_tabela.set_index("Fundos", inplace=True)
+            # Exibir tabela reorganizada
+            if op1:
+                st.write("### Risco por Fundo")
+                st.table(nova_tabela)
+                st.markdown(
+                    "<p style='font-size: 13px; font-style: italic;'>(CoVaR bps / % Risco Total)</p>", unsafe_allow_html=True)
+
+            if op2:
+                st.write("### Stress & DIV01 por Fundo")
+                st.table(tabela_dados_fundos)
+                st.markdown(
+                    "<p style='font-size: 13px; font-style: italic;'>(Div01 bps / Stress bps)</p>", unsafe_allow_html=True)
+            return
+        except:
+            st.write("Nenhum fundo selecionado / Nenhum contrato cadastrado")
+            return
+    else:
+        st.write("Nenhum fundo selecionado / Nenhum contrato cadastrado")
+        return
+
+
+
+def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos, op1, op2):
+    df_tira = df_contratos.copy()
+    df_tira.reset_index(inplace=True)
+    # Tirar colunas que contenham o nome 'Max' ou 'Adm'
+    df_tira = df_tira[df_tira.columns.drop(
+        list(df_tira.filter(regex='Max')))]
+    df_tira.rename(columns={'index': 'Fundo'}, inplace=True)
+    lista_remove = []
+    for fundo2 in fundos[:]:
+        # Filtrar a linha do fundo
+        linha = df_tira[df_tira['Fundo'] == fundo2].select_dtypes(include=['number'])
+
+        # Verificar se todas as colunas são zero
+        # `axis=1` verifica todas as colunas na linha
+        if (linha == 0).all(axis=1).values[0]:
+            lista_remove.append(fundo2)
+    for fundo in lista_remove:
+        fundos.remove(fundo)
+    if fundos:
+        # st.write(df_contratos)
+        file_pl = "Dados/pl_fundos.parquet"
+        df_pl = pd.read_parquet(file_pl)
+        file_bbg = "Dados/BBG - ECO DASH.xlsx"
+
+        # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
+        dict_pesos = {
+            'GLOBAL BONDS': 4,
+            'HORIZONTE': 1,
+            'JERA2026': 1,
+            'REAL FIM': 1,
+            'BH FIRF INFRA': 1,
+            'BORDEAUX INFRA': 1,
+            'TOPAZIO INFRA': 1,
+            'MANACA INFRA FIRF': 1,
+            'AF DEB INCENTIVADAS': 3
+        }
+        # Zerar os pesos de fundos que não tem contratos
+        for idx, row in df_contratos.iterrows():
+            if idx == 'Total':
+                continue
+            else:
+                fundo = idx
+                check = 0
+                for asset in assets:
+                    if int(row[f'Contratos {asset}']) != 0:
+                        check = 1
+                if check == 0:
+                    dict_pesos[fundo] = 0
+
+        Weights = list(dict_pesos.values())
+        df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(
+            df_pl, Weights)
+
+        df = pd.read_parquet('Dados/df_inicial.parquet')
+        df_precos, df_completo = load_and_process_excel(df, assets)
+        df_retorno = process_returns(df_completo, assets)
+
+        var_ativos = var_not_parametric(df_retorno).abs()
+  
+        df_precos_ajustados = adjust_prices_with_var(df_precos, var_ativos)
+        quantidade_nomes = {}
+        tabela_dados_fundos = pd.DataFrame()
+        tabela_dados_riscos = pd.DataFrame()
+        # Antes do loop principal, inicialize o dicionário de dados:
+
+        df_portfolio_final = pd.DataFrame()
+        for idx, row in df_contratos.iterrows():
+            if idx in fundos:
+                df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio_especifico(
+                    df_pl, Weights, idx)
+                for i in range(len(assets)):
+                    quantidade_nomes[assets[i]] = row[f'Contratos {assets[i]}']
+                quantidade = np.array(list(quantidade_nomes.values()))
+                vp = df_precos_ajustados['Valor Fechamento'] * abs(quantidade)
+                vp_soma = vp.sum()
+                if vp_soma == 0:
+                    pass
+                else:
+
+                    pesos = quantidade * \
+                        df_precos_ajustados['Valor Fechamento'] / vp_soma
+                    df_returns_portifolio = df_retorno * pesos
+                    df_returns_portifolio['Portifolio'] = df_returns_portifolio.sum(
+                        axis=1)
+
+                    # VaR
+                    var_port = var_not_parametric(
+                        df_returns_portifolio['Portifolio'])
+                    var_port = abs(var_port)
+                    var_port_dinheiro = vp_soma * var_port
+
+                    # ######################################################################################
+                    # ######################################################################################
+                    # #####################################################################################
+                    ######################################################################################
+                    ######## var bps e var limite são fixos, mas podem ser dinâmicos no futuro ########################
+
+                    var_bps = 1.0
+                    var_bps = var_bps / 10000
+
+                    var_limite = 1.0
+
+                    vol_port_retornos = df_returns_portifolio['Portifolio'].std(
+                    )
+                    vol_port_analitica = vol_port_retornos * np.sqrt(252)
+
+                    df_retorno['Portifolio'] = df_returns_portifolio['Portifolio']
+                    cov = df_retorno.cov()
+                    cov_port = cov['Portifolio'].drop('Portifolio')
+                    df_beta = cov_port / (vol_port_retornos**2)
+                    df_mvar = df_beta * var_port
+                    df_mvar_dinheiro = df_mvar * \
+                        df_precos_ajustados['Valor Fechamento']
+
+                    covar = df_mvar * pesos.values * vp_soma
+                    covar_perc = covar / covar.sum()
+
+                    cvar = df_retorno[df_retorno['Portifolio'] < var_not_parametric(
+                        df_retorno['Portifolio'])]['Portifolio'].mean()
+                    cvar = abs(cvar)
+                    cvar_dinheiro = vp_soma * cvar
+
+                    df_divone, dolar, treasury = load_and_process_divone(
+                        'Dados/BBG - ECO DASH.xlsx', df_completo)
+
+                    lista_juros_interno = [
+                        asset for asset in assets if 'DI' in asset]
+                    df_divone_juros_nominais = df_divone[lista_juros_interno]
+
+                    lista_quantidade = [quantidade_nomes[asset]
+                                        for asset in lista_juros_interno]
+                    df_divone_juros_nominais = df_divone_juros_nominais * \
+                        np.array(lista_quantidade)
+                    df_divone_juros_nominais = df_divone_juros_nominais.sum(
+                        axis=1)
+
+                    lista_juros_interno_real = [a for a in assets if ('DAP' in a) or ('NTNB' in a)]
 
                     df_divone_juros_real = df_divone[lista_juros_interno_real]
 
@@ -1594,8 +2552,7 @@ def calcular_metricas_de_fundo_analise(assets, quantidades, df_contratos, fundos
                     np.array(lista_quantidade)
                 df_divone_juros_nominais = df_divone_juros_nominais.sum(axis=1)
 
-                lista_juros_interno_real = [
-                    asset for asset in assets if 'DAP' or 'NTNB' in asset]
+                lista_juros_interno_real = [a for a in assets if ('DAP' in a) or ('NTNB' in a)]
 
                 df_divone_juros_real = df_divone[lista_juros_interno_real]
 
@@ -1746,6 +2703,8 @@ def calcular_metricas_de_fundo_analise(assets, quantidades, df_contratos, fundos
                     df_portfolio_final,
                     pd.DataFrame(dados_fundo, index=[idx])
                 ])
+
+                #st.write(df_portfolio_final)
 
                 # Exiba a tabela formatada no Streamlit:
                 # Supondo que df_dados já está criado com múltiplos índices (ativos)
@@ -2153,8 +3112,7 @@ def calcular_metricas_de_port(assets, quantidades, df_contratos):
         np.array(lista_quantidade)
     df_divone_juros_nominais = df_divone_juros_nominais.sum(axis=1)
 
-    lista_juros_interno_real = [
-        asset for asset in assets if 'DAP' or 'NTNB' in asset]
+    lista_juros_interno_real = [a for a in assets if ('DAP' in a) or ('NTNB' in a)]
 
     df_divone_juros_real = df_divone[lista_juros_interno_real]
 
@@ -3033,8 +3991,6 @@ def atualizar_parquet_fundos(
         status_container.markdown(" | ".join(mensagens))
         add_data_2(df_fundo, table_name)  # permanece a mesma chamada
         print(f"[{fundo}] -> parquet atualizado: {nome_arquivo_parquet}")
-
- #
 
 
 def analisar_performance_fundos(
@@ -3994,6 +4950,7 @@ def load_pl_series(return_fee=True, dias_ano=252):
     pl_by_fund = df.set_index("Fundos/Carteiras Adm")[cols_data]
     pl_by_fund.columns = pd.to_datetime(pl_by_fund.columns)
 
+
     # Série total
     pl_series = pl_by_fund.sum(axis=0).sort_index()
     pl_series.name = "PL_total"
@@ -4436,10 +5393,10 @@ def calcular_metricas_por_pl(
 
     # 6) Recalcula retornos com universo final e reimpõe índices de data
     df_precos_u, df_completo_u = load_and_process_excel(df_base, assets_universe)
-    df_retorno_u = process_returns(df_completo_u, assets_universe)
+    df_retorno_u = process_returns2(df_completo_u, assets_universe)
     df_retorno_u = _ensure_dt_index_df(df_retorno_u)
     df_completo_u = _ensure_dt_index_df(df_completo_u)
-    #st.write(df_retorno_hist)
+
 
     # Ajusta histórico até data_eff
     df_retorno_hist = df_retorno_u.loc[df_retorno_u.index <= data_eff].copy()
@@ -4460,17 +5417,20 @@ def calcular_metricas_por_pl(
         precos_ult = df_precos_ajustados["Valor Fechamento Ajustado pelo Var"].reindex(assets_universe)
     else:
         precos_ult = df_completo_u[assets_universe].ffill().loc[:data_eff].iloc[-1]
-
+    #st.write(precos_ult)
     quantidades = quantidades.reindex(assets_universe).fillna(0.0)
     vp = (precos_ult * quantidades.abs()).fillna(0.0)
     vp_soma = float(vp.sum())
-    #st.write(df_retorno_hist)
     if vp_soma > 0:
         # alinha colunas
         cols = [c for c in assets_universe if c in df_retorno_hist.columns]
+        #st.write(cols)
         vp = vp.reindex(cols).fillna(0.0)
+        #st.write(vp)
         pesos = (vp / float(vp.sum())).values
+        #st.write(f"Pesos: {pesos}")
         df_retorno_hist = df_retorno_hist[cols]
+        #st.write(df_retorno_hist)
 
     else:
         cols = list(df_retorno_hist.columns)
@@ -4480,12 +5440,15 @@ def calcular_metricas_por_pl(
     #st.write(f"Retorno do portfólio ({data_eff.date()}): {port_ret.sum():.4f} ({port_ret.mean():.4f} médio)")
     #st.write(port_ret)
     var, cvar = _var_cvar(port_ret, alpha=alpha)
+    #st.write(f"VaR ({alpha*100:.1f}%): {var:.4f} | CVaR: {cvar:.4f}")
+
 
     pl_ref = _pl_ref(pl_series, data_eff)
-    var_R  = var  * pl_ref
-    cvar_R = cvar * pl_ref
-    var_bps  = var  * 10_000
-    cvar_bps = cvar * 10_000
+    var_R  = var  * vp_soma
+    cvar_R = cvar * vp_soma
+    var_bps = var_R / pl_ref * 10_000
+    #var_bps  = var  * 10_000
+    cvar_bps = cvar_R / pl_ref * 10_000
 
     # 9) Stress DV01 (simplificado)
     try:
@@ -4493,6 +5456,7 @@ def calcular_metricas_por_pl(
         cols_intersec = [a for a in df_retorno_hist.columns if a in df_divone.columns]
         if cols_intersec:
             dv01_row = df_divone[cols_intersec].iloc[0].astype(float).fillna(0.0)
+            #st.write(f"DV01 Row: {dv01_row}")
             # pesos alinhados
             pesos_alinh = pd.Series(pesos, index=cols_intersec)
             dv01_port = float((dv01_row * pesos_alinh).sum())
@@ -4503,7 +5467,17 @@ def calcular_metricas_por_pl(
         stress_R = 0.0
 
     stress_bps = _stress_percent(stress_R, pl_ref)
+    #st.write(f"PL ref. (R$): {pl_ref:.2f}")
+    #st.write(f"VaR (R$): {var_R:.2f} | CVaR (R$): {cvar_R:.2f}")
+    #st.write(f"VaR (bps): {var_bps:.2f} | CVaR (bps): {cvar_bps:.2f}")
     #st.write(f"Stress DV01 (R$): {stress_R:.2f} | Stress DV01 (bps): {stress_bps:.2f}")
+
+    #st.write(f"Stress DV01 (R$): {stress_R:.2f} | Stress DV01 (bps): {stress_bps:.2f}")
+
+
+
+    #st.write("Debug nova função")
+    #calcular_metricas_de_fundo3(default_assets, df_contratos_2, lista_fundos)
 
     return {
         "PL_ref (R$)"       : float(pl_ref),
@@ -4513,7 +5487,9 @@ def calcular_metricas_por_pl(
         "CVaR (R$)"         : float(cvar_R),
         "Stress DV01 (R$)"  : float(stress_R),
         "Stress DV01 (bps)" : float(stress_bps),
-    }
+    }, default_assets
+
+
 
 # ==========================================================
 #   PÁGINA – Simular Cota
@@ -4610,7 +5586,11 @@ def simulate_nav_cota() -> None:
     desp_series = desp_series.reindex(common).fillna(0.0)
 
     #st.write(pl_series)
-    calcular_metricas_por_pl(pl_series)
+    # o retorno de calcular_metricas_por_pl é     return {    "PL_ref (R$)"       : float(pl_ref),    "VaR (bps)"         : float(var_bps),    "CVaR (bps)"        : float(cvar_bps),    "VaR (R$)"          : float(var_R),    "CVaR (R$)"         : float(cvar_R),    "Stress DV01 (R$)"  : float(stress_R),    "Stress DV01 (bps)" : float(stress_bps),}
+    # um dicionário com as métricas de risco
+    # e o PL de referência (PL_ref) para o dia
+    risco, default_assets = calcular_metricas_por_pl(pl_series, data=common[-1], alpha=0.05, tick_val=100.0)
+
 
     if pnl.empty:
         st.warning("Datas de P&L não batem com PL/LFT disponíveis.")
@@ -4828,10 +5808,6 @@ def simulate_nav_cota() -> None:
         with pd.ExcelWriter(buf, engine="xlsxwriter") as writer:
             out_xlsx.reset_index().to_excel(writer, sheet_name="simulacao", index=False)
         buf.seek(0)
-
-
-
-
         # ───────────────────── 1) Retorno mensal ─────────────────────
         # ------------------------------------------------------------
         #  Retorno mensal (tabela + gráfico sem título, rótulos destaque)
@@ -5016,13 +5992,11 @@ def simulate_nav_cota() -> None:
         # ---------------------------------------------------------------
         st.sidebar.markdown("---")
         st.sidebar.markdown("### Horizonte para *attribution*")
-
         opcao = st.sidebar.selectbox(
             "Tipo de recorte",
             ("Dia", "Mês", "Período"),
             index=1           # ← “Mês” como default
         )
-
         # ----------------------------------------------------------------------------
         # lista de todas as datas válidas já filtradas pelo restante do app
         # (common já é DatetimeIndex ordenado)
@@ -5264,9 +6238,32 @@ def simulate_nav_cota() -> None:
 
         # ------------- gráfico Waterfall plot ------------------------
     with aba_div01:
-        st.header("Análise de Risco")
+        st.header("Análise Portfolio Compilado")
+        # Colocar as metricas de risco aqui e fazer igual foi ali em cima
+        #c1, c2, c3, c4, c5, c6 = st.columns(6 c1.metric("Retorno carteira",  f"{ret_acum:,.2%}") c2.metric("Retorno CDI",       f"{ret_cdi_acum:,.2%}") c3.metric("% CDI",     f"{perc_cdi:,.2%}") c4.metric("Vol. anual",        f"{vol_anual:,.2%}") c5.metric("Sharpe",  f"{sharpe_cdi:,.2f}") c6.metric("Máx. Drawdown",     f"{max_dd:,.2%}")
+        # Gráfico de Heatmap de correlação
+        #colocar em metricas todas as variaveis no dicionario risco
+        # {"PL_ref (R$)":8052833.074700001"VaR (bps)":0.029226003028186547"CVaR (bps)":0.04098093439321214"VaR (R$)":23.5352123826663"CVaR (R$)":33.00126239137695"Stress DV01 (R$)":3861.8117618134606"Stress DV01 (bps)":4.795593955556229}
+        d1,d2,d3,d4,d5,d6 = st.columns(6)
+        #d1.metric("PL_ref (R$)", f"{risco['PL_ref (R$)']:,.2f}")
+        d2.metric("VaR (bps)", f"{risco['VaR (bps)']:.2f}")
+        d3.metric("CVaR (bps)", f"{risco['CVaR (bps)']:.2f}")
+        d4.metric("VaR (R$)", f"{risco['VaR (R$)']:,.2f}")
+        d5.metric("CVaR (R$)", f"{risco['CVaR (R$)']:,.2f}")
+        df_contratos_2 = read_atual_contratos()
+        for col in df_contratos_2.columns:
+            df_contratos_2.rename(columns={col: f'Contratos {col}'}, inplace=True)
 
-        # 1) Carrega e processa os dados de risco
+        df_contratos_2 = df_contratos_2.apply(pd.to_numeric, errors='coerce')
+        lista_fundos = df_contratos_2.index.tolist()
+        lista_fundos = [str(x)
+                        for x in df_contratos_2.index.tolist() if str(x) != 'Total']
+        #assets, df_contratos, fundos
+        calcular_metricas_de_fundo2(default_assets, df_contratos_2, lista_fundos)
+        #d6.metric("Stress DV01 (R$)", f"{risco['Stress DV01 (R$)']:,.2f}")
+
+
+
         
     
     
@@ -5469,8 +6466,7 @@ def main_page():
                 np.array(lista_quantidade)
             df_divone_juros_nominais = df_divone_juros_nominais.sum(axis=1)
 
-            lista_juros_interno_real = [
-                asset for asset in assets if 'DAP' or 'NTNB' in asset]
+            lista_juros_interno_real = [a for a in assets if ('DAP' in a) or ('NTNB' in a)]
             df_divone_juros_real = df_divone[lista_juros_interno_real]
             lista_quantidade = [quantidade_nomes[asset]
                                 for asset in lista_juros_interno_real]

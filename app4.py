@@ -7037,6 +7037,8 @@ def main_page():
                     fundo = idx
                     check = 0
                     for asset in default_assets:
+                        st.write(f"Verificando ativo {asset} no fundo {fundo}")
+                        st.write(row)
                         if int(row[asset]) != 0:
                             check = 1
                     if check == 0:

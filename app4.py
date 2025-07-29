@@ -1716,8 +1716,7 @@ def calcular_metricas_de_fundo2(assets, df_contratos, fundos, op1 = True, op2 = 
                             [tabela_dados_fundos, tabela_dados_fundo], axis=0)
 
                     #st.table(tabela_filtrada_com_soma)
-                    st.write("## Dados de cada Fundo")
-                    st.table(df_portfolio_final)
+                    
         # Criar coluna de Total
         # sum_row = pd.DataFrame({
         #    'PL_Sem_Peso (R$)': f"R${soma_pl_sem_pesos:,.0f}",
@@ -1728,6 +1727,8 @@ def calcular_metricas_de_fundo2(assets, df_contratos, fundos, op1 = True, op2 = 
         #    '% Risco Total': f"{abs(covar.sum()/ var_limite_comparativo):.2%}"
         # }, index=['Total'])
         # df_portfolio_final = pd.concat([df_portfolio_final, sum_row])
+        st.write("## Dados de cada Fundo")
+        st.table(df_portfolio_final)
         # Criar coluna de Total
         # Tirar bps e / de cada célula
         # Processar tabela_dados_fundos_p1 (valor antes de '/')
@@ -5336,46 +5337,38 @@ def calcular_metricas_por_pl(
     pl_series: pd.Series,
     data: pd.Timestamp | str | None = None,
     alpha: float = 0.05,
-    tick_val: float = 100.0,
+    tick_val: float = 100.0,   # ignorado (compatibilidade)
     debug: bool = False,
-) -> dict:
+):
     """
-    Calcula métricas (VaR, CVaR, Stress) usando 1% do PL total do dia.
-    - pl_series: Series com índice de datas e valores de PL total agregado (R$).
-    - data: data alvo (se None, usa a última data comum entre pl_series e df_retorno).
-    - alpha: nível para VaR/CVaR histórico.
-    - tick_val: conversor R$/pt em stress DV01 (ajuste conforme o contrato).
+    Métricas do portfólio (VaR, CVaR, CoVaR, DV01 e DV01-stress) normalizadas pelo PL_ref (1% do PL do dia).
+    Retorna (dict, default_assets).
     """
 
-    # 1) Dados do portfólio
+    # ---------------- 1) Base/retornos ----------------
     default_assets, quantidade_inicial, portifolio_default = processar_dados_port()
     df_base = pd.read_parquet('Dados/df_inicial.parquet')
     df_precos, df_completo = load_and_process_excel(df_base, default_assets)
     df_retorno = process_returns2(df_completo, default_assets)
 
-    # 2) Garanta índices de data
+    # ---------------- 2) Datas e interseção segura ----------------
     pl_series   = _ensure_dt_index_series(pl_series)
     df_retorno  = _ensure_dt_index_df(df_retorno)
     df_completo = _ensure_dt_index_df(df_completo)
 
-    # df_retorno tem como indice a coluna "Date" que contem todas as datas cadastradas
-    # (df_precos/df_precos_ajustados não precisam de DatetimeIndex para este erro específico)
-
-    # 3) Data efetiva segura (interseção)
     common_idx = df_retorno.index.intersection(pl_series.index)
     data_eff = _choose_effective_date(data, common_idx)
 
-    # 4) VaR dos ativos e preços ajustados
+    # ---------------- 3) Ajustes e retornos até a data ----------------
     df_retorno_hist = df_retorno.loc[df_retorno.index <= data_eff].copy()
     var_ativos = var_not_parametric(df_retorno_hist).abs()
     df_precos_ajustados = adjust_prices_with_var(df_precos, var_ativos)
 
-    # 5) Quantidades agregadas (todos os fundos)
+    # ---------------- 4) Quantidades agregadas (todos os fundos) ----------------
     df_contratos_2 = read_atual_contratos_cached()
     if 'Fundo' in df_contratos_2.columns:
         df_contratos_2 = df_contratos_2.set_index('Fundo')
 
-    # padroniza colunas "Contratos X"
     asset_cols = [c for c in df_contratos_2.columns if c.startswith("Contratos ")]
     if not asset_cols:
         df_contratos_2 = df_contratos_2.rename(columns={c: f"Contratos {c}" for c in df_contratos_2.columns})
@@ -5388,106 +5381,185 @@ def calcular_metricas_por_pl(
     assets_from_contracts = [c.replace("Contratos ", "") for c in s_quant.index]
     quantidades = pd.Series(s_quant.values, index=assets_from_contracts).astype(float)
 
-    # Universo de ativos = união (para não perder histórico)
+    # Universo final (para não perder histórico)
     assets_universe = sorted(set(default_assets).union(set(quantidades.index)))
-
-    # 6) Recalcula retornos com universo final e reimpõe índices de data
     df_precos_u, df_completo_u = load_and_process_excel(df_base, assets_universe)
     df_retorno_u = process_returns2(df_completo_u, assets_universe)
     df_retorno_u = _ensure_dt_index_df(df_retorno_u)
     df_completo_u = _ensure_dt_index_df(df_completo_u)
 
-
-    # Ajusta histórico até data_eff
+    # Histórico até data_eff
     df_retorno_hist = df_retorno_u.loc[df_retorno_u.index <= data_eff].copy()
     if df_retorno_hist.empty:
         pl_ref = _pl_ref(pl_series, data_eff)
-        return {
-            "PL_ref (R$)"       : pl_ref,
-            "VaR (bps)"         : 0.0,
-            "CVaR (bps)"        : 0.0,
-            "VaR (R$)"          : 0.0,
-            "CVaR (R$)"         : 0.0,
-            "Stress DV01 (R$)"  : 0.0,
-            "Stress DV01 (bps)" : 0.0,
-        }
+        return ({
+            "PL_ref (R$)"               : float(pl_ref),
+            "VaR (bps)"                 : 0.0,
+            "CVaR (bps)"                : 0.0,
+            "VaR (R$)"                  : 0.0,
+            "CVaR (R$)"                 : 0.0,
+            "DV01 Port (R$/bp)"         : 0.0,
+            "DV01 Port (bps do PL_ref)" : 0.0,
+            "DV01 Stress (R$)"          : 0.0,
+            "DV01 Stress (bps)"         : 0.0,
+            "VaR (% de 1bp)"            : 0.0,
+            "CVaR (% de 1bp)"           : 0.0,
+            "CoVaR total (R$)"          : 0.0,
+            "CoVaR total (bps)"         : 0.0,
+            "CoVaR por ativo (R$)"      : {},
+            "CoVaR por ativo (bps)"     : {},
+            "CoVaR por ativo (% de 1bp)": {},
+        }, default_assets)
 
-    # 7) Pesos (quantidade × preço)
+    # ---------------- 5) Pesos por MV e MV_total ----------------
     if "Valor Fechamento Ajustado pelo Var" in df_precos_ajustados.columns:
         precos_ult = df_precos_ajustados["Valor Fechamento Ajustado pelo Var"].reindex(assets_universe)
     else:
         precos_ult = df_completo_u[assets_universe].ffill().loc[:data_eff].iloc[-1]
-    #st.write(precos_ult)
-    quantidades = quantidades.reindex(assets_universe).fillna(0.0)
-    vp = (precos_ult * quantidades.abs()).fillna(0.0)
-    vp_soma = float(vp.sum())
-    if vp_soma > 0:
-        # alinha colunas
-        cols = [c for c in assets_universe if c in df_retorno_hist.columns]
-        #st.write(cols)
-        vp = vp.reindex(cols).fillna(0.0)
-        #st.write(vp)
-        pesos = (vp / float(vp.sum())).values
-        #st.write(f"Pesos: {pesos}")
-        df_retorno_hist = df_retorno_hist[cols]
-        #st.write(df_retorno_hist)
 
+    quantidades = quantidades.reindex(assets_universe).fillna(0.0)
+    mv = (precos_ult * quantidades.abs()).fillna(0.0)     # MV por ativo (R$)
+    mv_total = float(mv.sum())
+
+    if mv_total > 0:
+        cols = [c for c in assets_universe if c in df_retorno_hist.columns]
+        mv = mv.reindex(cols).fillna(0.0)
+        pesos = (mv / float(mv.sum())).values              # pesos de MV
+        df_retorno_hist = df_retorno_hist[cols]
     else:
         cols = list(df_retorno_hist.columns)
         pesos = np.ones(len(cols)) / len(cols) if cols else np.array([])
-    # 8) Retorno do portfólio e métricas
+
+    # ---------------- 6) VaR / CVaR ----------------
     port_ret = (df_retorno_hist * pesos).sum(axis=1) if len(pesos) else pd.Series(dtype=float)
-    #st.write(f"Retorno do portfólio ({data_eff.date()}): {port_ret.sum():.4f} ({port_ret.mean():.4f} médio)")
-    #st.write(port_ret)
-    var, cvar = _var_cvar(port_ret, alpha=alpha)
-    #st.write(f"VaR ({alpha*100:.1f}%): {var:.4f} | CVaR: {cvar:.4f}")
+    var_ret, cvar_ret = _var_cvar(port_ret, alpha=alpha)   # (em retorno)
+    var_R  = float(var_ret  * mv_total)
+    cvar_R = float(cvar_ret * mv_total)
 
+    # Normalizações por PL_ref
+    pl_ref  = float(_pl_ref(pl_series, data_eff))   # 1% do PL total (R$)
+    one_bp_R = pl_ref * 1e-4
 
-    pl_ref = _pl_ref(pl_series, data_eff)
-    var_R  = var  * vp_soma
-    cvar_R = cvar * vp_soma
-    var_bps = var_R / pl_ref * 10_000
-    #var_bps  = var  * 10_000
-    cvar_bps = cvar_R / pl_ref * 10_000
+    var_bps  = float((var_R  / pl_ref) * 1e4) if pl_ref else 0.0
+    cvar_bps = float((cvar_R / pl_ref) * 1e4) if pl_ref else 0.0
+    var_pct_of_1bp  = float((var_R  / one_bp_R) * 100.0) if one_bp_R else 0.0
+    cvar_pct_of_1bp = float((cvar_R / one_bp_R) * 100.0) if one_bp_R else 0.0
 
-    # 9) Stress DV01 (simplificado)
-    try:
-        df_divone, _, _ = load_and_process_divone('Dados/BBG - ECO DASH.xlsx', df_completo_u)
-        cols_intersec = [a for a in df_retorno_hist.columns if a in df_divone.columns]
-        if cols_intersec:
-            dv01_row = df_divone[cols_intersec].iloc[0].astype(float).fillna(0.0)
-            #st.write(f"DV01 Row: {dv01_row}")
-            # pesos alinhados
-            pesos_alinh = pd.Series(pesos, index=cols_intersec)
-            dv01_port = float((dv01_row * pesos_alinh).sum())
-            stress_R = abs(dv01_port) * float(tick_val)
-        else:
-            stress_R = 0.0
-    except Exception:
-        stress_R = 0.0
+    # ---------------- 7) DV01 do portfólio (df_divone) ----------------
+    file_bbg = "Dados/BBG - ECO DASH.xlsx"
+    df_divone, _, _ = load_and_process_divone(file_bbg, df_completo_u)
+    candidates = ["FUT_TICK_VAL", "DV01", "BPV", "PVBP"]
+    dv01_label = next((lab for lab in candidates if lab in df_divone.index), None)
+    if dv01_label is None:
+        dv01_per_contract = df_divone.loc[df_divone.index[0]].astype(float)
+    else:
+        dv01_per_contract = df_divone.loc[dv01_label].astype(float)
 
-    stress_bps = _stress_percent(stress_R, pl_ref)
-    #st.write(f"PL ref. (R$): {pl_ref:.2f}")
-    #st.write(f"VaR (R$): {var_R:.2f} | CVaR (R$): {cvar_R:.2f}")
-    #st.write(f"VaR (bps): {var_bps:.2f} | CVaR (bps): {cvar_bps:.2f}")
-    #st.write(f"Stress DV01 (R$): {stress_R:.2f} | Stress DV01 (bps): {stress_bps:.2f}")
+    intersec = [a for a in cols if a in dv01_per_contract.index]
+    q_signed = quantidades.reindex(intersec).fillna(0.0)
+    dv01_pc  = dv01_per_contract.reindex(intersec).fillna(0.0)
+    dv01_asset_R = (dv01_pc * q_signed).astype(float)   # R$/bp por ativo (já agregado por quantidade)
+    dv01_port_R  = float(dv01_asset_R.sum())            # DV01 do portfólio (R$/bp)
+    dv01_port_bps_of_PLref = float((dv01_port_R / pl_ref) * 1e4) if pl_ref else 0.0
 
-    #st.write(f"Stress DV01 (R$): {stress_R:.2f} | Stress DV01 (bps): {stress_bps:.2f}")
+    # ---------------- 8) DV01 "stress" por drawdown ----------------
+    dd_min = df_retorno_hist[intersec].min(axis=0).astype(float)
+    mv_intersec = mv.reindex(intersec).fillna(0.0).astype(float)
+    dv01_stress_R   = float((dd_min.abs() * mv_intersec).sum())
+    dv01_stress_bps = float((dv01_stress_R / pl_ref) * 1e4) if pl_ref else 0.0
 
+    # ---------------- 9) CoVaR (procedimentos do seu trecho) ----------------
+    # VaR do portfólio em retorno:
+    var_port = abs(var_ret)
 
+    # Volatilidade do portfólio (retorno)
+    vol_port_retornos = float(port_ret.std())
 
-    #st.write("Debug nova função")
-    #calcular_metricas_de_fundo3(default_assets, df_contratos_2, lista_fundos)
+    # Preço base para mVaR_em_dinheiro (como no seu código): usa "Valor Fechamento" se existir
+    if "Valor Fechamento" in df_precos_ajustados.columns:
+        precos_base = df_precos_ajustados["Valor Fechamento"].reindex(cols).fillna(0.0)
+    else:
+        precos_base = precos_ult.reindex(cols).fillna(0.0)
 
-    return {
-        "PL_ref (R$)"       : float(pl_ref),
-        "VaR (bps)"         : float(var_bps),
-        "CVaR (bps)"        : float(cvar_bps),
-        "VaR (R$)"          : float(var_R),
-        "CVaR (R$)"         : float(cvar_R),
-        "Stress DV01 (R$)"  : float(stress_R),
-        "Stress DV01 (bps)" : float(stress_bps),
-    }, default_assets
+    # Monta DF temporário com a coluna 'Portifolio' para a covariância
+    df_tmp = df_retorno_hist.copy()
+    df_tmp["Portifolio"] = port_ret
+
+    cov = df_tmp.cov()
+    if "Portifolio" in cov.columns:
+        cov_port = cov["Portifolio"].drop(labels=["Portifolio"], errors="ignore")
+    else:
+        cov_port = pd.Series(0.0, index=cols)
+
+    denom = (vol_port_retornos ** 2) if vol_port_retornos != 0 else np.nan
+    df_beta = cov_port / denom
+
+    # mVaR no espaço de retorno
+    df_mvar = df_beta * var_port
+
+    # mVaR em R$ (seguindo seu código original: multiplicando por preço base)
+    df_mvar_dinheiro = (df_mvar * precos_base.reindex(df_mvar.index).fillna(0.0)).astype(float)
+
+    # CoVaR por ativo (R$): mVaR_i * peso_i * MV_total
+    pesos_series = pd.Series(pesos, index=cols)
+    covar_R = (df_mvar.reindex(cols).fillna(0.0) * pesos_series * mv_total).astype(float)
+
+    # Distribuição percentual dentro do total de CoVaR (como no seu código)
+    covar_total_R = float(covar_R.sum())
+    covar_perc = (covar_R / covar_total_R) if covar_total_R != 0 else covar_R.copy()
+
+    # CoVaR em bps do PL_ref e % de 1 bp
+    covar_bps       = ((covar_R / pl_ref) * 1e4).replace([np.inf, -np.inf], 0.0).fillna(0.0) if pl_ref else covar_R*0.0
+    covar_pct_1bp   = ((covar_R / one_bp_R) * 100.0).replace([np.inf, -np.inf], 0.0).fillna(0.0) if one_bp_R else covar_R*0.0
+    covar_total_bps = float((covar_total_R / pl_ref) * 1e4) if pl_ref else 0.0
+
+    # ---------------- 10) Saída ----------------
+    out = {
+        # Bases
+        "PL_ref (R$)"               : pl_ref,
+        "MV_total (R$)"             : mv_total,
+
+        # VaR/CVaR
+        "VaR (R$)"                  : var_R,
+        "CVaR (R$)"                 : cvar_R,
+        "VaR (bps)"                 : var_bps,
+        "CVaR (bps)"                : cvar_bps,
+        "VaR (% de 1bp)"            : var_pct_of_1bp,
+        "CVaR (% de 1bp)"           : cvar_pct_of_1bp,
+
+        # DV01
+        "DV01 Port (R$/bp)"         : dv01_port_R,
+        "DV01 Port (bps do PL_ref)" : dv01_port_bps_of_PLref,
+        "DV01 Stress (R$)"          : dv01_stress_R,
+        "DV01 Stress (bps)"         : dv01_stress_bps,
+
+        # CoVaR (novo)
+        "CoVaR total (R$)"          : covar_total_R,
+        "CoVaR total (bps)"         : covar_total_bps,
+        "CoVaR por ativo (R$)"      : covar_R.to_dict(),
+        "CoVaR por ativo (bps)"     : covar_bps.to_dict(),
+        "CoVaR por ativo (% de 1bp)": covar_pct_1bp.to_dict(),
+
+        # Diagnósticos úteis
+        "Beta por ativo"            : df_beta.replace([np.inf, -np.inf], np.nan).fillna(0.0).to_dict(),
+        "mVaR por ativo (ret)"      : df_mvar.replace([np.inf, -np.inf], np.nan).fillna(0.0).to_dict(),
+        "mVaR por ativo (R$)"       : df_mvar_dinheiro.to_dict(),
+        "Peso MV por ativo"         : pesos_series.to_dict(),
+    }
+
+    if debug:
+        st.write("Ativos usados:", cols)
+        st.write("Vol port (ret):", vol_port_retornos)
+        st.write("Beta:", df_beta)
+        st.write("mVaR (ret):", df_mvar)
+        st.write("mVaR (R$):", df_mvar_dinheiro)
+        st.write("CoVaR (R$):", covar_R)
+        st.write("CoVaR (% dentro do total):", covar_perc)
+        st.write("CoVaR (bps do PL_ref):", covar_bps)
+        st.write("CoVaR (% de 1bp):", covar_pct_1bp)
+
+    return out, default_assets
+
 
 
 
@@ -6239,17 +6311,285 @@ def simulate_nav_cota() -> None:
         # ------------- gráfico Waterfall plot ------------------------
     with aba_div01:
         st.header("Análise Portfolio Compilado")
-        # Colocar as metricas de risco aqui e fazer igual foi ali em cima
-        #c1, c2, c3, c4, c5, c6 = st.columns(6 c1.metric("Retorno carteira",  f"{ret_acum:,.2%}") c2.metric("Retorno CDI",       f"{ret_cdi_acum:,.2%}") c3.metric("% CDI",     f"{perc_cdi:,.2%}") c4.metric("Vol. anual",        f"{vol_anual:,.2%}") c5.metric("Sharpe",  f"{sharpe_cdi:,.2f}") c6.metric("Máx. Drawdown",     f"{max_dd:,.2%}")
-        # Gráfico de Heatmap de correlação
-        #colocar em metricas todas as variaveis no dicionario risco
-        # {"PL_ref (R$)":8052833.074700001"VaR (bps)":0.029226003028186547"CVaR (bps)":0.04098093439321214"VaR (R$)":23.5352123826663"CVaR (R$)":33.00126239137695"Stress DV01 (R$)":3861.8117618134606"Stress DV01 (bps)":4.795593955556229}
-        d1,d2,d3,d4,d5,d6 = st.columns(6)
-        #d1.metric("PL_ref (R$)", f"{risco['PL_ref (R$)']:,.2f}")
-        d2.metric("VaR (bps)", f"{risco['VaR (bps)']:.2f}")
-        d3.metric("CVaR (bps)", f"{risco['CVaR (bps)']:.2f}")
-        d4.metric("VaR (R$)", f"{risco['VaR (R$)']:,.2f}")
-        d5.metric("CVaR (R$)", f"{risco['CVaR (R$)']:,.2f}")
+
+        # ---- helpers ----
+        def fmt_rs(x):
+            try: return f"R${float(x):,.0f}"
+            except: return "R$0"
+        def fmt_bps_raw(x):
+            try: return f"{float(x):,.2f}"
+            except: return "0,00"
+        def fmt_pct(x):
+            try: return f"{float(x):,.2f}%"
+            except: return "0,00%"
+
+        # ---- extrai do dicionário 'risco' ----
+        var_rs          = float(risco.get("VaR (R$)", 0.0))
+        cvar_rs         = float(risco.get("CVaR (R$)", 0.0))
+        var_bps         = float(risco.get("VaR (bps)", 0.0))
+        cvar_bps        = float(risco.get("CVaR (bps)", 0.0))
+
+        dv01_port_rs    = float(risco.get("DV01 Port (R$/bp)", 0.0))
+        dv01_port_bps   = float(risco.get("DV01 Port (bps do PL_ref)", 0.0))  # se vier 0, mostramos só R$
+        dv01_stress_rs  = float(risco.get("DV01 Stress (R$)", 0.0))
+        dv01_stress_bps = float(risco.get("DV01 Stress (bps)", 0.0))
+
+        covar_tot_rs    = float(risco.get("CoVaR total (R$)", 0.0))
+        covar_tot_bps   = float(risco.get("CoVaR total (bps)", 0.0))
+        covar_bps_dict  = risco.get("CoVaR por ativo (bps)", {}) or {}
+        covar_rs_dict   = risco.get("CoVaR por ativo (R$)",  {}) or {}
+
+        # ---- strings combinadas (R$ / bps) ----
+        var_display        = f"{fmt_rs(var_rs)} / {fmt_bps_raw(var_bps)}bps"
+        cvar_display       = f"{fmt_rs(cvar_rs)} / {fmt_bps_raw(cvar_bps)}bps"
+        dv01_port_display  = f"{fmt_rs(dv01_port_rs)} / {fmt_bps_raw(dv01_port_bps)}bps" if dv01_port_bps else fmt_rs(dv01_port_rs)
+        dv01_strss_display = f"{fmt_rs(dv01_stress_rs)} / {fmt_bps_raw(dv01_stress_bps)}bps" if dv01_stress_bps else fmt_rs(dv01_stress_rs)
+        covar_tot_display  = f"{fmt_rs(covar_tot_rs)} / {fmt_bps_raw(covar_tot_bps)}bps"
+
+        # ---- orçamento de risco (1/2/3 bps) ----
+        orcamento_bps = st.radio(
+            "Orçamento de risco (bps)",
+            options=[1, 2, 3],
+            index=0,
+            horizontal=True
+        )
+
+        def pct_consumo(bps):  # % do orçamento escolhido
+            try:
+                return max(0.0, (abs(float(bps)) / float(orcamento_bps)) * 100.0)
+            except:
+                return 0.0
+
+        # ==========================
+        # Cards principais (sem delta/setinhas)
+        # ==========================
+        st.subheader("Resumo de risco")
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("VaR (R$ / bps)",  var_display)
+        c2.metric("CVaR (R$ / bps)", cvar_display)
+        c3.metric("DV01 Port (R$/bp / bps)", dv01_port_display)
+        c4.metric("DV01 Stress (R$ / bps)",  dv01_strss_display)
+
+        c5, c6 = st.columns(2)
+        c5.metric("CoVaR Total (R$ / bps)",  covar_tot_display)
+        c6.metric("Orçamento selecionado", f"{orcamento_bps} bps")
+
+        # ==========================
+        # Donuts de consumo do orçamento (VaR e CVaR)
+        # ==========================
+        st.subheader("Consumo do orçamento (VaR e CVaR)")
+        import pandas as pd
+
+        def donut_chart(label, pct):
+            # clamp para o gráfico, mas mostramos o número real ao lado
+            pct_clamped = max(0.0, min(100.0, pct))
+            df_donut = pd.DataFrame({
+                "categoria": ["Consumido", "Livre"],
+                "valor": [pct_clamped, 100.0 - pct_clamped]
+            })
+            try:
+                import altair as alt
+                base = alt.Chart(df_donut).encode(
+                    theta="valor:Q",
+                    color=alt.Color("categoria:N",
+                                    scale=alt.Scale(domain=["Consumido","Livre"],
+                                                    range=["#4F46E5","#E5E7EB"]),
+                                    legend=None)
+                )
+                donut = base.mark_arc(outerRadius=80, innerRadius=55)
+                texto = alt.Chart(pd.DataFrame({"txt":[f"{pct:.2f}%"]})).mark_text(fontSize=18, fontWeight="bold").encode(text="txt:N")
+                st.altair_chart(donut | texto, use_container_width=False)
+            except Exception:
+                # fallback
+                st.progress(pct_clamped/100.0)
+
+        colA, colB = st.columns(2)
+        with colA:
+            st.caption(f"VaR — {fmt_pct(pct_consumo(var_bps))} do orçamento")
+            donut_chart("VaR", pct_consumo(var_bps))
+        with colB:
+            st.caption(f"CVaR — {fmt_pct(pct_consumo(cvar_bps))} do orçamento")
+            donut_chart("CVaR", pct_consumo(cvar_bps))
+
+        # ==========================
+        # CoVaR por ativo (tabela, sem gráfico)
+        # ==========================
+        st.subheader("CoVaR por ativo")
+
+        if len(covar_bps_dict) > 0:
+            import pandas as pd
+            import altair as alt
+
+            # ----- helpers locais (fallback) -----
+            if 'fmt_rs' not in globals():
+                fmt_rs = lambda x: f"R${float(x):,.0f}"
+            if 'fmt_bps_raw' not in globals():
+                fmt_bps_raw = lambda x: f"{float(x):,.2f}"
+            if 'pct_consumo' not in globals():
+                # se não houver sua função, considera orçamento em 1 bp (ajuste se quiser)
+                pct_consumo = lambda bps: max(0.0, float(bps)) * 100.0
+
+            def _short(s, n=24):
+                s = str(s)
+                return s if len(s) <= n else s[:n-1] + "…"
+
+            # ---------- base ----------
+            df_cov = pd.DataFrame({
+                "Ativo": list(covar_bps_dict.keys()),
+                "CoVaR_bps": [float(v) for v in covar_bps_dict.values()],
+            })
+            if covar_rs_dict:
+                df_cov["CoVaR_R$"] = df_cov["Ativo"].map({k: float(v) for k, v in covar_rs_dict.items()}).fillna(0.0)
+            else:
+                df_cov["CoVaR_R$"] = 0.0
+
+            # remove zeros puros
+            df_cov = df_cov[df_cov["CoVaR_bps"] != 0.0].copy()
+            if df_cov.empty:
+                st.info("Todos os CoVaR estão zerados.")
+            else:
+                df_cov["abs_bps"] = df_cov["CoVaR_bps"].abs()
+                df_cov["% do orçamento"] = df_cov["CoVaR_bps"].apply(lambda x: pct_consumo(x))
+                df_cov["label_rs_bps"] = df_cov.apply(
+                    lambda r: f"{fmt_rs(r['CoVaR_R$'])} / {fmt_bps_raw(r['CoVaR_bps'])}bps", axis=1
+                )
+                df_cov["Ativo_short"] = df_cov["Ativo"].map(_short)
+
+                # layout em 2 colunas
+                col1, col2 = st.columns(2)
+
+                # ===================================================
+                # (coluna 1) Barras horizontais — CoVaR em bps (com sinal)
+                # ===================================================
+                with col1:
+                    df_a = df_cov.sort_values("abs_bps", ascending=True).copy()
+
+                    bar_h = 28
+                    chart_h = int(max(200, min(800, bar_h * max(1, len(df_a)))))
+                    chart_h = 380
+
+                    base_a = alt.Chart(df_a).properties(height=chart_h)
+
+                    bars = base_a.mark_bar(cornerRadiusEnd=4).encode(
+                        y=alt.Y("Ativo_short:N", sort=None, title=None,
+                                axis=alt.Axis(labelLimit=1000)),
+                        x=alt.X("CoVaR_bps:Q",
+                                title="CoVaR (bps, com sinal)",
+                                axis=alt.Axis(format=",.2f")),
+                        color=alt.condition(
+                            "datum.CoVaR_bps >= 0",
+                            alt.value("#2563EB"),   # azul = consome risco
+                            alt.value("#EF4444")    # vermelho = alivia risco
+                        ),
+                        tooltip=[
+                            alt.Tooltip("Ativo:N", title="Ativo"),
+                            alt.Tooltip("CoVaR_bps:Q", title="CoVaR (bps)", format=",.2f"),
+                            alt.Tooltip("CoVaR_R$:Q",  title="CoVaR (R$)",  format=",.0f"),
+                            alt.Tooltip("% do orçamento:Q", title="% do orçamento", format=",.2f")
+                        ]
+                    )
+
+                    zero_rule = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color="#9CA3AF").encode(x="x:Q")
+
+                    labels_pos = base_a.transform_filter("datum.CoVaR_bps >= 0").mark_text(
+                        align="left", dx=6, dy=0, fontSize=12
+                    ).encode(
+                        y=alt.Y("Ativo_short:N", sort=None, title=None),
+                        x=alt.X("CoVaR_bps:Q"),
+                        text="label_rs_bps:N",
+                        color=alt.value("#111827")
+                    )
+                    labels_neg = base_a.transform_filter("datum.CoVaR_bps < 0").mark_text(
+                        align="right", dx=-6, dy=0, fontSize=12
+                    ).encode(
+                        y=alt.Y("Ativo_short:N", sort=None, title=None),
+                        x=alt.X("CoVaR_bps:Q"),
+                        text="label_rs_bps:N",
+                        color=alt.value("#111827")
+                    )
+
+                    chart_cov = (bars + zero_rule + labels_pos + labels_neg) \
+                        .configure_axis(labelFontSize=12, titleFontSize=12) \
+                        .configure_view(strokeWidth=0)
+
+                    st.altair_chart(chart_cov, use_container_width=True)
+                    st.caption("Azul = contribui para risco; vermelho = alivia. Passe o mouse para ver nome completo, bps, R$ e % do orçamento.")
+
+                # ===================================================
+                # (coluna 2) Barras verticais — distribuição do orçamento normalizado (100%)
+                #   - somente contribuições POSITIVAS; se não houver, usa |CoVaR|
+                #   - labels de % em cada barra
+                #   - rotação de rótulos e zoom/pan para garantir visibilidade
+                # ===================================================
+                with col2:
+                    import pandas as pd
+                    import plotly.express as px
+
+                    # --- preparar dados (idêntico à sua lógica, mas com dtype garantido) ---
+                    df_b = df_cov.copy()
+                    # consumo positivo; se não houver, usa |CoVaR|
+                    df_b["consumo"] = pd.to_numeric(df_b["CoVaR_bps"], errors="coerce").clip(lower=0.0)
+                    usar_abs = False
+                    soma_pos = float(df_b["consumo"].sum())
+
+                    if soma_pos <= 0:
+                        df_b["consumo"] = pd.to_numeric(df_b["abs_bps"], errors="coerce")
+                        usar_abs = True
+                        soma_pos = float(df_b["consumo"].sum())
+
+                    df_b = df_b[df_b["consumo"] > 0].copy()
+                    if df_b.empty:
+                        st.info("Sem consumo positivo (ou absoluto) para distribuir orçamento.")
+                    else:
+                        # share em 0..1 garantido como float
+                        df_b["share"] = (df_b["consumo"] / soma_pos).astype(float)
+                        df_b["Ativo_short"] = df_b["Ativo"].map(_short)
+                        df_b = df_b.sort_values("share", ascending=False).reset_index(drop=True)
+
+                        # --- gráfico: barras verticais com labels (Plotly) ---
+                        fig = px.bar(
+                            df_b,
+                            x="Ativo", y="share",
+                            labels={"share": "% do orçamento (normalizado a 100%)", "Ativo": ""},
+                        )
+
+                        # labels e estilo
+                        fig.update_traces(
+                            text=df_b["share"].map(lambda v: f"{v:.2%}"),
+                            textposition="outside",
+                            marker_color="#2563EB"
+                        )
+                        # nomes completos nos dados; abreviados nos ticks (para caber tudo)
+                        fig.update_xaxes(
+                            ticktext=df_b["Ativo_short"],
+                            tickvals=df_b["Ativo"],
+                            tickangle=-35
+                        )
+                        # eixo y em 0..100% e formato percentual
+                        fig.update_yaxes(range=[0, 1], tickformat=".0%")
+
+                        # largura ajustável e layout limpo
+                        step = 28  # px por categoria
+                        width = int(min(1400, max(420, step * len(df_b))))
+                        fig.update_layout(
+                            height=380,
+                            width=width,
+                            margin=dict(l=10, r=10, t=10, b=30),
+                            bargap=0.25,
+                            uniformtext_minsize=10,
+                            uniformtext_mode="hide",
+                        )
+
+                        st.plotly_chart(fig, use_container_width=True)
+                        st.caption(
+                            "Distribuição do orçamento (100%) entre os ativos "
+                            + ("normalizada por |CoVaR| (não havia contribuição positiva)."
+                            if usar_abs else "considerando apenas contribuições positivas.")
+                        )
+        else:
+            st.info("CoVaR por ativo indisponível para este portfólio.")
+
         df_contratos_2 = read_atual_contratos()
         for col in df_contratos_2.columns:
             df_contratos_2.rename(columns={col: f'Contratos {col}'}, inplace=True)
@@ -6278,6 +6618,7 @@ def main_page():
     file_pl = "Dados/pl_fundos.parquet"
     df_pl = pd.read_parquet(file_pl)
     file_bbg = "Dados/BBG - ECO DASH.xlsx"
+    
 
     # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
     dict_pesos = {
@@ -6453,7 +6794,7 @@ def main_page():
 
             cvar = df_retorno[df_retorno['Portifolio'] < var_not_parametric(
                 df_returns_portifolio['Portifolio'])]['Portifolio'].mean()
-
+            
             df_divone, dolar, treasury = load_and_process_divone(file_bbg, df)
             # --- Exemplo de cálculo de stress e DIVONE (mesmo que seu original) ---
             lista_juros_interno = [

@@ -7041,7 +7041,7 @@ def main_page():
                             if int(row[asset]) != 0:
                                 check = 1
                         except KeyError:
-                            continue
+                            st.error(f"Erro: Ativo {asset} não encontrado no DataFrame de contratos.")
                     if check == 0:
                         dict_pesos[fundo] = 0                        
 

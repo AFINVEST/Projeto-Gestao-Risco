@@ -7037,14 +7037,17 @@ def main_page():
                     fundo = idx
                     check = 0
                     for asset in default_assets:
-                        st.write(f"Verificando ativo {asset} no fundo {fundo}")
-                        st.write(row)
-                        if int(row[asset]) != 0:
-                            check = 1
+                        try:
+                            if int(row[asset]) != 0:
+                                check = 1
+                        except KeyError:
+                            continue
                     if check == 0:
-                        dict_pesos[fundo] = 0
+                        dict_pesos[fundo] = 0                        
 
             Weights = list(dict_pesos.values())
+            st.write("## Pesos dos Fundos")
+            st.write(dict_pesos)
             df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(
                 df_pl, Weights)
             for asset in default_assets:

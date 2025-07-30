@@ -60,6 +60,7 @@ df.columns = [
     'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY', 'IBOV',
     'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40', 'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'
 ]
+
 df.to_parquet('Dados/df_inicial.parquet')
 
 df_divone = pd.read_excel(file_bbg, sheet_name='DIV01',
@@ -79,10 +80,12 @@ df_divone.to_parquet('Dados/df_divone.parquet')
 df_ntnb = pd.read_excel('Dados/FechamentoNTNBs.xlsx')
 df_ntnb.columns = df_ntnb.iloc[0]
 df_ntnb = df_ntnb.drop(df_ntnb.index[0])
+
 # Dropar a primeira linha
 df_ntnb = df_ntnb.drop(df_ntnb.index[0])
 df_ntnb.dropna(inplace=True)
 df_ntnb.rename(columns={'Nome': 'Assets'}, inplace=True)
+
 # Tirar o horario das datas da coluna Assets
 df_ntnb['Assets'] = pd.to_datetime(df_ntnb['Assets']).dt.date
 df_ntnb['Assets'] = df_ntnb['Assets'].astype(str)
@@ -91,6 +94,7 @@ df_ntnb.columns = df_ntnb.iloc[0]
 df_ntnb = df_ntnb.drop(df_ntnb.index[0])
 df_ntnb.reset_index(inplace=True)
 df_ntnb.rename(columns={0: 'Assets'}, inplace=True)
+
 # Mudar todos os "." por ","
 colunas = df_ntnb.columns
 for col in colunas:

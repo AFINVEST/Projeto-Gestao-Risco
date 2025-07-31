@@ -72,6 +72,7 @@ columns = [
     'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY', 'IBOV', 'S&P',
     'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40', 'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'
 ]
+
 df_divone.columns = columns
 df_divone = df_divone.drop(df_divone.index[0])
 
@@ -105,9 +106,7 @@ df_b3 = pd.read_parquet('Dados/df_preco_de_ajuste_atual.parquet')
 
 # Fazer o merge dos dataframes
 df_precos = pd.concat([df_b3, df_ntnb], axis=0)
-
 df_precos.to_parquet('Dados/df_preco_de_ajuste_atual_completo.parquet')
-
 dados = pd.read_excel(r'Z:\Asset Management\FUNDOS e CLUBES\Gerencial\dashboard LFT.xlsx', sheet_name='Historico preços')
 #Renomear a coluna 'Unnamed: 0' para 'Data'
 dados.rename(columns={'Unnamed: 0': 'Data'}, inplace=True)

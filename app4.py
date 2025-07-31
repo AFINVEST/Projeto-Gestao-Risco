@@ -101,6 +101,81 @@ def load_and_process_divone(file_bbg, df_excel):
 
     df_divone['TREASURY'] = pd.to_numeric(
         df_divone['TREASURY'], errors='coerce')
+    
+    df_pe['WDO1'] = pd.to_numeric(df_pe['WDO1'], errors='coerce')
+
+    df_divone['TREASURY'] = df_divone['TREASURY'] * \
+        df_pe['WDO1'].iloc[0] / 10000
+    dolar = df_pe['WDO1'].iloc[0]
+    treasury = df_pe['TREASURY'].iloc[0]
+
+    return df_divone, dolar, treasury
+
+
+def load_and_process_divone2(file_bbg, df_excel):
+    # --- 1) Carrega o df_divone existente ---
+    path_parquet = 'Dados/df_divone.parquet'
+    df_divone = pd.read_parquet(path_parquet)
+
+    # --- 2) Seu pré-processamento (como você já fez) ---
+    # DI
+    di = pd.read_excel('Dados/AF_Trading.xlsm', sheet_name='Base CDI', skiprows=1, usecols='G:M')
+    di = di.iloc[:14, :].iloc[4:, :]         # mantém 14 linhas, depois dropa as 4 primeiras
+    di = di.drop(di.index[1])                # dropa a segunda linha
+    di['Nome'] = ['DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30', 'DI_32', 'DI_33', 'DI_35', 'DI_37']
+    di = di[['Nome', 'DV01']]
+
+    # DAP
+    dap = pd.read_excel('Dados/AF_Trading.xlsm', sheet_name='Base IPCA', skiprows=16, usecols='A:M')
+    dap = dap.iloc[:9, :]
+    dap['Nome'] = ['DAP26', 'DAP27', 'DAP28', 'DAP29', 'DAP30', 'DAP32', 'DAP33', 'DAP35', 'DAP40']
+    dap = dap[dap['Nome'] != 'DAP33']
+    dap = dap[['Nome', 'DV01']]
+
+    # --- 3) Monta a série de atualização (DI + DAP) ---
+    s_di  = di.set_index('Nome')['DV01'].astype(float)
+    s_dap = dap.set_index('Nome')['DV01'].astype(float)
+    s_upd = pd.concat([s_di, s_dap])  # índice = nomes dos ativos, valores = DV01
+
+    # Filtra apenas os ativos que existem no df_divone
+    cols_existentes = [c for c in df_divone.columns if c in s_upd.index]
+
+    # --- 4) Descobre qual linha é a de DV01 no df_divone ---
+    linha_alvo = None
+    for cand in ['FUT_TICK_VAL', 'DV01', 'BPV', 'PVBP']:
+        if cand in df_divone.index:
+            linha_alvo = cand
+            break
+
+    # Se não achou, mas o df tem 1 linha, usa a única linha
+    if linha_alvo is None and df_divone.shape[0] == 1:
+        linha_alvo = df_divone.index[0]
+
+    if linha_alvo is None:
+        raise ValueError("Não encontrei a linha de DV01 em df_divone (ex.: 'FUT_TICK_VAL').")
+
+    # --- 5) Atualiza os valores de DV01 nessa linha, somente para DI_* e DAP* que existirem ---
+    df_divone.loc[linha_alvo, cols_existentes] = s_upd.loc[cols_existentes].values
+
+    # (opcional) Reporta o que foi atualizado e o que ficou de fora
+    atualizados = cols_existentes
+    nao_encontrados = sorted(set(s_upd.index) - set(cols_existentes))
+    print(f"Atualizados ({len(atualizados)}): {atualizados}")
+    if nao_encontrados:
+        print(f"Ignorados (não existem no df_divone): {nao_encontrados}")
+
+
+    df_pe = df_excel.copy()
+    df_pe = df_pe.tail(1)
+
+    df_divone['TREASURY'] = df_divone['TREASURY'].astype(
+        str).str.replace(',', '.', regex=False)
+    df_pe['WDO1'] = df_pe['WDO1'].astype(
+        str).str.replace(',', '.', regex=False)
+
+    df_divone['TREASURY'] = pd.to_numeric(
+        df_divone['TREASURY'], errors='coerce')
+    
     df_pe['WDO1'] = pd.to_numeric(df_pe['WDO1'], errors='coerce')
 
     df_divone['TREASURY'] = df_divone['TREASURY'] * \
@@ -119,6 +194,7 @@ def process_returns(df, assets):
     df_retorno = df_retorno.tail(756).reset_index(drop=True)
     df_retorno = np.log(df_retorno / df_retorno.shift(1))
     return df_retorno
+
 
 def process_returns2(df, assets):
     #Colocar a coluna 'Date' como índice
@@ -987,14 +1063,12 @@ def calcular_metricas_de_fundo3(assets, df_contratos, fundos, op1=True, op2=True
             continue
 
         pesos = (quantidade * df_precos_ajustados['Valor Fechamento'].reindex(assets).fillna(0.0).values) / vp_soma
-        st.write(pesos)
 
         df_returns_portifolio = (df_retorno.reindex(columns=assets).fillna(0.0)
                                  * pd.Series(pesos, index=assets)).copy()
         df_returns_portifolio['Portifolio'] = df_returns_portifolio.sum(axis=1)
 
         var_port = abs(var_not_parametric(df_returns_portifolio['Portifolio']))
-        st.write(var_port)
         var_port_dinheiro = vp_soma * var_port
 
         var_bps = 1.0 / 10000.0
@@ -1019,7 +1093,7 @@ def calcular_metricas_de_fundo3(assets, df_contratos, fundos, op1=True, op2=True
         cvar_dinheiro = vp_soma * cvar
 
         # -------------- DV01 / Stress --------------
-        df_divone, dolar, treasury = load_and_process_divone(file_bbg, df_completo)
+        df_divone, dolar, treasury = load_and_process_divone2(file_bbg, df_completo)
 
         lista_juros_interno      = _ativos_por(assets, quantidade_nomes, "DI")
         lista_juros_interno_real = _ativos_por(assets, quantidade_nomes, "DAP", "NTNB")
@@ -1389,7 +1463,7 @@ def calcular_metricas_de_fundo2(assets, df_contratos, fundos, op1 = True, op2 = 
                     cvar = abs(cvar)
                     cvar_dinheiro = vp_soma * cvar
 
-                    df_divone, dolar, treasury = load_and_process_divone(
+                    df_divone, dolar, treasury = load_and_process_divone2(
                         'Dados/BBG - ECO DASH.xlsx', df_completo)
 
                     lista_juros_interno = [
@@ -5447,7 +5521,7 @@ def calcular_metricas_por_pl(
 
     # ---------------- 7) DV01 do portfólio (df_divone) ----------------
     file_bbg = "Dados/BBG - ECO DASH.xlsx"
-    df_divone, _, _ = load_and_process_divone(file_bbg, df_completo_u)
+    df_divone, _, _ = load_and_process_divone2(file_bbg, df_completo_u)
     candidates = ["FUT_TICK_VAL", "DV01", "BPV", "PVBP"]
     dv01_label = next((lab for lab in candidates if lab in df_divone.index), None)
     if dv01_label is None:
@@ -5464,10 +5538,67 @@ def calcular_metricas_por_pl(
     dv01_port_bps_of_PLref = float((dv01_port_R / pl_ref) * 1e4) if pl_ref else 0.0
 
     # ---------------- 8) DV01 "stress" por drawdown ----------------
-    dd_min = df_retorno_hist[intersec].min(axis=0).astype(float)
-    mv_intersec = mv.reindex(intersec).fillna(0.0).astype(float)
-    dv01_stress_R   = float((dd_min.abs() * mv_intersec).sum())
-    dv01_stress_bps = float((dv01_stress_R / pl_ref) * 1e4) if pl_ref else 0.0
+    # ---------------- 8) Stress por ativo / por classe / portfólio ----------------
+    # Helpers de classificação
+    is_nominal = lambda a: a.startswith("DI_")
+    is_real    = lambda a: a.startswith(("DAP", "NTNB"))
+    is_us      = lambda a: "TREASURY" in a
+    is_fx      = lambda a: "WDO1" in a
+
+    nominais = [a for a in intersec if is_nominal(a)]
+    reais    = [a for a in intersec if is_real(a)]
+    us_rates = [a for a in intersec if is_us(a)]
+    moeda    = [a for a in intersec if is_fx(a)]
+
+    # Drawdown por ativo (retorno mínimo histórico até data_eff)
+    dd_min_series = df_retorno_hist[intersec].min(axis=0).astype(float)
+    mv_intersec   = mv.reindex(intersec).fillna(0.0).astype(float)
+
+    # Stress POR ATIVO em R$ conforme regra
+    stress_asset_R = {}
+    for a in intersec:
+        if is_nominal(a):
+            # 100 bps sobre DV01
+            stress_asset_R[a] = abs(float(dv01_asset_R.get(a, 0.0))) * 100.0
+        elif is_real(a):
+            # 50 bps sobre DV01
+            stress_asset_R[a] = abs(float(dv01_asset_R.get(a, 0.0))) * 50.0
+        elif is_us(a) or is_fx(a):
+            # drawdown × MV
+            stress_asset_R[a] = abs(float(dd_min_series.get(a, 0.0))) * float(mv_intersec.get(a, 0.0))
+        else:
+            # fallback: drawdown × MV
+            stress_asset_R[a] = abs(float(dd_min_series.get(a, 0.0))) * float(mv_intersec.get(a, 0.0))
+
+    # Versão em bps do PL_ref
+    stress_asset_bps = {a: ((v / pl_ref) * 1e4 if pl_ref else 0.0) for a, v in stress_asset_R.items()}
+
+    # Totais POR CLASSE (R$)
+    stress_nom_R  = sum(stress_asset_R.get(a, 0.0) for a in nominais)
+    stress_real_R = sum(stress_asset_R.get(a, 0.0) for a in reais)
+    stress_us_R   = sum(stress_asset_R.get(a, 0.0) for a in us_rates)
+    stress_fx_R   = sum(stress_asset_R.get(a, 0.0) for a in moeda)
+
+    stress_cat_R = {
+        "JUROS NOMINAIS BRASIL": stress_nom_R,
+        "JUROS REAIS BRASIL"  : stress_real_R,
+        "JUROS US"            : stress_us_R,
+        "MOEDA"               : stress_fx_R,
+    }
+    stress_cat_bps = {k: ((v / pl_ref) * 1e4 if pl_ref else 0.0) for k, v in stress_cat_R.items()}
+
+    # Stress COMBINADO das classes (aplica todos os choques simultaneamente)
+    stress_combined_R   = stress_nom_R + stress_real_R + stress_us_R + stress_fx_R
+    stress_combined_bps = (stress_combined_R / pl_ref) * 1e4 if pl_ref else 0.0
+
+    # Stress agregado por ativo (que você já fazia): soma |dd_i| × MV_i
+    dv01_stress_R   = float((dd_min_series.abs() * mv_intersec).sum())
+    dv01_stress_bps = (dv01_stress_R / pl_ref) * 1e4 if pl_ref else 0.0
+
+    # Drawdown do PORTFÓLIO (retorno mínimo do portfólio × MV_total)
+    dd_port              = abs(float(port_ret.min())) if len(port_ret) else 0.0
+    stress_port_dd_R     = dd_port * mv_total
+    stress_port_dd_bps   = (stress_port_dd_R / pl_ref) * 1e4 if pl_ref else 0.0
 
     # ---------------- 9) CoVaR (procedimentos do seu trecho) ----------------
     # VaR do portfólio em retorno:
@@ -5550,6 +5681,33 @@ def calcular_metricas_por_pl(
         "Peso MV por ativo"         : pesos_series.to_dict(),
     }
 
+    out.update({
+        # Stress por ativo
+        "Stress por ativo (R$)" : stress_asset_R,
+        "Stress por ativo (bps)": stress_asset_bps,
+
+        # Stress por classe
+        "Stress por classe (R$)" : stress_cat_R,
+        "Stress por classe (bps)": stress_cat_bps,
+
+        # Stress combinado (todas as classes)
+        "Stress combinado classes (R$)" : stress_combined_R,
+        "Stress combinado classes (bps)": stress_combined_bps,
+
+        # Portfólio: 2 óticas de drawdown
+        "Stress Portfólio (agregado por ativo) (R$)"  : dv01_stress_R,
+        "Stress Portfólio (agregado por ativo) (bps)" : dv01_stress_bps,
+        "Stress Portfólio (retorno min do port) (R$)" : stress_port_dd_R,
+        "Stress Portfólio (retorno min do port) (bps)": stress_port_dd_bps,
+    })
+
+    out["DV01 por classe (R$/bp)"] = {
+        "JUROS NOMINAIS BRASIL": float(dv01_asset_R.reindex(nominais).sum()),
+        "JUROS REAIS BRASIL"  : float(dv01_asset_R.reindex(reais).sum()),
+        "JUROS US"            : float(dv01_asset_R.reindex(us_rates).sum()),
+        "MOEDA"               : float(dv01_asset_R.reindex(moeda).sum()),
+    }
+
     if debug:
         st.write("Ativos usados:", cols)
         st.write("Vol port (ret):", vol_port_retornos)
@@ -5562,8 +5720,6 @@ def calcular_metricas_por_pl(
         st.write("CoVaR (% de 1bp):", covar_pct_1bp)
 
     return out, default_assets
-
-
 
 
 # ==========================================================
@@ -5665,7 +5821,7 @@ def simulate_nav_cota() -> None:
     # um dicionário com as métricas de risco
     # e o PL de referência (PL_ref) para o dia
     risco, default_assets = calcular_metricas_por_pl(pl_series, data=common[-1], alpha=0.05, tick_val=100.0)
-
+    st.write(risco)
 
     if pnl.empty:
         st.warning("Datas de P&L não batem com PL/LFT disponíveis.")
@@ -6350,16 +6506,31 @@ def simulate_nav_cota() -> None:
         covar_tot_display  = f"{fmt_rs(covar_tot_rs)} / {fmt_bps_raw(covar_tot_bps)}bps"
 
         # ---- orçamento de risco (1/2/3 bps) ----
-        orcamento_bps = st.radio(
-            "Orçamento de risco (bps)",
-            options=[1, 2, 3],
-            index=0,
-            horizontal=True
-        )
+        coll1,coll2 = st.columns(2)
+        with coll1:
+            orcamento_bps_var = st.radio(
+                "Orçamento de risco (bps)",
+                options=[1, 2, 3],
+                index=0,
+                horizontal=True
+            )
+        with coll2:
+            orcamento_bps_cvar = st.radio(
+                "Orçamento de risco CVaR (bps)",
+                options=[1, 2, 3],
+                index=1,
+                horizontal=True
+            )
 
-        def pct_consumo(bps):  # % do orçamento escolhido
+        def pct_consumo_var(bps):  # % do orçamento escolhido
             try:
-                return max(0.0, (abs(float(bps)) / float(orcamento_bps)) * 100.0)
+                return max(0.0, (abs(float(bps)) / float(orcamento_bps_var)) * 100.0)
+            except:
+                return 0.0
+
+        def pct_consumo_cvar(bps):  # % do orçamento escolhido
+            try:
+                return max(0.0, (abs(float(bps)) / float(orcamento_bps_cvar)) * 100.0)
             except:
                 return 0.0
 
@@ -6374,9 +6545,167 @@ def simulate_nav_cota() -> None:
         c3.metric("DV01 Port (R$/bp / bps)", dv01_port_display)
         c4.metric("DV01 Stress (R$ / bps)",  dv01_strss_display)
 
-        c5, c6 = st.columns(2)
+        c5, c6, c7 = st.columns(3)
         c5.metric("CoVaR Total (R$ / bps)",  covar_tot_display)
-        c6.metric("Orçamento selecionado", f"{orcamento_bps} bps")
+        c6.metric("Orçamento selecionado", f"{orcamento_bps_var} bps")
+        c7.metric("Orçamento CVaR selecionado", f"{orcamento_bps_cvar} bps")
+        
+        st.subheader("DV01 por classe")
+
+        dv01_cls = risco.get("DV01 por classe (R$/bp)", {}) or {}
+        classes_order = ["JUROS NOMINAIS BRASIL", "JUROS REAIS BRASIL", "JUROS US", "MOEDA"]
+
+        if len(dv01_cls) > 0:
+            import pandas as pd
+            import plotly.express as px
+
+            df_dv01c = pd.DataFrame({
+                "Classe": list(dv01_cls.keys()),
+                "DV01_R$/bp": [float(v) for v in dv01_cls.values()],
+            })
+
+            # ordena por ordem desejada (se existir), senão por valor absoluto
+            df_dv01c["ord"] = df_dv01c["Classe"].apply(lambda c: classes_order.index(c) if c in classes_order else 999)
+            df_dv01c = df_dv01c.sort_values(["ord", "DV01_R$/bp"]).drop(columns="ord")
+            df_dv01c["abs_R$"] = df_dv01c["DV01_R$/bp"].abs()
+
+            total_abs = float(df_dv01c["abs_R$"].sum())
+            df_dv01c["share_%"] = (df_dv01c["abs_R$"] / total_abs * 100.0) if total_abs > 0 else 0.0
+
+            # barras horizontais com label R$ e % do total
+            fig = px.bar(
+                df_dv01c.sort_values("abs_R$", ascending=True),
+                x="DV01_R$/bp", y="Classe",
+                orientation="h",
+                labels={"DV01_R$/bp": "DV01 (R$/bp)", "Classe": ""},
+                text=df_dv01c.apply(lambda r: f"{fmt_rs(r['DV01_R$/bp'])} • {r['share_%']:.2f}%", axis=1)
+            )
+            fig.update_traces(
+                textposition="outside",
+                marker_color=df_dv01c["DV01_R$/bp"].apply(lambda v: "#2563EB" if v >= 0 else "#EF4444")
+            )
+            fig.update_layout(
+                height=max(240, 60*len(df_dv01c)),
+                margin=dict(l=10, r=10, t=10, b=10),
+                xaxis=dict(title="DV01 (R$/bp)", tickformat=",.0f")
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        else:
+            st.info("DV01 por classe indisponível.")
+
+        # ==========================
+        # STRESS — visão geral
+        # ==========================
+        st.subheader("Stress — visão geral")
+
+        # leitura segura
+        def _f(key, default=0.0):
+            try: return float(risco.get(key, default))
+            except: return default
+
+        def _fd(key):
+            try: return {k: float(v) for k,v in (risco.get(key, {}) or {}).items()}
+            except: return {}
+
+        # stress por ativo (se quiser usar depois)
+        stress_asset_R   = _fd("Stress por ativo (R$)")
+        stress_asset_bps = _fd("Stress por ativo (bps)")
+
+        # por classe / combinado / portfólio
+        stress_cls_R   = _fd("Stress por classe (R$)")
+        stress_cls_bps = _fd("Stress por classe (bps)")
+
+        stress_comb_R   = _f("Stress combinado classes (R$)")
+        stress_comb_bps = _f("Stress combinado classes (bps)")
+
+        stress_port_aggr_R   = _f("Stress Portfólio (agregado por ativo) (R$)")
+        stress_port_aggr_bps = _f("Stress Portfólio (agregado por ativo) (bps)")
+
+        stress_port_dd_R   = _f("Stress Portfólio (retorno min do port) (R$)")
+        stress_port_dd_bps = _f("Stress Portfólio (retorno min do port) (bps)")
+
+        # strings R$ / bps
+        def join_rs_bps(rs, bps): return f"{fmt_rs(rs)} / {fmt_bps_raw(bps)}bps"
+
+        colA, colB, colC = st.columns(3)
+        colA.metric("Stress combinado (todas as classes)", join_rs_bps(stress_comb_R, stress_comb_bps))
+        colB.metric("Stress portfólio (agregado por ativo)", join_rs_bps(stress_port_aggr_R, stress_port_aggr_bps))
+        colC.metric("Stress portfólio (drawdown do portfólio)", join_rs_bps(stress_port_dd_R, stress_port_dd_bps))
+
+        # ==========================
+        # STRESS por CLASSE — R$ e bps + composição 100%
+        # ==========================
+        st.subheader("Stress por classe")
+
+        if len(stress_cls_R) > 0:
+            import pandas as pd
+            import plotly.express as px
+
+            # dataframe base
+            df_sc = pd.DataFrame({"Classe": list(stress_cls_R.keys()),
+                                "Stress_R$": [float(v) for v in stress_cls_R.values()]})
+            df_sc["Stress_bps"] = df_sc["Classe"].map(stress_cls_bps).fillna(0.0).astype(float)
+
+            # ordena segundo classes_order, se existirem
+            df_sc["ord"] = df_sc["Classe"].apply(lambda c: classes_order.index(c) if c in classes_order else 999)
+            df_sc = df_sc.sort_values("ord").drop(columns="ord")
+
+            col1, col2 = st.columns(2)
+
+            # --- barras R$ ---
+            with col1:
+                fig_r = px.bar(
+                    df_sc, x="Classe", y="Stress_R$",
+                    labels={"Stress_R$": "Stress (R$)", "Classe": ""},
+                    text=df_sc["Stress_R$"].map(lambda v: fmt_rs(v))
+                )
+                fig_r.update_traces(marker_color="#2563EB", textposition="outside")
+                fig_r.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=40),
+                                    xaxis=dict(tickangle=-20), yaxis=dict(tickformat=",.0f"))
+                st.plotly_chart(fig_r, use_container_width=True)
+
+            # --- barras bps ---
+            with col2:
+                fig_b = px.bar(
+                    df_sc, x="Classe", y="Stress_bps",
+                    labels={"Stress_bps": "Stress (bps)", "Classe": ""},
+                    text=df_sc["Stress_bps"].map(lambda v: f"{v:,.2f}bps")
+                )
+                fig_b.update_traces(marker_color="#9333EA", textposition="outside")
+                fig_b.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=40),
+                                    xaxis=dict(tickangle=-20))
+                st.plotly_chart(fig_b, use_container_width=True)
+
+            # --- composição 100% do stress combinado (só positivos; se zero, usa absoluto) ---
+            st.caption("Composição do stress combinado (100%) por classe")
+            df_share = df_sc.copy()
+            # só positivos; se a soma positivar for zero, usa valor absoluto
+            soma_pos = float(df_share["Stress_R$"].clip(lower=0.0).sum())
+            if soma_pos > 0:
+                df_share["base"] = df_share["Stress_R$"].clip(lower=0.0)
+            else:
+                df_share["base"] = df_share["Stress_R$"].abs()
+
+            total_base = float(df_share["base"].sum())
+            if total_base > 0:
+                df_share["share"] = (df_share["base"] / total_base).astype(float)
+
+                fig100 = px.bar(
+                    df_share, x="Classe", y="share",
+                    labels={"share": "Participação (100%)", "Classe": ""},
+                    text=df_share["share"].map(lambda v: f"{v:.2%}")
+                )
+                fig100.update_traces(marker_color="#0EA5E9", textposition="outside")
+                fig100.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=40),
+                                    xaxis=dict(tickangle=-20), yaxis=dict(range=[0,1], tickformat=".0%"))
+                st.plotly_chart(fig100, use_container_width=True)
+            else:
+                st.info("Não há valor para distribuir na composição 100% das classes.")
+
+        else:
+            st.info("Stress por classe indisponível.")
+
 
         # ==========================
         # Donuts de consumo do orçamento (VaR e CVaR)
@@ -6409,13 +6738,13 @@ def simulate_nav_cota() -> None:
 
         colA, colB = st.columns(2)
         with colA:
-            st.caption(f"VaR — {fmt_pct(pct_consumo(var_bps))} do orçamento")
-            donut_chart("VaR", pct_consumo(var_bps))
+            st.caption(f"VaR — {fmt_pct(pct_consumo_var(var_bps))} do orçamento")
+            donut_chart("VaR", pct_consumo_var(var_bps))
         with colB:
-            st.caption(f"CVaR — {fmt_pct(pct_consumo(cvar_bps))} do orçamento")
-            donut_chart("CVaR", pct_consumo(cvar_bps))
+            st.caption(f"CVaR — {fmt_pct(pct_consumo_cvar(cvar_bps))} do orçamento")
+            donut_chart("CVaR", pct_consumo_cvar(cvar_bps))
         # ==========================
-        # DV01 por ativo (R$/bp) — barras + composição 100%
+        # DV01 por ativo (R$/bp) — Plotly
         # ==========================
         st.subheader("DV01 por ativo")
 
@@ -6424,23 +6753,32 @@ def simulate_nav_cota() -> None:
 
         if len(dv01_asset_rs_dict) > 0:
             import pandas as pd
+            import plotly.express as px
+            import plotly.graph_objects as go
 
-            # helpers locais
+            # --- helpers (fallbacks, caso não existam no seu app) ---
+            if 'fmt_rs' not in globals():
+                def fmt_rs(x):
+                    try: return f"R${float(x):,.0f}"
+                    except: return "R$0"
+            if 'fmt_bps_raw' not in globals():
+                def fmt_bps_raw(x):
+                    try: return f"{float(x):,.2f}"
+                    except: return "0,00"
             def _short(s, n=24):
                 s = str(s)
                 return s if len(s) <= n else s[:n-1] + "…"
 
+            # --- base ---
             df_dv = pd.DataFrame({
                 "Ativo": list(dv01_asset_rs_dict.keys()),
                 "DV01_R$": [float(v) for v in dv01_asset_rs_dict.values()],
             })
-            # opcional: DV01 em bps (se você salvou no out)
             if dv01_asset_bps_dict:
                 df_dv["DV01_bps"] = df_dv["Ativo"].map({k: float(v) for k, v in dv01_asset_bps_dict.items()}).fillna(0.0)
             else:
                 df_dv["DV01_bps"] = 0.0
 
-            # remove zeros puros
             df_dv = df_dv[df_dv["DV01_R$"] != 0.0].copy()
             if df_dv.empty:
                 st.info("Todos os DV01 por ativo estão zerados.")
@@ -6452,143 +6790,158 @@ def simulate_nav_cota() -> None:
                     axis=1
                 )
 
-                col1, col2 = st.columns([6.5, 3.5])
+                col1, col2 = st.columns([6, 4])
 
                 # -------------------------------------------
-                # (coluna 1) Barras horizontais — DV01 (R$/bp)
+                # (coluna 1) Barras horizontais — DV01 (R$/bp) com sinal
                 # -------------------------------------------
                 with col1:
-                    try:
-                        import altair as alt
+                    # ordena por magnitude para facilitar leitura
+                    df_plot = df_dv.sort_values("abs_R$", ascending=True).reset_index(drop=True)
 
-                        df_a = df_dv.sort_values("abs_R$", ascending=True).copy()
+                    # separa positivo/negativo para posicionar labels adequadamente
+                    df_pos = df_plot[df_plot["DV01_R$"] >= 0].copy()
+                    df_neg = df_plot[df_plot["DV01_R$"] <  0].copy()
 
-                        # altura dinâmica
-                        bar_h   = 28
-                        chart_h = int(max(200, min(800, bar_h * max(1, len(df_a)))))
-                        chart_h = 380
+                    # ordem das categorias no eixo Y (mantém a ordenação da tabela)
+                    cat_order = df_plot["Ativo_short"].tolist()
 
-                        base = alt.Chart(df_a).properties(height=chart_h)
+                    fig_h = go.Figure()
 
-                        bars = base.mark_bar(cornerRadiusEnd=4).encode(
-                            y=alt.Y("Ativo_short:N", sort=None, title=None,
-                                    axis=alt.Axis(labelLimit=1000)),
-                            x=alt.X("DV01_R$:Q",
-                                    title="DV01 por ativo (R$/bp, com sinal)",
-                                    axis=alt.Axis(format=",.0f")),
-                            color=alt.condition(
-                                "datum.DV01_R$ >= 0",
-                                alt.value("#2563EB"),   # azul = DV01 positivo
-                                alt.value("#EF4444")    # vermelho = DV01 negativo
+                    # trace positivos
+                    if not df_pos.empty:
+                        fig_h.add_trace(go.Bar(
+                            x=df_pos["DV01_R$"],
+                            y=df_pos["Ativo_short"],
+                            orientation="h",
+                            name="DV01 (R$/bp)",
+                            marker_color="#2563EB",
+                            text=df_pos["label_rs_bps"],
+                            textposition="outside",
+                            hovertemplate=(
+                                "<b>%{customdata[0]}</b><br>" +
+                                "DV01 (R$/bp): %{x:,.0f}<br>" +
+                                ("% DV01 (bps): %{customdata[1]:,.2f}<br>" if dv01_asset_bps_dict else "") +
+                                "<extra></extra>"
                             ),
-                            tooltip=[
-                                alt.Tooltip("Ativo:N",    title="Ativo"),
-                                alt.Tooltip("DV01_R$:Q",  title="DV01 (R$/bp)", format=",.0f")
-                            ] + (
-                                [alt.Tooltip("DV01_bps:Q", title="DV01 (bps)", format=",.2f")]
-                                if dv01_asset_bps_dict else []
-                            )
-                        )
+                            customdata=df_pos[["Ativo","DV01_bps"]].values if dv01_asset_bps_dict else df_pos[["Ativo"]].assign(dummy=0).values
+                        ))
 
-                        zero_rule = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color="#9CA3AF").encode(x="x:Q")
+                    # trace negativos
+                    if not df_neg.empty:
+                        fig_h.add_trace(go.Bar(
+                            x=df_neg["DV01_R$"],
+                            y=df_neg["Ativo_short"],
+                            orientation="h",
+                            name="DV01 (R$/bp)",
+                            marker_color="#EF4444",
+                            text=df_neg["label_rs_bps"],
+                            textposition="outside",
+                            hovertemplate=(
+                                "<b>%{customdata[0]}</b><br>" +
+                                "DV01 (R$/bp): %{x:,.0f}<br>" +
+                                ("% DV01 (bps): %{customdata[1]:,.2f}<br>" if dv01_asset_bps_dict else "") +
+                                "<extra></extra>"
+                            ),
+                            customdata=df_neg[["Ativo","DV01_bps"]].values if dv01_asset_bps_dict else df_neg[["Ativo"]].assign(dummy=0).values
+                        ))
 
-                        labels_pos = base.transform_filter("datum.DV01_R$ >= 0").mark_text(
-                            align="left", dx=6, fontSize=12
-                        ).encode(
-                            y="Ativo_short:N",
-                            x="DV01_R$:Q",
-                            text="label_rs_bps:N",
-                            color=alt.value("#111827")
-                        )
-                        labels_neg = base.transform_filter("datum.DV01_R$ < 0").mark_text(
-                            align="right", dx=-6, fontSize=12
-                        ).encode(
-                            y="Ativo_short:N",
-                            x="DV01_R$:Q",
-                            text="label_rs_bps:N",
-                            color=alt.value("#111827")
-                        )
+                    # linha de zero e layout
+                    n_bars   = len(df_plot)
+                    height   = max(220, min(900, 28 * n_bars + 60))
+                    height = 380
 
-                        chart_dv01 = (bars + zero_rule + labels_pos + labels_neg) \
-                            .configure_axis(labelFontSize=12, titleFontSize=12) \
-                            .configure_view(strokeWidth=0)
-
-                        st.altair_chart(chart_dv01, use_container_width=True)
-                        st.caption("Azul = DV01 positivo; vermelho = DV01 negativo. Tooltip mostra nome completo e valores.")
-                    except Exception:
-                        # fallback simples
-                        st.bar_chart(df_dv.set_index("Ativo_short")["DV01_R$"])
+                    fig_h.update_layout(
+                        height=height,
+                        margin=dict(l=10, r=10, t=10, b=10),
+                        showlegend=False,
+                        plot_bgcolor="white",
+                        xaxis=dict(
+                            title="DV01 por ativo (R$/bp, com sinal)",
+                            zeroline=True, zerolinewidth=1, zerolinecolor="#9CA3AF",
+                            showgrid=True, gridcolor="#F3F4F6"
+                        ),
+                        yaxis=dict(
+                            categoryorder='array',
+                            categoryarray=cat_order,
+                            title=None
+                        ),
+                        bargap=0.25,
+                        uniformtext_minsize=10,
+                        uniformtext_mode="hide",
+                    )
+                    st.plotly_chart(fig_h, use_container_width=True)
+                    st.caption("Azul = DV01 positivo; vermelho = DV01 negativo. Passe o mouse para ver o nome completo e os valores.")
 
                 # -----------------------------------------------------
                 # (coluna 2) Barras verticais — composição de |DV01| (%)
                 # -----------------------------------------------------
                 with col2:
-                    try:
-                        import plotly.express as px
+                    total_abs = float(df_dv["abs_R$"].sum())
+                    if total_abs <= 0:
+                        st.info("Sem DV01 para distribuir no total.")
+                    else:
+                        df_b = df_dv.copy()
+                        df_b["share"] = (df_b["abs_R$"] / total_abs).astype(float)
+                        df_b = df_b.sort_values("share", ascending=False).reset_index(drop=True)
 
-                        total_abs = float(df_dv["abs_R$"].sum())
-                        if total_abs <= 0:
-                            st.info("Sem DV01 para distribuir no total.")
-                        else:
-                            df_b = df_dv.copy()
-                            df_b["share"] = (df_b["abs_R$"] / total_abs).astype(float)
-                            df_b = df_b.sort_values("share", ascending=False).reset_index(drop=True)
-
-                            fig = px.bar(
-                                df_b,
-                                x="Ativo", y="share",
-                                labels={"share": "Participação em |DV01| total (100%)", "Ativo": ""},
-                            )
-                            fig.update_traces(
-                                text=df_b["share"].map(lambda v: f"{v:.2%}"),
-                                textposition="outside",
-                                marker_color="#2563EB"
-                            )
-                            # nomes abreviados nos ticks; nome completo no tooltip
-                            fig.update_xaxes(
-                                ticktext=df_b["Ativo_short"],
-                                tickvals=df_b["Ativo"],
-                                tickangle=-35
-                            )
-                            fig.update_yaxes(range=[0, 1], tickformat=".0%")
-                            # largura ajustada ao nº de barras
-                            step  = 28
-                            width = int(min(1400, max(420, step * len(df_b))))
-                            fig.update_layout(
-                                height=380,
-                                width=width,
-                                margin=dict(l=10, r=10, t=10, b=30),
-                                bargap=0.25,
-                                uniformtext_minsize=10,
-                                uniformtext_mode="hide",
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                            st.caption("Distribuição normalizada de |DV01| (100%) por ativo.")
-                    except Exception:
-                        # fallback simples
-                        st.dataframe(
-                            df_dv[["Ativo", "DV01_R$", "abs_R$"]].assign(share=lambda d: d["abs_R$"]/d["abs_R$"].sum()),
-                            use_container_width=True
+                        fig_v = px.bar(
+                            df_b,
+                            x="Ativo", y="share",
+                            labels={"share": "Participação em |DV01| total (100%)", "Ativo": ""},
                         )
+                        fig_v.update_traces(
+                            text=df_b["share"].map(lambda v: f"{v:.2%}"),
+                            textposition="outside",
+                            marker_color="#2563EB",
+                            hovertemplate="<b>%{x}</b><br>Participação: %{y:.2%}<extra></extra>"
+                        )
+                        # nomes abreviados nos ticks; nome completo no hover
+                        fig_v.update_xaxes(
+                            ticktext=df_b["Ativo_short"],
+                            tickvals=df_b["Ativo"],
+                            tickangle=-35
+                        )
+                        fig_v.update_yaxes(range=[0, 1], tickformat=".0%")
+                        step  = 28
+                        width = int(min(1400, max(420, step * len(df_b))))
+                        fig_v.update_layout(
+                            height=380,
+                            width=width,
+                            margin=dict(l=10, r=10, t=10, b=30),
+                            bargap=0.25,
+                            uniformtext_minsize=10,
+                            uniformtext_mode="hide",
+                            plot_bgcolor="white",
+                        )
+                        st.plotly_chart(fig_v, use_container_width=True)
+                        st.caption("Distribuição normalizada de |DV01| (100%) por ativo.")
         else:
             st.info("DV01 por ativo indisponível para este portfólio.")
         # ==========================
-        # CoVaR por ativo (tabela, sem gráfico)
+        # CoVaR por ativo — Plotly
         # ==========================
         st.subheader("CoVaR por ativo")
 
         if len(covar_bps_dict) > 0:
             import pandas as pd
-            import altair as alt
+            import plotly.express as px
+            import plotly.graph_objects as go
 
-            # ----- helpers locais (fallback) -----
+            # ----- helpers locais (fallbacks) -----
             if 'fmt_rs' not in globals():
-                fmt_rs = lambda x: f"R${float(x):,.0f}"
+                def fmt_rs(x):
+                    try: return f"R${float(x):,.0f}"
+                    except: return "R$0"
             if 'fmt_bps_raw' not in globals():
-                fmt_bps_raw = lambda x: f"{float(x):,.2f}"
+                def fmt_bps_raw(x):
+                    try: return f"{float(x):,.2f}"
+                    except: return "0,00"
             if 'pct_consumo' not in globals():
-                # se não houver sua função, considera orçamento em 1 bp (ajuste se quiser)
-                pct_consumo = lambda bps: max(0.0, float(bps)) * 100.0
+                # fallback: considera orçamento de 1 bp se não houver sua função
+                def pct_consumo(bps):
+                    try: return max(0.0, float(bps)) * 100.0
+                    except: return 0.0
 
             def _short(s, n=24):
                 s = str(s)
@@ -6604,90 +6957,100 @@ def simulate_nav_cota() -> None:
             else:
                 df_cov["CoVaR_R$"] = 0.0
 
-            # remove zeros puros
+            # remove zeros
             df_cov = df_cov[df_cov["CoVaR_bps"] != 0.0].copy()
             if df_cov.empty:
                 st.info("Todos os CoVaR estão zerados.")
             else:
-                df_cov["abs_bps"] = df_cov["CoVaR_bps"].abs()
-                df_cov["% do orçamento"] = df_cov["CoVaR_bps"].apply(lambda x: pct_consumo(x))
-                df_cov["label_rs_bps"] = df_cov.apply(
+                df_cov["abs_bps"]         = df_cov["CoVaR_bps"].abs()
+                df_cov["%_orcamento"]     = df_cov["CoVaR_bps"].apply(lambda x: pct_consumo(x))
+                df_cov["label_rs_bps"]    = df_cov.apply(
                     lambda r: f"{fmt_rs(r['CoVaR_R$'])} / {fmt_bps_raw(r['CoVaR_bps'])}bps", axis=1
                 )
-                df_cov["Ativo_short"] = df_cov["Ativo"].map(_short)
+                df_cov["Ativo_short"]     = df_cov["Ativo"].map(_short)
 
                 # layout em 2 colunas
-                col1, col2 = st.columns(2)
+                col1, col2 = st.columns([6, 4])
 
                 # ===================================================
                 # (coluna 1) Barras horizontais — CoVaR em bps (com sinal)
                 # ===================================================
                 with col1:
-                    df_a = df_cov.sort_values("abs_bps", ascending=True).copy()
-                    bar_h = 28
-                    chart_h = int(max(200, min(800, bar_h * max(1, len(df_a)))))
-                    chart_h = 380
+                    df_a = df_cov.sort_values("abs_bps", ascending=True).reset_index(drop=True)
+                    df_pos = df_a[df_a["CoVaR_bps"] >= 0].copy()
+                    df_neg = df_a[df_a["CoVaR_bps"] <  0].copy()
+                    cat_order = df_a["Ativo_short"].tolist()
 
-                    base_a = alt.Chart(df_a).properties(height=chart_h)
+                    fig_h = go.Figure()
 
-                    bars = base_a.mark_bar(cornerRadiusEnd=4).encode(
-                        y=alt.Y("Ativo_short:N", sort=None, title=None,
-                                axis=alt.Axis(labelLimit=1000)),
-                        x=alt.X("CoVaR_bps:Q",
-                                title="CoVaR (bps, com sinal)",
-                                axis=alt.Axis(format=",.2f")),
-                        color=alt.condition(
-                            "datum.CoVaR_bps >= 0",
-                            alt.value("#2563EB"),   # azul = consome risco
-                            alt.value("#EF4444")    # vermelho = alivia risco
+                    # positivos
+                    if not df_pos.empty:
+                        fig_h.add_trace(go.Bar(
+                            x=df_pos["CoVaR_bps"],
+                            y=df_pos["Ativo_short"],
+                            orientation="h",
+                            marker_color="#2563EB",
+                            name="CoVaR (bps)",
+                            text=df_pos["label_rs_bps"],
+                            textposition="outside",
+                            customdata=df_pos[["Ativo","CoVaR_R$","%_orcamento"]].values,
+                            hovertemplate="<b>%{customdata[0]}</b><br>" +
+                                        "CoVaR (bps): %{x:,.2f}<br>" +
+                                        "CoVaR (R$): %{customdata[1]:,.0f}<br>" +
+                                        "% do orçamento: %{customdata[2]:,.2f}%<extra></extra>"
+                        ))
+
+                    # negativos
+                    if not df_neg.empty:
+                        fig_h.add_trace(go.Bar(
+                            x=df_neg["CoVaR_bps"],
+                            y=df_neg["Ativo_short"],
+                            orientation="h",
+                            marker_color="#EF4444",
+                            name="CoVaR (bps)",
+                            text=df_neg["label_rs_bps"],
+                            textposition="outside",
+                            customdata=df_neg[["Ativo","CoVaR_R$","%_orcamento"]].values,
+                            hovertemplate="<b>%{customdata[0]}</b><br>" +
+                                        "CoVaR (bps): %{x:,.2f}<br>" +
+                                        "CoVaR (R$): %{customdata[1]:,.0f}<br>" +
+                                        "% do orçamento: %{customdata[2]:,.2f}%<extra></extra>"
+                        ))
+
+                    n_bars = len(df_a)
+                    height = max(220, min(900, 28 * n_bars + 60))
+                    height = 380
+                    fig_h.update_layout(
+                        height=height,
+                        margin=dict(l=10, r=10, t=10, b=10),
+                        showlegend=False,
+                        plot_bgcolor="white",
+                        xaxis=dict(
+                            title="CoVaR (bps, com sinal)",
+                            zeroline=True, zerolinewidth=1, zerolinecolor="#9CA3AF",
+                            showgrid=True, gridcolor="#F3F4F6",
+                            tickformat=",.2f"
                         ),
-                        tooltip=[
-                            alt.Tooltip("Ativo:N", title="Ativo"),
-                            alt.Tooltip("CoVaR_bps:Q", title="CoVaR (bps)", format=",.2f"),
-                            alt.Tooltip("CoVaR_R$:Q",  title="CoVaR (R$)",  format=",.0f"),
-                            alt.Tooltip("% do orçamento:Q", title="% do orçamento", format=",.2f")
-                        ]
+                        yaxis=dict(
+                            categoryorder='array',
+                            categoryarray=cat_order,
+                            title=None
+                        ),
+                        bargap=0.25,
+                        uniformtext_minsize=10,
+                        uniformtext_mode="hide",
                     )
-
-                    zero_rule = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color="#9CA3AF").encode(x="x:Q")
-
-                    labels_pos = base_a.transform_filter("datum.CoVaR_bps >= 0").mark_text(
-                        align="left", dx=6, dy=0, fontSize=12
-                    ).encode(
-                        y=alt.Y("Ativo_short:N", sort=None, title=None),
-                        x=alt.X("CoVaR_bps:Q"),
-                        text="label_rs_bps:N",
-                        color=alt.value("#111827")
-                    )
-                    labels_neg = base_a.transform_filter("datum.CoVaR_bps < 0").mark_text(
-                        align="right", dx=-6, dy=0, fontSize=12
-                    ).encode(
-                        y=alt.Y("Ativo_short:N", sort=None, title=None),
-                        x=alt.X("CoVaR_bps:Q"),
-                        text="label_rs_bps:N",
-                        color=alt.value("#111827")
-                    )
-
-                    chart_cov = (bars + zero_rule + labels_pos + labels_neg) \
-                        .configure_axis(labelFontSize=12, titleFontSize=12) \
-                        .configure_view(strokeWidth=0)
-
-                    st.altair_chart(chart_cov, use_container_width=True)
+                    st.plotly_chart(fig_h, use_container_width=True)
                     st.caption("Azul = contribui para risco; vermelho = alivia. Passe o mouse para ver nome completo, bps, R$ e % do orçamento.")
 
                 # ===================================================
                 # (coluna 2) Barras verticais — distribuição do orçamento normalizado (100%)
                 #   - somente contribuições POSITIVAS; se não houver, usa |CoVaR|
                 #   - labels de % em cada barra
-                #   - rotação de rótulos e zoom/pan para garantir visibilidade
                 # ===================================================
                 with col2:
-                    import pandas as pd
-                    import plotly.express as px
-
-                    # --- preparar dados (idêntico à sua lógica, mas com dtype garantido) ---
-                    df_b = df_cov.copy()
                     # consumo positivo; se não houver, usa |CoVaR|
+                    df_b = df_cov.copy()
                     df_b["consumo"] = pd.to_numeric(df_b["CoVaR_bps"], errors="coerce").clip(lower=0.0)
                     usar_abs = False
                     soma_pos = float(df_b["consumo"].sum())
@@ -6701,46 +7064,40 @@ def simulate_nav_cota() -> None:
                     if df_b.empty:
                         st.info("Sem consumo positivo (ou absoluto) para distribuir orçamento.")
                     else:
-                        # share em 0..1 garantido como float
                         df_b["share"] = (df_b["consumo"] / soma_pos).astype(float)
                         df_b["Ativo_short"] = df_b["Ativo"].map(_short)
                         df_b = df_b.sort_values("share", ascending=False).reset_index(drop=True)
 
-                        # --- gráfico: barras verticais com labels (Plotly) ---
-                        fig = px.bar(
+                        fig_v = px.bar(
                             df_b,
                             x="Ativo", y="share",
                             labels={"share": "% do orçamento (normalizado a 100%)", "Ativo": ""},
                         )
-
-                        # labels e estilo
-                        fig.update_traces(
+                        fig_v.update_traces(
                             text=df_b["share"].map(lambda v: f"{v:.2%}"),
                             textposition="outside",
-                            marker_color="#2563EB"
+                            marker_color="#2563EB",
+                            hovertemplate="<b>%{x}</b><br>Participação: %{y:.2%}<extra></extra>"
                         )
-                        # nomes completos nos dados; abreviados nos ticks (para caber tudo)
-                        fig.update_xaxes(
+                        fig_v.update_xaxes(
                             ticktext=df_b["Ativo_short"],
                             tickvals=df_b["Ativo"],
                             tickangle=-35
                         )
-                        # eixo y em 0..100% e formato percentual
-                        fig.update_yaxes(range=[0, 1], tickformat=".0%")
+                        fig_v.update_yaxes(range=[0, 1], tickformat=".0%")
 
-                        # largura ajustável e layout limpo
-                        step = 28  # px por categoria
+                        step  = 28
                         width = int(min(1400, max(420, step * len(df_b))))
-                        fig.update_layout(
+                        fig_v.update_layout(
                             height=380,
                             width=width,
                             margin=dict(l=10, r=10, t=10, b=30),
                             bargap=0.25,
                             uniformtext_minsize=10,
                             uniformtext_mode="hide",
+                            plot_bgcolor="white",
                         )
-
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig_v, use_container_width=True)
                         st.caption(
                             "Distribuição do orçamento (100%) entre os ativos "
                             + ("normalizada por |CoVaR| (não havia contribuição positiva)."
@@ -6759,6 +7116,8 @@ def simulate_nav_cota() -> None:
                         for x in df_contratos_2.index.tolist() if str(x) != 'Total']
         #assets, df_contratos, fundos
         calcular_metricas_de_fundo2(default_assets, df_contratos_2, lista_fundos)
+        calcular_metricas_de_fundo3(default_assets, df_contratos_2, lista_fundos)
+
         #d6.metric("Stress DV01 (R$)", f"{risco['Stress DV01 (R$)']:,.2f}")
 
 

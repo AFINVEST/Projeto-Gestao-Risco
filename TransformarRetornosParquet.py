@@ -103,7 +103,6 @@ for col in colunas:
 
 df_b3 = pd.read_parquet('Dados/df_preco_de_ajuste_atual.parquet')
 
-
 # Fazer o merge dos dataframes
 df_precos = pd.concat([df_b3, df_ntnb], axis=0)
 df_precos.to_parquet('Dados/df_preco_de_ajuste_atual_completo.parquet')

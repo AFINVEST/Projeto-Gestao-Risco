@@ -954,6 +954,7 @@ def att_portifosições():
 
     # Chamar a função add_data(data) para atualizar portifolio_posições no banco de dados
     add_data(df_portifolio.to_dict(orient="records"))
+
     return
 
 def calcular_metricas_de_fundo3(assets, df_contratos, fundos, op1=True, op2=True):
@@ -1093,8 +1094,8 @@ def calcular_metricas_de_fundo3(assets, df_contratos, fundos, op1=True, op2=True
         cvar_dinheiro = vp_soma * cvar
 
         # -------------- DV01 / Stress --------------
-        df_divone, dolar, treasury = load_and_process_divone2(file_bbg, df_completo)
-
+        df_divone, dolar, treasury = load_and_process_divone2(file_bbg, df_completo)   
+        
         lista_juros_interno      = _ativos_por(assets, quantidade_nomes, "DI")
         lista_juros_interno_real = _ativos_por(assets, quantidade_nomes, "DAP", "NTNB")
         lista_juros_externo      = _ativos_por(assets, quantidade_nomes, "TREASURY")
@@ -1281,7 +1282,7 @@ def calcular_metricas_de_fundo3(assets, df_contratos, fundos, op1=True, op2=True
         tabela_dados_fundos = pd.concat([tabela_dados_fundos, tabela_dados_fundo], axis=0)
 
     # ---------------- pós-loop: totais/relatórios ----------------
-    st.table(df_portfolio_final)
+    #st.table(df_portfolio_final)
 
     tabela_dados_fundos_p1 = tabela_dados_fundos.applymap(lambda x: x.replace('bps', '') if isinstance(x, str) else x)
     tabela_dados_fundos_p1 = tabela_dados_fundos_p1.applymap(lambda x: x.split('/')[0] if isinstance(x, str) and '/' in x else x).astype(float)
@@ -1392,6 +1393,7 @@ def calcular_metricas_de_fundo2(assets, df_contratos, fundos, op1 = True, op2 = 
                     dict_pesos[fundo] = 0
 
         Weights = list(dict_pesos.values())
+
         df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(
             df_pl, Weights)
 
@@ -1460,7 +1462,9 @@ def calcular_metricas_de_fundo2(assets, df_contratos, fundos, op1 = True, op2 = 
 
                     cvar = df_retorno[df_retorno['Portifolio'] < var_not_parametric(
                         df_retorno['Portifolio'])]['Portifolio'].mean()
+                    
                     cvar = abs(cvar)
+
                     cvar_dinheiro = vp_soma * cvar
 
                     df_divone, dolar, treasury = load_and_process_divone2(
@@ -5719,6 +5723,8 @@ def calcular_metricas_por_pl(
         st.write("CoVaR (bps do PL_ref):", covar_bps)
         st.write("CoVaR (% de 1bp):", covar_pct_1bp)
 
+    st.write(df_divone)
+
     return out, default_assets
 
 
@@ -5821,7 +5827,7 @@ def simulate_nav_cota() -> None:
     # um dicionário com as métricas de risco
     # e o PL de referência (PL_ref) para o dia
     risco, default_assets = calcular_metricas_por_pl(pl_series, data=common[-1], alpha=0.05, tick_val=100.0)
-    st.write(risco)
+    #st.write(risco)
 
     if pnl.empty:
         st.warning("Datas de P&L não batem com PL/LFT disponíveis.")
@@ -5851,8 +5857,6 @@ def simulate_nav_cota() -> None:
     # ------------- converte para custo diário --------------------
     rate_adm_dia  = (1.02**(1/252) - 1) if taxa_adm_on else 0.0
     rate_extra_dia = ((1 + custo_pct_aa)**(1/252) - 1) if custo_pct_aa else 0.0
-
-    
 
     # capital efetivamente investido em cada dia (mesmo % do PL)
     capital_dia = pct * pl_series
@@ -6549,7 +6553,7 @@ def simulate_nav_cota() -> None:
         c5.metric("CoVaR Total (R$ / bps)",  covar_tot_display)
         c6.metric("Orçamento selecionado", f"{orcamento_bps_var} bps")
         c7.metric("Orçamento CVaR selecionado", f"{orcamento_bps_cvar} bps")
-        
+
         st.subheader("DV01 por classe")
 
         dv01_cls = risco.get("DV01 por classe (R$/bp)", {}) or {}
@@ -7115,8 +7119,9 @@ def simulate_nav_cota() -> None:
         lista_fundos = [str(x)
                         for x in df_contratos_2.index.tolist() if str(x) != 'Total']
         #assets, df_contratos, fundos
-        calcular_metricas_de_fundo2(default_assets, df_contratos_2, lista_fundos)
+        #calcular_metricas_de_fundo2(default_assets, df_contratos_2, lista_fundos)
         calcular_metricas_de_fundo3(default_assets, df_contratos_2, lista_fundos)
+
 
         #d6.metric("Stress DV01 (R$)", f"{risco['Stress DV01 (R$)']:,.2f}")
 

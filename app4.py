@@ -1779,6 +1779,8 @@ def calcular_metricas_de_fundo2(assets, df_contratos, fundos, op1 = True, op2 = 
                             ]
                         }
 
+                        
+
                         # Criando a linha "Total"
                         # dados['Total'] = [
                         #    f"R${abs(df_divone_juros_nominais.iloc[0]) + abs(df_divone_juros_real.iloc[0]) + abs(df_divone_juros_externo_certo.iloc[0]) + (abs(df_divone_dolar.iloc[0]) if lista_dolar else 0):,.2f} / "
@@ -8021,39 +8023,39 @@ def main_page():
                 if 'PL' in columns_sem_fundo:
                     columns_sem_fundo.remove('PL')
                 #
-                st.write("### Selecione as colunas")
+                #st.write("### Selecione as colunas")
                 col1_, col2_, col3_ = st.columns([4, 3, 3])
-                columns = []
-                for i, col_name in enumerate(columns_sem_fundo):
-                    if i % 3 == 0:
-                        with col1_:
-                            if st.checkbox(col_name, value=(col_name in default_columns), key=f"check_{col_name}"):
-                                columns.append(col_name)
-                    elif i % 3 == 1:
-                        with col2_:
-                            if st.checkbox(col_name, value=(col_name in default_columns), key=f"check_{col_name}"):
-                                columns.append(col_name)
-                    else:
-                        with col3_:
-                            if st.checkbox(col_name, value=(col_name in default_columns), key=f"check_{col_name}"):
-                                columns.append(col_name)
-
-                coll1, coll2 = st.columns([7, 3])
-
-                with coll2:
-                    st.write("### Filtrar por Adm")
-                    filtro_adm = []
-                    for adm in df_pl_processado["Adm"].unique():
-                        if st.checkbox(adm, key=f"checkbox_adm_{adm}"):
-                            filtro_adm.append(adm)
-
-                with coll1:
-                    st.write("### Filtrar por Fundos/Carteiras")
-                    filtro_fundo = st.multiselect(
-                        'Filtrar por Fundos/Carteiras Adm',
-                        df_pl_processado["Fundos/Carteiras Adm"].unique()
-                    )
-
+                columns = columns_sem_fundo
+                #for i, col_name in enumerate(columns_sem_fundo):
+                #    if i % 3 == 0:
+                #        with col1_:
+                #            if st.checkbox(col_name, value=(col_name in default_columns), key=f"check_{col_name}"):
+                #                columns.append(col_name)
+                #    elif i % 3 == 1:
+                #        with col2_:
+                #            if st.checkbox(col_name, value=(col_name in default_columns), key=f"check_{col_name}"):
+                #                columns.append(col_name)
+                #    else:
+                #        with col3_:
+                #            if st.checkbox(col_name, value=(col_name in default_columns), key=f"check_{col_name}"):
+                #                columns.append(col_name)
+                #
+                #coll1, coll2 = st.columns([7, 3])
+                #
+                #with coll2:
+                #    st.write("### Filtrar por Adm")
+                #    filtro_adm = []
+                #    for adm in df_pl_processado["Adm"].unique():
+                #        if st.checkbox(adm, key=f"checkbox_adm_{adm}"):
+                #            filtro_adm.append(adm)
+                #
+                #with coll1:
+                #    st.write("### Filtrar por Fundos/Carteiras")
+                #    filtro_fundo = st.multiselect(
+                #        'Filtrar por Fundos/Carteiras Adm',
+                #        df_pl_processado["Fundos/Carteiras Adm"].unique()
+                #    )
+                #
                 filtered_df = df_pl_processado_input.copy()
 
                 for asset in default_assets:
@@ -8102,11 +8104,11 @@ def main_page():
                         filtered_df.drop(columns=[
                             'Peso Relativo', 'Contratos Proporcionais', 'Contratos Inteiros', 'Resíduo'], inplace=True)
 
-                if filtro_fundo:
-                    filtered_df = filtered_df[filtered_df["Fundos/Carteiras Adm"].isin(
-                        filtro_fundo)]
-                if filtro_adm:
-                    filtered_df = filtered_df[filtered_df["Adm"].isin(filtro_adm)]
+                #if filtro_fundo:
+                #    filtered_df = filtered_df[filtered_df["Fundos/Carteiras Adm"].isin(
+                #        filtro_fundo)]
+                #if filtro_adm:
+                #    filtered_df = filtered_df[filtered_df["Adm"].isin(filtro_adm)]
 
                 sum_row = filtered_df.select_dtypes(include='number').sum()
                 sum_row['Fundos/Carteiras Adm'] = 'Total'
@@ -8121,30 +8123,87 @@ def main_page():
                     col for col in filtered_df.columns if col.startswith('Contratos')]
                 for col in col_contratos:
                     filtered_df[col] = df_contratos[col.replace('Contratos ', '')]
-                if columns:
+                #if columns:
                     # Formatação
-                    for c in columns:
-                        if c == 'PL_atualizado':
-                            filtered_df[c] = filtered_df[c].apply(
-                                lambda x: f"R${x:,.0f}")
+                for c in columns:
+                    if c == 'PL_atualizado':
+                        filtered_df[c] = filtered_df[c].apply(
+                            lambda x: f"R${x:,.0f}")
+                    else:
+                        if c == 'Adm' or 'Fundos/Carteiras Adm':
+                            filtered_df[c] = filtered_df[c].apply(lambda x: x)
                         else:
-                            if c == 'Adm' or 'Fundos/Carteiras Adm':
-                                filtered_df[c] = filtered_df[c].apply(lambda x: x)
-                            else:
-                                filtered_df[c] = filtered_df[c].apply(
-                                    lambda x: f"{x:.2f}")
-                    for col in filtered_df.columns:
-                        if col.startswith("Contratos"):
-                            filtered_df[col] = filtered_df[col].apply(
-                                lambda x: f"{x:.0f}")
-                    st.table(filtered_df[columns])
-                    st.write("OBS: Os contratos estão arrendodandos para inteiros.")
-                    st.write("---")
+                            filtered_df[c] = filtered_df[c].apply(
+                                lambda x: f"{x:.2f}")
+                for col in filtered_df.columns:
+                    if col.startswith("Contratos"):
+                        filtered_df[col] = filtered_df[col].apply(
+                            lambda x: f"{x:.0f}")
+                        
+                # ===== 1) identificar colunas de contratos e rótulo "Total" =====
+                df_calc = filtered_df.copy()
 
+                contract_cols = [c for c in df_calc.columns if str(c).startswith('Contratos')]
+                non_contract_cols = [c for c in df_calc.columns if c not in contract_cols]
 
-                    
+                # tenta achar a linha "Total" (case/espacos robusto)
+                total_label = next((idx for idx in df_calc.index if str(idx).strip().lower() == 'total'), None)
+
+                # converter contratos para numérico (sem afetar o df original)
+                df_num = df_calc[contract_cols].apply(pd.to_numeric, errors='coerce').fillna(0)
+
+                # ===== 2) somar contratos (excluindo a linha Total, se existir) =====
+                if total_label is not None:
+                    sum_by_col = df_num.drop(index=total_label, errors='ignore').sum(axis=0)
                 else:
-                    st.write("Selecione ao menos uma coluna para exibir os dados.")
+                    sum_by_col = df_num.sum(axis=0)
+
+                # ===== 3) atualizar a linha Total no df original, apenas nas colunas de contratos =====
+                if total_label is not None:
+                    filtered_df.loc[total_label, contract_cols] = sum_by_col.round().astype(int)
+
+                # ===== 4) montar visão para tela: manter não-contratos + contratos com soma != 0 =====
+                keep_contract_cols = [c for c in contract_cols if abs(sum_by_col.get(c, 0)) != 0]
+
+                df_view = filtered_df[non_contract_cols + keep_contract_cols].copy()
+
+                # renomear "Contratos XXX" -> "XXX"
+                rename_map = {c: c.replace('Contratos ', '') for c in keep_contract_cols}
+                df_view = df_view.rename(columns=rename_map)
+
+                asset_cols_clean = list(rename_map.values())
+
+                # arredondar contratos para inteiros na visão
+                df_view[asset_cols_clean] = (
+                    df_view[asset_cols_clean]
+                    .apply(pd.to_numeric, errors='coerce')
+                    .round(0)
+                    .astype('Int64')              # preserva NaN, se houver
+                )
+
+                # (opcional) remover também colunas cujo total (excluindo Total) ficou 0 após arredondamento
+                if total_label is not None:
+                    zero_cols = [c for c in asset_cols_clean
+                                if (pd.to_numeric(df_view.loc[df_view.index != total_label, c], errors='coerce')
+                                    .fillna(0).sum() == 0)]
+                    if zero_cols:
+                        df_view = df_view.drop(columns=zero_cols)
+                        asset_cols_clean = [c for c in asset_cols_clean if c not in zero_cols]
+
+                # (opcional) ordenar ativos por soma absoluta decrescente
+                if asset_cols_clean:
+                    soma_ativos = {c: abs(pd.to_numeric(df_view.loc[df_view.index != total_label, c], errors='coerce')
+                                            .fillna(0).sum()) for c in asset_cols_clean}
+                    order_assets = sorted(asset_cols_clean, key=lambda k: soma_ativos[k], reverse=True)
+                    df_view = df_view[non_contract_cols + order_assets]
+                
+                #Tirar as colunas "Fundos/Carteiras Adm", "PL", "Weights", "PL_atualizado", "Adm" e todas que começarem com "Max"
+                columns_to_drop = ['Fundos/Carteiras Adm', 'PL', 'Weights', 'PL_atualizado', 'Adm']
+                columns_to_drop += [col for col in df_view.columns if col.startswith("Max")]
+                df_view = df_view.drop(columns=columns_to_drop, errors='ignore')
+     
+                st.table(df_view)
+                st.write("---")
                 
                 st.write("## Analise por Fundo")
                 st.write("### Selecione os filtros")

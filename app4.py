@@ -5565,7 +5565,11 @@ def calcular_metricas_por_pl(
     for a in intersec:
         if is_nominal(a):
             # 100 bps sobre DV01
+            st.write(f"Ativo nominal: {a}, DV01: {dv01_asset_R.get(a, 0.0)}")
+            st.write(f"Drawdown: {dd_min_series.get(a, 0.0)}")
+            st.write(f"MV: {mv_intersec.get(a, 0.0)}")
             stress_asset_R[a] = abs(float(dv01_asset_R.get(a, 0.0))) * 100.0
+            st.write(f"Stress nominal R$: {stress_asset_R[a]}")
         elif is_real(a):
             # 50 bps sobre DV01
             stress_asset_R[a] = abs(float(dv01_asset_R.get(a, 0.0))) * 50.0
@@ -6635,9 +6639,11 @@ def simulate_nav_cota() -> None:
         def join_rs_bps(rs, bps): return f"{fmt_rs(rs)} / {fmt_bps_raw(bps)}bps"
 
         colA, colB, colC = st.columns(3)
+
         colA.metric("Stress combinado (todas as classes)", join_rs_bps(stress_comb_R, stress_comb_bps))
         colB.metric("Stress portfólio (agregado por ativo)", join_rs_bps(stress_port_aggr_R, stress_port_aggr_bps))
         colC.metric("Stress portfólio (drawdown do portfólio)", join_rs_bps(stress_port_dd_R, stress_port_dd_bps))
+
 
         # ==========================
         # STRESS por CLASSE — R$ e bps + composição 100%

@@ -5729,7 +5729,6 @@ def calcular_metricas_por_pl(
         st.write("CoVaR (bps do PL_ref):", covar_bps)
         st.write("CoVaR (% de 1bp):", covar_pct_1bp)
 
-    st.write(df_divone)
 
     return out, default_assets
 

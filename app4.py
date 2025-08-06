@@ -5299,7 +5299,7 @@ def plot_ret_diario(ret: pd.Series) -> alt.Chart:
 import requests
 from datetime import date
 
-@st.cache_data(ttl=24*3600)         # consulta ao SGS no máx. 1 vez/dia
+#@st.cache_data(ttl=24*3600)         # consulta ao SGS no máx. 1 vez/dia
 def load_cdi_series(cache_csv: str = "Dados/cdi_cached.csv") -> pd.Series:
     """
     Retorna Series diária do CDI (decimal) indexada por datetime.
@@ -7758,6 +7758,7 @@ def main_page():
 
             df_port, key, soma_pl_sem_pesos = checkar_portifolio(
                 assets, quantidade_nomes, precos_user, data_compra, filtered_df)
+            
             if key == True:
                 atualizar_parquet_fundos(
                     filtered_df, data_compra_todos, df_port, quantidade_nomes)

@@ -6362,7 +6362,14 @@ def simulate_nav_cota() -> None:
                 .sum())                              # soma Custos + Despesas
 
         # 3‑C)  ► acrescenta CDI e impõe a ordem final ------------------
-        ret_cdi_periodo = (cdi_cum.loc[fim_eff] / cdi_cum.loc[ini_eff]) - 1
+        d0 = cdi_cum.index[cdi_cum.index.get_indexer([ini_eff], method="pad")[0]]
+        d1 = cdi_cum.index[cdi_cum.index.get_indexer([fim_eff], method="pad")[0]]
+
+        # pega o valor do dia imediatamente anterior a d0
+        i0 = cdi_cum.index.get_loc(d0)
+        base = cdi_cum.iloc[i0-1] if i0 > 0 else 1.0
+
+        ret_cdi_periodo = (cdi_cum.loc[d1] / base) - 1
 
         df_wf = contrib.reset_index().rename(columns={"index": "Componente",
                                                     0:      "ret_pl"})

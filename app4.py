@@ -5565,11 +5565,11 @@ def calcular_metricas_por_pl(
     for a in intersec:
         if is_nominal(a):
             # 100 bps sobre DV01
-            st.write(f"Ativo nominal: {a}, DV01: {dv01_asset_R.get(a, 0.0)}")
-            st.write(f"Drawdown: {dd_min_series.get(a, 0.0)}")
-            st.write(f"MV: {mv_intersec.get(a, 0.0)}")
+            #st.write(f"Ativo nominal: {a}, DV01: {dv01_asset_R.get(a, 0.0)}")
+            #st.write(f"Drawdown: {dd_min_series.get(a, 0.0)}")
+            #st.write(f"MV: {mv_intersec.get(a, 0.0)}")
             stress_asset_R[a] = abs(float(dv01_asset_R.get(a, 0.0))) * 100.0
-            st.write(f"Stress nominal R$: {stress_asset_R[a]}")
+            #st.write(f"Stress nominal R$: {stress_asset_R[a]}")
         elif is_real(a):
             # 50 bps sobre DV01
             stress_asset_R[a] = abs(float(dv01_asset_R.get(a, 0.0))) * 50.0

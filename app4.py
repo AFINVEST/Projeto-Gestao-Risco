@@ -462,6 +462,58 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                         else:
                             st.error(
                                 f"Ativo {asset} não encontrado no DataFrame.")
+            elif 'DI' in asset:
+                df_ajuste = pd.read_parquet(
+                    'Dados/df_valor_ajuste_contrato.parquet')
+                
+                # Selecionar apenas as colunas de data (ignorando a primeira, que é "Assets")
+                colunas_datas_originais = df_ajuste.columns[1:]
+                df_ajuste[colunas_datas_originais] = (
+                    df_ajuste[colunas_datas_originais]
+                    .replace('\.', '', regex=True)
+                    .replace(',', '.', regex=True)
+                    .astype(float)
+                )
+
+                # Renomear as colunas de data para string no formato 'YYYY-MM-DD'
+                novos_nomes_colunas = [
+                    pd.to_datetime(col, errors='coerce').strftime('%Y-%m-%d') for col in colunas_datas_originais
+                ]
+                renomear_colunas = dict(
+                    zip(colunas_datas_originais, novos_nomes_colunas))
+                df_ajuste.rename(columns=renomear_colunas, inplace=True)
+
+                # Obter a data da compra específica do ativo
+                data_compra_raw = dia_compra.get(asset)
+                if data_compra_raw is None:
+                    st.error(
+                        f"Data de compra não encontrada para o ativo {asset}")
+                else:
+                    coluna_dia_compra_str = pd.to_datetime(
+                        data_compra_raw).strftime('%Y-%m-%d')
+
+                    # Verificar se a coluna existe no DataFrame antes de tentar acessar
+                    if coluna_dia_compra_str not in df_ajuste.columns:
+                        st.error(
+                            f"Coluna de data '{coluna_dia_compra_str}' não encontrada no DataFrame.")
+                    else:
+                        filtro = df_ajuste['Assets'] == asset
+                        if filtro.any():
+                            valor_ajuste = df_ajuste.loc[filtro,
+                                                         coluna_dia_compra_str].values[0]
+                            # Ver se tem alguma coluna de ajuste posterior a data de compra
+                            colunas_uteis = df_ajuste.columns[df_ajuste.columns >
+                                                              coluna_dia_compra_str]
+                            colunas_uteis = colunas_uteis[colunas_uteis != 'Assets']
+                            if len(colunas_uteis) > 0:
+                                # Pegar o valor do ajuste mais recente
+                                rendimento = valor_ajuste * qtd_final
+                            else:
+                                rendimento = qtd_final * (preco_fechamento_atual - preco_compra)
+
+                        else:
+                            st.error(
+                                f"Ativo {asset} não encontrado no DataFrame.")
 
             else:
                 rendimento = qtd_final * \
@@ -924,6 +976,24 @@ def att_portifosições():
 
             # Soma os ajustes após a data de compra e multiplica pela quantidade
             return linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
+        
+        elif 'DI' in ativo:
+            dia_compra = pd.to_datetime(row['Dia de Compra'])
+
+            # Pega linha do ativo no df_ajuste
+            linha_ajuste = df_ajuste[df_ajuste['Assets'] == ativo].drop(columns='Assets')
+            if linha_ajuste.empty:
+                return 0  # Ativo não encontrado
+
+            # 1) PnL do DIA DA COMPRA (D0)
+            pnl_d0 = (preco_de_ajuste - preco_compra) * quantidade
+
+            # 2) Ajustes a partir do DIA SEGUINTE (D+1)
+            colunas_uteis = linha_ajuste.columns[datas_validas > dia_compra]
+            soma_ajustes = linha_ajuste[colunas_uteis].sum(axis=1).values[0] if len(colunas_uteis) else 0
+
+            return pnl_d0 + soma_ajustes * quantidade
+
 
         else:
             return quantidade * (preco_de_ajuste - preco_compra)
@@ -3960,6 +4030,24 @@ def atualizar_parquet_fundos(
                     # Soma os ajustes após a data de compra e multiplica pela quantidade
                     rendimento = linha_ajuste[colunas_uteis].sum(
                         axis=1).values[0] * quantidade
+                    
+                elif 'DI' in asset:
+                    dia_compra = pd.to_datetime(dia_operacao)
+
+                    # linha do ativo no df_ajuste
+                    linha_ajuste = df_ajuste[df_ajuste['Assets'] == asset].drop(columns='Assets')
+
+                    # 1) PnL do DIA DA COMPRA (D0)
+                    pnl_d0 = (preco_fechamento_dia - preco_compra)
+
+                    if linha_ajuste.empty:
+                        # Sem ajustes disponíveis → fica só o D0
+                        rendimento = pnl_d0
+                    else:
+                        # 2) Ajustes a partir do DIA SEGUINTE (D+1)
+                        colunas_uteis = linha_ajuste.columns[datas_validas > dia_compra]
+                        soma_ajustes = linha_ajuste[colunas_uteis].sum(axis=1).values[0] if len(colunas_uteis) else 0
+                        rendimento = pnl_d0 + soma_ajustes
 
                 else:
                     rendimento = (preco_fechamento_dia - preco_compra)
@@ -4056,12 +4144,31 @@ def atualizar_parquet_fundos(
                     # Soma os ajustes após a data de compra e multiplica pela quantidade
                     rendimento_unit = linha_ajuste[colunas_uteis].sum(
                         axis=1).values[0] * quantidade_new
+                    
+                elif 'DI' in asset:
+                    dia_compra = pd.to_datetime(dia_operacao)
+                    # Pega linha do ativo no df_ajuste
+                    linha_ajuste = df_ajuste[df_ajuste['Assets'] == asset].drop(columns='Assets')
+
+                    # 1) PnL do DIA DA COMPRA (D0) — por unidade
+                    pnl_d0_unit = (preco_fechamento_dia - preco_compra_new)
+
+                    if linha_ajuste.empty:
+                        # Sem ajustes disponíveis → fica só o D0
+                        rendimento_unit = quantidade_new * pnl_d0_unit
+                    else:
+                        # 2) Ajustes a partir do DIA SEGUINTE (D+1)
+                        colunas_uteis = linha_ajuste.columns[datas_validas > dia_compra]  # estritamente > D0
+                        soma_ajustes_unit = linha_ajuste[colunas_uteis].sum(axis=1).values[0] if len(colunas_uteis) else 0
+                        # total = D0 + ajustes (já multiplicando pela quantidade_new conforme seu padrão aqui)
+                        rendimento_unit = quantidade_new * (pnl_d0_unit + soma_ajustes_unit)
 
                 else:
                     rendimento_unit = (preco_fechamento_dia - preco_compra_new)
 
                 rendimento_new = quantidade_new * rendimento_unit
                 df_fundo.loc[asset, col_Rend] = old_rend + rendimento_new
+
         # 4.4) Salvar ao final, como no fluxo original##
         df_fundo.reset_index(drop=True, inplace=True)
         df_fundo.to_parquet(nome_arquivo_parquet, index=False)
@@ -4481,6 +4588,21 @@ def analisar_dados_fundos(
                         # ──────────────────────────────────────────────
                         if data_fech == data_op:           # mesma data da compra?  ⇒  rendimento zero
                             rend_cash = 0
+                        else:
+                            try:
+                                ajuste_dia = df_ajuste.at[ativo, data_fech]   # ajuste do PRÓPRIO dia
+                                rend_cash  = ajuste_dia * qtd
+                            except KeyError:                                  # sem ajuste disponível
+                                rend_cash = 0
+                    
+                    
+                    elif "DI" in ativo:
+                        # ──────────────────────────────────────────────
+                        # regra antiga:  1) na data da compra ⇒ 0
+                        #                2) depois da compra ⇒ ajuste do próprio dia * quantidade
+                        # ──────────────────────────────────────────────
+                        if data_fech == data_op:           # mesma data da compra?  ⇒  rendimento zero
+                            rend_cash = (p_fech - p_ant) * qtd
                         else:
                             try:
                                 ajuste_dia = df_ajuste.at[ativo, data_fech]   # ajuste do PRÓPRIO dia
@@ -5190,7 +5312,6 @@ def analisar_dados_fundos2(
                 usa_bps = not pd.isna(pl_op) and pl_op != 0
                 p_ant   = p_compra
 
-
                 for data_fech in df_b3_fechamento.columns[1:]:
                     if data_fech < data_op:
                         continue
@@ -5206,6 +5327,12 @@ def analisar_dados_fundos2(
                     elif "DAP" in ativo:
                         if data_fech == data_op:
                             rend = 0
+                        else:
+                            ajuste = df_ajuste.get(data_fech, pd.Series()).get(ativo, 0)
+                            rend   = ajuste * qtd
+                    elif "DI" in ativo:
+                        if data_fech == data_op:
+                            rend = (p_fech - p_ant) * qtd
                         else:
                             ajuste = df_ajuste.get(data_fech, pd.Series()).get(ativo, 0)
                             rend   = ajuste * qtd
@@ -6566,11 +6693,54 @@ def simulate_nav_cota() -> None:
         c6.metric("Orçamento selecionado", f"{orcamento_bps_var} bps")
         c7.metric("Orçamento CVaR selecionado", f"{orcamento_bps_cvar} bps")
 
-        
+        st.subheader("DV01 por classe")
+
+        dv01_cls = risco.get("DV01 por classe (R$/bp)", {}) or {}
+        classes_order = ["JUROS NOMINAIS BRASIL", "JUROS REAIS BRASIL", "JUROS US", "MOEDA"]
+
+        if len(dv01_cls) > 0:
+            import pandas as pd
+            import plotly.express as px
+
+            df_dv01c = pd.DataFrame({
+                "Classe": list(dv01_cls.keys()),
+                "DV01_R$/bp": [float(v) for v in dv01_cls.values()],
+            })
+
+            # ordena por ordem desejada (se existir), senão por valor absoluto
+            df_dv01c["ord"] = df_dv01c["Classe"].apply(lambda c: classes_order.index(c) if c in classes_order else 999)
+            df_dv01c = df_dv01c.sort_values(["ord", "DV01_R$/bp"]).drop(columns="ord")
+            df_dv01c["abs_R$"] = df_dv01c["DV01_R$/bp"].abs()
+
+            total_abs = float(df_dv01c["abs_R$"].sum())
+            df_dv01c["share_%"] = (df_dv01c["abs_R$"] / total_abs * 100.0) if total_abs > 0 else 0.0
+
+            # barras horizontais com label R$ e % do total
+            fig = px.bar(
+                df_dv01c.sort_values("abs_R$", ascending=True),
+                x="DV01_R$/bp", y="Classe",
+                orientation="h",
+                labels={"DV01_R$/bp": "DV01 (R$/bp)", "Classe": ""},
+                text=df_dv01c.apply(lambda r: f"{fmt_rs(r['DV01_R$/bp'])} • {r['share_%']:.2f}%", axis=1)
+            )
+            fig.update_traces(
+                textposition="outside",
+                marker_color=df_dv01c["DV01_R$/bp"].apply(lambda v: "#2563EB" if v >= 0 else "#EF4444")
+            )
+            fig.update_layout(
+                height=max(240, 60*len(df_dv01c)),
+                margin=dict(l=10, r=10, t=10, b=10),
+                xaxis=dict(title="DV01 (R$/bp)", tickformat=",.0f")
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        else:
+            st.info("DV01 por classe indisponível.")
+
         # ==========================
         # STRESS — visão geral
         # ==========================
-        #st.subheader("Stress — visão geral")
+        st.subheader("Stress — visão geral")
 
         # leitura segura
         def _f(key, default=0.0):
@@ -6681,6 +6851,7 @@ def simulate_nav_cota() -> None:
         #else:
         #    st.info("Stress por classe indisponível.")
 
+
         # ==========================
         # Donuts de consumo do orçamento (VaR e CVaR)
         # ==========================
@@ -6717,7 +6888,6 @@ def simulate_nav_cota() -> None:
         with colB:
             st.caption(f"CVaR — {fmt_pct(pct_consumo_cvar(cvar_bps))} do orçamento")
             donut_chart("CVaR", pct_consumo_cvar(cvar_bps))
-        
         # ==========================
         # DV01 por ativo (R$/bp) — Plotly
         # ==========================
@@ -6893,52 +7063,6 @@ def simulate_nav_cota() -> None:
                         st.caption("Distribuição normalizada de |DV01| (100%) por ativo.")
         else:
             st.info("DV01 por ativo indisponível para este portfólio.")
-        
-        st.subheader("DV01 por classe")
-
-        dv01_cls = risco.get("DV01 por classe (R$/bp)", {}) or {}
-        classes_order = ["JUROS NOMINAIS BRASIL", "JUROS REAIS BRASIL", "JUROS US", "MOEDA"]
-
-        if len(dv01_cls) > 0:
-            import pandas as pd
-            import plotly.express as px
-
-            df_dv01c = pd.DataFrame({
-                "Classe": list(dv01_cls.keys()),
-                "DV01_R$/bp": [float(v) for v in dv01_cls.values()],
-            })
-
-            # ordena por ordem desejada (se existir), senão por valor absoluto
-            df_dv01c["ord"] = df_dv01c["Classe"].apply(lambda c: classes_order.index(c) if c in classes_order else 999)
-            df_dv01c = df_dv01c.sort_values(["ord", "DV01_R$/bp"]).drop(columns="ord")
-            df_dv01c["abs_R$"] = df_dv01c["DV01_R$/bp"].abs()
-
-            total_abs = float(df_dv01c["abs_R$"].sum())
-            df_dv01c["share_%"] = (df_dv01c["abs_R$"] / total_abs * 100.0) if total_abs > 0 else 0.0
-
-            # barras horizontais com label R$ e % do total
-            fig = px.bar(
-                df_dv01c.sort_values("abs_R$", ascending=True),
-                x="DV01_R$/bp", y="Classe",
-                orientation="h",
-                labels={"DV01_R$/bp": "DV01 (R$/bp)", "Classe": ""},
-                text=df_dv01c.apply(lambda r: f"{fmt_rs(r['DV01_R$/bp'])} • {r['share_%']:.2f}%", axis=1)
-            )
-            fig.update_traces(
-                textposition="outside",
-                marker_color=df_dv01c["DV01_R$/bp"].apply(lambda v: "#2563EB" if v >= 0 else "#EF4444")
-            )
-            fig.update_layout(
-                height=max(240, 60*len(df_dv01c)),
-                margin=dict(l=10, r=10, t=10, b=10),
-                xaxis=dict(title="DV01 (R$/bp)", tickformat=",.0f")
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-        else:
-            st.info("DV01 por classe indisponível.")
-
-        
         # ==========================
         # CoVaR por ativo — Plotly
         # ==========================
@@ -7137,7 +7261,7 @@ def simulate_nav_cota() -> None:
                         for x in df_contratos_2.index.tolist() if str(x) != 'Total']
         #assets, df_contratos, fundos
         #calcular_metricas_de_fundo2(default_assets, df_contratos_2, lista_fundos)
-        #calcular_metricas_de_fundo3(default_assets, df_contratos_2, lista_fundos)
+        calcular_metricas_de_fundo3(default_assets, df_contratos_2, lista_fundos)
 
 
         #d6.metric("Stress DV01 (R$)", f"{risco['Stress DV01 (R$)']:,.2f}")

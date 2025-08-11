@@ -491,8 +491,8 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
     col_p1, col_p3, col_p2 = st.columns([4.9, 0.2, 4.9])
 
     with col_p1:
-        st.subheader("Portfólio Atual (já salvo)")
-        st.table(df_portifolio_salvo.set_index('Ativo'))
+        #st.subheader("Portfólio Atual (já salvo)")
+        #st.table(df_portifolio_salvo.set_index('Ativo'))
 
         # Agrupar para ver quantidades consolidadas do portfólio atual
         df_atual = df_portifolio_salvo.groupby('Ativo', as_index=False)[
@@ -6570,7 +6570,7 @@ def simulate_nav_cota() -> None:
         # ==========================
         # STRESS — visão geral
         # ==========================
-        st.subheader("Stress — visão geral")
+        #st.subheader("Stress — visão geral")
 
         # leitura segura
         def _f(key, default=0.0):

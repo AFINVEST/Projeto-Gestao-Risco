@@ -6566,50 +6566,7 @@ def simulate_nav_cota() -> None:
         c6.metric("Orçamento selecionado", f"{orcamento_bps_var} bps")
         c7.metric("Orçamento CVaR selecionado", f"{orcamento_bps_cvar} bps")
 
-        st.subheader("DV01 por classe")
-
-        dv01_cls = risco.get("DV01 por classe (R$/bp)", {}) or {}
-        classes_order = ["JUROS NOMINAIS BRASIL", "JUROS REAIS BRASIL", "JUROS US", "MOEDA"]
-
-        if len(dv01_cls) > 0:
-            import pandas as pd
-            import plotly.express as px
-
-            df_dv01c = pd.DataFrame({
-                "Classe": list(dv01_cls.keys()),
-                "DV01_R$/bp": [float(v) for v in dv01_cls.values()],
-            })
-
-            # ordena por ordem desejada (se existir), senão por valor absoluto
-            df_dv01c["ord"] = df_dv01c["Classe"].apply(lambda c: classes_order.index(c) if c in classes_order else 999)
-            df_dv01c = df_dv01c.sort_values(["ord", "DV01_R$/bp"]).drop(columns="ord")
-            df_dv01c["abs_R$"] = df_dv01c["DV01_R$/bp"].abs()
-
-            total_abs = float(df_dv01c["abs_R$"].sum())
-            df_dv01c["share_%"] = (df_dv01c["abs_R$"] / total_abs * 100.0) if total_abs > 0 else 0.0
-
-            # barras horizontais com label R$ e % do total
-            fig = px.bar(
-                df_dv01c.sort_values("abs_R$", ascending=True),
-                x="DV01_R$/bp", y="Classe",
-                orientation="h",
-                labels={"DV01_R$/bp": "DV01 (R$/bp)", "Classe": ""},
-                text=df_dv01c.apply(lambda r: f"{fmt_rs(r['DV01_R$/bp'])} • {r['share_%']:.2f}%", axis=1)
-            )
-            fig.update_traces(
-                textposition="outside",
-                marker_color=df_dv01c["DV01_R$/bp"].apply(lambda v: "#2563EB" if v >= 0 else "#EF4444")
-            )
-            fig.update_layout(
-                height=max(240, 60*len(df_dv01c)),
-                margin=dict(l=10, r=10, t=10, b=10),
-                xaxis=dict(title="DV01 (R$/bp)", tickformat=",.0f")
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-        else:
-            st.info("DV01 por classe indisponível.")
-
+        
         # ==========================
         # STRESS — visão geral
         # ==========================
@@ -6644,86 +6601,85 @@ def simulate_nav_cota() -> None:
         # strings R$ / bps
         def join_rs_bps(rs, bps): return f"{fmt_rs(rs)} / {fmt_bps_raw(bps)}bps"
 
-        colA, colB, colC = st.columns(3)
+        #colA, colB, colC = st.columns(3)
 
-        colA.metric("Stress combinado (todas as classes)", join_rs_bps(stress_comb_R, stress_comb_bps))
-        colB.metric("Stress portfólio (agregado por ativo)", join_rs_bps(stress_port_aggr_R, stress_port_aggr_bps))
-        colC.metric("Stress portfólio (drawdown do portfólio)", join_rs_bps(stress_port_dd_R, stress_port_dd_bps))
+        #colA.metric("Stress combinado (todas as classes)", join_rs_bps(stress_comb_R, stress_comb_bps))
+        #colB.metric("Stress portfólio (agregado por ativo)", join_rs_bps(stress_port_aggr_R, stress_port_aggr_bps))
+        #colC.metric("Stress portfólio (drawdown do portfólio)", join_rs_bps(stress_port_dd_R, stress_port_dd_bps))
 
 
         # ==========================
         # STRESS por CLASSE — R$ e bps + composição 100%
         # ==========================
-        st.subheader("Stress por classe")
-
-        if len(stress_cls_R) > 0:
-            import pandas as pd
-            import plotly.express as px
-
-            # dataframe base
-            df_sc = pd.DataFrame({"Classe": list(stress_cls_R.keys()),
-                                "Stress_R$": [float(v) for v in stress_cls_R.values()]})
-            df_sc["Stress_bps"] = df_sc["Classe"].map(stress_cls_bps).fillna(0.0).astype(float)
-
-            # ordena segundo classes_order, se existirem
-            df_sc["ord"] = df_sc["Classe"].apply(lambda c: classes_order.index(c) if c in classes_order else 999)
-            df_sc = df_sc.sort_values("ord").drop(columns="ord")
-
-            col1, col2 = st.columns(2)
-
-            # --- barras R$ ---
-            with col1:
-                fig_r = px.bar(
-                    df_sc, x="Classe", y="Stress_R$",
-                    labels={"Stress_R$": "Stress (R$)", "Classe": ""},
-                    text=df_sc["Stress_R$"].map(lambda v: fmt_rs(v))
-                )
-                fig_r.update_traces(marker_color="#2563EB", textposition="outside")
-                fig_r.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=40),
-                                    xaxis=dict(tickangle=-20), yaxis=dict(tickformat=",.0f"))
-                st.plotly_chart(fig_r, use_container_width=True)
-
-            # --- barras bps ---
-            with col2:
-                fig_b = px.bar(
-                    df_sc, x="Classe", y="Stress_bps",
-                    labels={"Stress_bps": "Stress (bps)", "Classe": ""},
-                    text=df_sc["Stress_bps"].map(lambda v: f"{v:,.2f}bps")
-                )
-                fig_b.update_traces(marker_color="#9333EA", textposition="outside")
-                fig_b.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=40),
-                                    xaxis=dict(tickangle=-20))
-                st.plotly_chart(fig_b, use_container_width=True)
-
-            # --- composição 100% do stress combinado (só positivos; se zero, usa absoluto) ---
-            st.caption("Composição do stress combinado (100%) por classe")
-            df_share = df_sc.copy()
-            # só positivos; se a soma positivar for zero, usa valor absoluto
-            soma_pos = float(df_share["Stress_R$"].clip(lower=0.0).sum())
-            if soma_pos > 0:
-                df_share["base"] = df_share["Stress_R$"].clip(lower=0.0)
-            else:
-                df_share["base"] = df_share["Stress_R$"].abs()
-
-            total_base = float(df_share["base"].sum())
-            if total_base > 0:
-                df_share["share"] = (df_share["base"] / total_base).astype(float)
-
-                fig100 = px.bar(
-                    df_share, x="Classe", y="share",
-                    labels={"share": "Participação (100%)", "Classe": ""},
-                    text=df_share["share"].map(lambda v: f"{v:.2%}")
-                )
-                fig100.update_traces(marker_color="#0EA5E9", textposition="outside")
-                fig100.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=40),
-                                    xaxis=dict(tickangle=-20), yaxis=dict(range=[0,1], tickformat=".0%"))
-                st.plotly_chart(fig100, use_container_width=True)
-            else:
-                st.info("Não há valor para distribuir na composição 100% das classes.")
-
-        else:
-            st.info("Stress por classe indisponível.")
-
+        #st.subheader("Stress por classe")
+#
+        #if len(stress_cls_R) > 0:
+        #    import pandas as pd
+        #    import plotly.express as px
+#
+        #    # dataframe base
+        #    df_sc = pd.DataFrame({"Classe": list(stress_cls_R.keys()),
+        #                        "Stress_R$": [float(v) for v in stress_cls_R.values()]})
+        #    df_sc["Stress_bps"] = df_sc["Classe"].map(stress_cls_bps).fillna(0.0).astype(float)
+#
+        #    # ordena segundo classes_order, se existirem
+        #    df_sc["ord"] = df_sc["Classe"].apply(lambda c: classes_order.index(c) if c in classes_order else 999)
+        #    df_sc = df_sc.sort_values("ord").drop(columns="ord")
+#
+        #    col1, col2 = st.columns(2)
+#
+        #    # --- barras R$ ---
+        #    with col1:
+        #        fig_r = px.bar(
+        #            df_sc, x="Classe", y="Stress_R$",
+        #            labels={"Stress_R$": "Stress (R$)", "Classe": ""},
+        #            text=df_sc["Stress_R$"].map(lambda v: fmt_rs(v))
+        #        )
+        #        fig_r.update_traces(marker_color="#2563EB", textposition="outside")
+        #        fig_r.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=40),
+        #                            xaxis=dict(tickangle=-20), yaxis=dict(tickformat=",.0f"))
+        #        st.plotly_chart(fig_r, use_container_width=True)
+#
+        #    # --- barras bps ---
+        #    with col2:
+        #        fig_b = px.bar(
+        #            df_sc, x="Classe", y="Stress_bps",
+        #            labels={"Stress_bps": "Stress (bps)", "Classe": ""},
+        #            text=df_sc["Stress_bps"].map(lambda v: f"{v:,.2f}bps")
+        #        )
+        #        fig_b.update_traces(marker_color="#9333EA", textposition="outside")
+        #        fig_b.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=40),
+        #                            xaxis=dict(tickangle=-20))
+        #        st.plotly_chart(fig_b, use_container_width=True)
+#
+        #    # --- composição 100% do stress combinado (só positivos; se zero, usa absoluto) ---
+        #    st.caption("Composição do stress combinado (100%) por classe")
+        #    df_share = df_sc.copy()
+        #    # só positivos; se a soma positivar for zero, usa valor absoluto
+        #    soma_pos = float(df_share["Stress_R$"].clip(lower=0.0).sum())
+        #    if soma_pos > 0:
+        #        df_share["base"] = df_share["Stress_R$"].clip(lower=0.0)
+        #    else:
+        #        df_share["base"] = df_share["Stress_R$"].abs()
+#
+        #    total_base = float(df_share["base"].sum())
+        #    if total_base > 0:
+        #        df_share["share"] = (df_share["base"] / total_base).astype(float)
+#
+        #        fig100 = px.bar(
+        #            df_share, x="Classe", y="share",
+        #            labels={"share": "Participação (100%)", "Classe": ""},
+        #            text=df_share["share"].map(lambda v: f"{v:.2%}")
+        #        )
+        #        fig100.update_traces(marker_color="#0EA5E9", textposition="outside")
+        #        fig100.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=40),
+        #                            xaxis=dict(tickangle=-20), yaxis=dict(range=[0,1], tickformat=".0%"))
+        #        st.plotly_chart(fig100, use_container_width=True)
+        #    else:
+        #        st.info("Não há valor para distribuir na composição 100% das classes.")
+#
+        #else:
+        #    st.info("Stress por classe indisponível.")
 
         # ==========================
         # Donuts de consumo do orçamento (VaR e CVaR)
@@ -6761,6 +6717,7 @@ def simulate_nav_cota() -> None:
         with colB:
             st.caption(f"CVaR — {fmt_pct(pct_consumo_cvar(cvar_bps))} do orçamento")
             donut_chart("CVaR", pct_consumo_cvar(cvar_bps))
+        
         # ==========================
         # DV01 por ativo (R$/bp) — Plotly
         # ==========================
@@ -6936,6 +6893,52 @@ def simulate_nav_cota() -> None:
                         st.caption("Distribuição normalizada de |DV01| (100%) por ativo.")
         else:
             st.info("DV01 por ativo indisponível para este portfólio.")
+        
+        st.subheader("DV01 por classe")
+
+        dv01_cls = risco.get("DV01 por classe (R$/bp)", {}) or {}
+        classes_order = ["JUROS NOMINAIS BRASIL", "JUROS REAIS BRASIL", "JUROS US", "MOEDA"]
+
+        if len(dv01_cls) > 0:
+            import pandas as pd
+            import plotly.express as px
+
+            df_dv01c = pd.DataFrame({
+                "Classe": list(dv01_cls.keys()),
+                "DV01_R$/bp": [float(v) for v in dv01_cls.values()],
+            })
+
+            # ordena por ordem desejada (se existir), senão por valor absoluto
+            df_dv01c["ord"] = df_dv01c["Classe"].apply(lambda c: classes_order.index(c) if c in classes_order else 999)
+            df_dv01c = df_dv01c.sort_values(["ord", "DV01_R$/bp"]).drop(columns="ord")
+            df_dv01c["abs_R$"] = df_dv01c["DV01_R$/bp"].abs()
+
+            total_abs = float(df_dv01c["abs_R$"].sum())
+            df_dv01c["share_%"] = (df_dv01c["abs_R$"] / total_abs * 100.0) if total_abs > 0 else 0.0
+
+            # barras horizontais com label R$ e % do total
+            fig = px.bar(
+                df_dv01c.sort_values("abs_R$", ascending=True),
+                x="DV01_R$/bp", y="Classe",
+                orientation="h",
+                labels={"DV01_R$/bp": "DV01 (R$/bp)", "Classe": ""},
+                text=df_dv01c.apply(lambda r: f"{fmt_rs(r['DV01_R$/bp'])} • {r['share_%']:.2f}%", axis=1)
+            )
+            fig.update_traces(
+                textposition="outside",
+                marker_color=df_dv01c["DV01_R$/bp"].apply(lambda v: "#2563EB" if v >= 0 else "#EF4444")
+            )
+            fig.update_layout(
+                height=max(240, 60*len(df_dv01c)),
+                margin=dict(l=10, r=10, t=10, b=10),
+                xaxis=dict(title="DV01 (R$/bp)", tickformat=",.0f")
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        else:
+            st.info("DV01 por classe indisponível.")
+
+        
         # ==========================
         # CoVaR por ativo — Plotly
         # ==========================
@@ -7134,7 +7137,7 @@ def simulate_nav_cota() -> None:
                         for x in df_contratos_2.index.tolist() if str(x) != 'Total']
         #assets, df_contratos, fundos
         #calcular_metricas_de_fundo2(default_assets, df_contratos_2, lista_fundos)
-        calcular_metricas_de_fundo3(default_assets, df_contratos_2, lista_fundos)
+        #calcular_metricas_de_fundo3(default_assets, df_contratos_2, lista_fundos)
 
 
         #d6.metric("Stress DV01 (R$)", f"{risco['Stress DV01 (R$)']:,.2f}")

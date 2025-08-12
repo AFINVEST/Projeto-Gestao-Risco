@@ -5671,8 +5671,8 @@ def calcular_metricas_por_pl(
         }, default_assets)
 
     # ---------------- 5) Pesos por MV e MV_total ----------------
-    if "Valor Fechamento Ajustado pelo Var" in df_precos_ajustados.columns:
-        precos_ult = df_precos_ajustados["Valor Fechamento Ajustado pelo Var"].reindex(assets_universe)
+    if "Valor Fechamento" in df_precos_ajustados.columns:
+        precos_ult = df_precos_ajustados["Valor Fechamento"].reindex(assets_universe)
     else:
         precos_ult = df_completo_u[assets_universe].ffill().loc[:data_eff].iloc[-1]
 
@@ -6263,13 +6263,13 @@ def simulate_nav_cota() -> None:
         #                                range =["#084594", "#2ca02c"]))  # verde & laranja
         #    )
         #)
-    #
+        #
         #labels = (
         #    barras.mark_text(
         #            dy=-8, fontSize=11, fontWeight="bold", color="black")
         #        .encode(text=alt.Text("Retorno:Q", format=".1%"))
         #)
-    #
+        #
         #st.altair_chart(
         #    (barras + labels)
         #    .properties(height=320)
@@ -7686,7 +7686,6 @@ def main_page():
                 columns_sem_fundo.remove('Fundos/Carteiras Adm')
             if 'PL' in columns_sem_fundo:
                 columns_sem_fundo.remove('PL')
-
             st.write("### Selecione as colunas")
             col1_, col2_, col3_ = st.columns([4, 3, 3])
             columns = []

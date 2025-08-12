@@ -657,6 +657,55 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                 subdf['Rendimento'] = rendimentos
                 rendimento_final = sum(rendimentos)
 
+            elif 'DI' in subdf['Ativo'].iloc[0]:
+                df_ajuste = pd.read_parquet('Dados/df_valor_ajuste_contrato.parquet')
+
+                # Se a última coluna é igual à penúltima, remove a última (cópia)
+                if df_ajuste.iloc[:, -1].equals(df_ajuste.iloc[:, -2]):
+                    df_ajuste = df_ajuste.iloc[:, :-1]
+
+                # Corrigir formatação
+                colunas_datas = df_ajuste.columns[1:]
+                df_ajuste[colunas_datas] = (
+                    df_ajuste[colunas_datas]
+                    .replace('\.', '', regex=True)
+                    .replace(',', '.', regex=True)
+                    .astype(float)
+                )
+
+                # Converter nomes de colunas (datas) para datetime e manter apenas válidas
+                datas_convertidas = pd.to_datetime(colunas_datas, errors='coerce')
+                colunas_datas_validas = [
+                    col for col, data in zip(df_ajuste.columns[1:], datas_convertidas) if pd.notnull(data)
+                ]
+                df_ajuste = df_ajuste[['Assets'] + colunas_datas_validas]
+
+                # Linha de ajuste do ativo
+                ativo = subdf['Ativo'].iloc[0]
+                linha_ajuste = df_ajuste[df_ajuste['Assets'] == ativo].drop(columns='Assets')
+                datas_ajuste = pd.to_datetime(linha_ajuste.columns) if not linha_ajuste.empty else pd.to_datetime([])
+
+                # Itera cada compra
+                rendimentos = []
+                for _, row in subdf.iterrows():
+                    dia_compra  = pd.to_datetime(row['Dia de Compra'])
+                    quantidade  = row['Quantidade']
+
+                    # 1) PnL do DIA DA COMPRA (D0) por unidade
+                    pnl_d0_unit = (row['Preço de Ajuste Atual'] - row['Preço de Compra'])
+
+                    # 2) Ajustes a partir de D+1
+                    if linha_ajuste.empty:
+                        soma_ajustes_unit = 0.0
+                    else:
+                        colunas_uteis = linha_ajuste.columns[datas_ajuste > dia_compra]  # estritamente > D0
+                        soma_ajustes_unit = linha_ajuste[colunas_uteis].sum(axis=1).values[0] if len(colunas_uteis) else 0.0
+
+                    rendimento = (pnl_d0_unit + soma_ajustes_unit) * quantidade
+                    rendimentos.append(rendimento)
+
+                subdf['Rendimento'] = rendimentos
+                rendimento_final = sum(rendimentos)
             else:
                 rendimento_final = (preco_ajuste_atual -
                                     preco_medio_compra) * qtd_total

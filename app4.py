@@ -454,6 +454,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                             colunas_uteis = df_ajuste.columns[df_ajuste.columns >
                                                               coluna_dia_compra_str]
                             colunas_uteis = colunas_uteis[colunas_uteis != 'Assets']
+                            colunas_uteis = colunas_uteis[:-1]
                             if len(colunas_uteis) > 0:
                                 # Pegar o valor do ajuste mais recente
                                 rendimento = valor_ajuste * qtd_final
@@ -505,6 +506,8 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                             colunas_uteis = df_ajuste.columns[df_ajuste.columns >
                                                               coluna_dia_compra_str]
                             colunas_uteis = colunas_uteis[colunas_uteis != 'Assets']
+                            #Dropar a ultima coluna
+                            colunas_uteis = colunas_uteis[:-1]
                             if len(colunas_uteis) > 0:
                                 # Pegar o valor do ajuste mais recente
                                 rendimento = valor_ajuste * qtd_final

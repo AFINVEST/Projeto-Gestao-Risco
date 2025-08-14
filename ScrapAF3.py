@@ -127,7 +127,7 @@ def main():
 
         # Indices dos fundos que compõem o TOTAL
         indices_total = [0, 7, 10, 14, 15, 16, 17, 20, 25]
-
+        
         # Coleta de dados
         current_date = start_date
         while current_date <= end_date:

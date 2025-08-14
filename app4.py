@@ -5441,29 +5441,63 @@ def analisar_dados_fundos2(
 # ---------------------------------------------------------------
 import altair as alt
 
-def plot_cota_altair(cota: pd.Series) -> alt.Chart:
-    df = (
-        cota.reset_index()
-            .rename(columns={"index": "Data", 0: "Cota"})
-            .sort_values("Data")                # garante ordem
-    )
-    y_min, y_max = df["Cota"].min(), df["Cota"].max()
-    pad = 0.002 * (y_max - y_min)
+def plot_cota_altair(cota: pd.Series, cdi_cum: pd.Series | None = None) -> alt.Chart:
+    # --- alinhar índices (interseção) ---
+    if cdi_cum is not None:
+        idx = cota.index.intersection(cdi_cum.index)
+        df = pd.DataFrame({
+            "Data": idx,
+            "Carteira": cota.reindex(idx).values,
+            "CDI":      cdi_cum.reindex(idx).values,
+        })
+        cols_val = ["Carteira", "CDI"]
+        y_min = float(np.nanmin(df[cols_val].values))
+        y_max = float(np.nanmax(df[cols_val].values))
+    else:
+        df = pd.DataFrame({"Data": cota.index, "Carteira": cota.values})
+        cols_val = ["Carteira"]
+        y_min = float(df["Carteira"].min())
+        y_max = float(df["Carteira"].max())
 
-    return (
+    # padding vertical suave
+    pad = 0.002 * (y_max - y_min) if y_max > y_min else 0.01
+
+    # dados em formato "long" com fold
+    base = (
         alt.Chart(df)
-            .mark_line(strokeWidth=2, color="#1565c0")
-            .encode(
-                x=alt.X("Data:T", title="", axis=alt.Axis(format="%d-%b")),
-                y=alt.Y("Cota:Q",
-                        scale=alt.Scale(domain=[y_min-pad, y_max+pad]),
-                        title="Índice (base=1)"),
-                tooltip=[alt.Tooltip("Data:T", title="Data", format="%d %b %Y"),
-                         alt.Tooltip("Cota:Q", title="Cota", format=".4f")]
-            )
-            .properties(height=320)
-            .interactive()
+        .transform_fold(
+            fold=cols_val,  # ["Carteira"] ou ["Carteira","CDI"]
+            as_=["Série", "Índice"]
+        )
     )
+
+    # mapeamento de cores fixas (azul carteira, cinza CDI)
+    color_scale = alt.Scale(
+        domain=["Carteira", "CDI"],
+        range=["#1565c0", "#7f7f7f"]
+    )
+
+    # linhas
+    linhas = (
+        base
+        .mark_line(strokeWidth=2)
+        .encode(
+            x=alt.X("Data:T", title="", axis=alt.Axis(format="%d-%b")),
+            y=alt.Y("Índice:Q",
+                    title="Índice (base=1)",
+                    scale=alt.Scale(domain=[y_min - pad, y_max + pad])),
+            color=alt.Color("Série:N", title="", scale=color_scale),
+            tooltip=[
+                alt.Tooltip("Data:T", title="Data", format="%d %b %Y"),
+                alt.Tooltip("Série:N", title="Série"),
+                alt.Tooltip("Índice:Q", title="Valor", format=".4f"),
+            ],
+        )
+        .properties(height=320)
+        .interactive()
+    )
+
+    return linhas
 
 # 2) ---- BARRAS DO RETORNO DIÁRIO ----------------------------------
 def plot_ret_diario(ret: pd.Series) -> alt.Chart:
@@ -5984,6 +6018,7 @@ def build_positions_timeseries(
               .sort_index()
         )
         pos = last.reindex(trading_index).ffill().fillna(0.0)
+    
 
     return pos.where(np.isfinite(pos), 0.0)
 
@@ -5999,7 +6034,7 @@ def _pl_ref_from_series(pl_series: pd.Series, d: pd.Timestamp) -> float:
 # ============================================================
 # HISTÓRICO NORMALIZADO (Top-N + Outros) PARA ÁREA EMPILHADA
 # ============================================================
-def _normalize_topN_from_dict(d: dict, top_n=8, use_abs=True, only_positive=False) -> pd.Series:
+def _normalize_topN_from_dict(d: dict, top_n=8, use_abs=True, only_positive=False, covar_tot_rs: float | None = None) -> pd.Series:
     s = pd.Series(d, dtype=float)
     s = s.replace({np.inf: np.nan, -np.inf: np.nan}).dropna()
     if only_positive:
@@ -6014,7 +6049,11 @@ def _normalize_topN_from_dict(d: dict, top_n=8, use_abs=True, only_positive=Fals
         top = s.head(top_n)
         outros = pd.Series({"Outros": s.iloc[top_n:].sum()})
         s = pd.concat([top, outros])
-    return (s / float(s.sum()))
+    if covar_tot_rs != 0:
+        return (s / covar_tot_rs)
+    else:
+        return (s / float(s.sum()))
+    #return (s)
 
 def build_history_normalized(
     dates: pd.DatetimeIndex,
@@ -6025,9 +6064,12 @@ def build_history_normalized(
     window: int = 126,          # janela para risco (CoVaR)
     alpha: float = 0.05,        # VaR para CoVaR
     pl_series: pd.Series | None = None,
+    covar_tot_rs: float | None = None
 
 ) -> pd.DataFrame:
     """Retorna df (datas x ativosTopN+Outros) com shares (0..1) normalizados por linha."""
+    #if not only_positive:
+    #    covar_tot_rs = 0.0 
     b = st.session_state.get("_risk_bundle")
     if b is None:
         raise RuntimeError("Bundle não encontrado em session_state['_risk_bundle'].")
@@ -6051,12 +6093,13 @@ def build_history_normalized(
         )
         if kind == "dv01":
             series_map = res["dv01_R$"]
-            norm = _normalize_topN_from_dict(series_map, top_n=top_n, use_abs=True, only_positive=False)
+            norm = _normalize_topN_from_dict(series_map, top_n=top_n, use_abs=True, only_positive=False, covar_tot_rs=covar_tot_rs)
+            #norm = series_map
         else:
             series_map = res["covar_R$"]
             # para CoVaR você pediu positivos → only_positive=True
-            norm = _normalize_topN_from_dict(series_map, top_n=top_n, use_abs=False, only_positive=True)
-
+            norm = _normalize_topN_from_dict(series_map, top_n=top_n, use_abs=False, only_positive=True, covar_tot_rs=covar_tot_rs)
+            #norm = series_map
         if norm.empty:
             continue
         rows.append(norm)
@@ -6074,7 +6117,6 @@ def calc_contribs_for_date_cached(
     window: int,
     alpha: float,
     bundle_signature: tuple,
-    # flags do que será retornado (evita “ifs” dentro do laço chamador)
     return_dv01: bool = True,
     return_covar: bool = True,
 ) -> dict:
@@ -6086,37 +6128,50 @@ def calc_contribs_for_date_cached(
     b = st.session_state.get("_risk_bundle")
     if b is None:
         raise RuntimeError("Bundle não encontrado em session_state['_risk_bundle'].")
-
-    d = pd.to_datetime(date_val)
+    
+    # Garantir que date_val seja convertido para Timestamp
+    d = pd.to_datetime(date_val, unit='ns')  # Convertendo 'date_val' para Timestamp
 
     # ---- Fatias na data ----
     rets = b["df_retorno_u"]
     cols = b["cols_returns"]
-    if d < rets.index[0]:
+
+    # Garantir que o primeiro índice de rets seja do tipo Timestamp
+    rets_index_first = pd.to_datetime(rets.index[0])  # Convertendo o primeiro índice de rets para Timestamp
+
+    # Verifique se 'd' é menor que o primeiro índice de retorno e retorne dicionário vazio
+    if d < rets_index_first:
         return {"dv01_R$": {}, "covar_R$": {}, "pesos": {}}
 
-    # janela rolante (ex.: 126d)
+    # Ajuste para usar o índice correto no pandas (DataFrame com Timestamps)
     df_hist = rets.loc[:d, cols].tail(window)
     if df_hist.empty:
         return {"dv01_R$": {}, "covar_R$": {}, "pesos": {}}
 
-    # preços (último disponível <= d)
-    precos_d = (
-        b["df_precos_u"][cols].loc[:d].ffill().tail(1).squeeze()
-        if hasattr(b["df_precos_u"], "squeeze")
-        else b["df_precos_u"][cols].loc[:d].ffill().iloc[-1]
-    )
+    # Garantir que os índices estejam como Timestamps
+    b["df_precos_u"].index = pd.to_datetime(b["df_precos_u"].index)
+
+    # Agora a linha de fatiamento funcionará corretamente
+    precos_d = b["df_precos_u"][cols].loc[:d].ffill().tail(1).squeeze()
+
+    # Converta precos_d para formato numérico
     precos_d = pd.to_numeric(precos_d, errors="coerce").fillna(0.0)
 
-    # quantidades na data (<= d)
+    # Quantidades na data (<= d) - Ajuste de índice
     q_d = b["positions_ts"].reindex(columns=cols)
+
+    # Caso as posições estejam vazias, retorne um dicionário vazio
     if q_d.empty:
         return {"dv01_R$": {}, "covar_R$": {}, "pesos": {}}
-    q_d = q_d.loc[_nearest_left(q_d.index, d)].fillna(0.0)
+
+    # Ajuste no cálculo das quantidades
+    # Ao invés de get_loc() com method='pad', vamos usar a fatiagem direta
+    q_d = q_d.loc[q_d.index <= d].iloc[-1].fillna(0.0)
 
     # MV e pesos
     mv_d = (precos_d * q_d.abs()).fillna(0.0)
     mv_total_d = float(mv_d.sum())
+
     if mv_total_d <= 0:
         pesos_d = pd.Series(0.0, index=cols)
     else:
@@ -6124,21 +6179,21 @@ def calc_contribs_for_date_cached(
 
     out = {"dv01_R$": {}, "covar_R$": {}, "pesos": pesos_d.to_dict()}
 
-    # ---------- DV01(d) ----------
+    # ---------- DV01(d) ---------- 
     if return_dv01:
         dv01_R_d = (b["dv01_pc"].reindex(cols).fillna(0.0) * q_d).astype(float)
         out["dv01_R$"] = dv01_R_d.to_dict()
 
     # ---------- CoVaR(d) ----------
     if return_covar:
-        # retorno do portfólio com os pesos NA DATA
+        # Retorno do portfólio com os pesos na data
         port_ret = (df_hist * pesos_d.reindex(df_hist.columns).values).sum(axis=1)
         std_p = float(port_ret.std())
+
         if std_p == 0 or np.isnan(std_p):
             out["covar_R$"] = {c: 0.0 for c in cols}
         else:
-            # beta de cada ativo vs portfólio
-            # cov(col, port) / var(port)
+            # Calculando a covariância e o beta
             cov = df_hist.cov()
             var_p = float(port_ret.var())
             cov_port = cov[port_ret.name] if port_ret.name in cov.columns else df_hist.apply(lambda x: x.cov(port_ret))
@@ -6147,7 +6202,7 @@ def calc_contribs_for_date_cached(
             # VaR do portfólio (retorno) no alfa
             var_port = abs(np.nanpercentile(port_ret.values, alpha*100.0))
 
-            mvar = beta * var_port                 # mVaR (ret)
+            mvar = beta * var_port  # mVaR (ret)
             covar_R = (mvar.reindex(cols).fillna(0.0) * pesos_d * mv_total_d).astype(float)
             out["covar_R$"] = covar_R.to_dict()
 
@@ -6174,32 +6229,72 @@ def normalize_topN(series_map: dict, top_n=8, use_abs=True, only_positive=False)
     return df
 
 # Carrega e prepara tudo que NÃO muda por data
+# Ajustando o código para garantir que a posição não seja zerada indevidamente e utilizando os dados de fechamento atualizados
+
+# Função para ajustar as posições, garantindo que não sejam zeradas quando não houver operação
+def adjust_positions(positions_ts, date, assets):
+    """Ajusta as posições dos ativos para garantir que não sejam zeradas indevidamente."""
+    # Verifica se a posição existe na data
+    if date in positions_ts.index:
+        return positions_ts.loc[date]
+    # Caso não haja posição na data, mantém a posição do dia anterior
+    previous_date = positions_ts.index[positions_ts.index.get_loc(date, method="pad")]
+    return positions_ts.loc[previous_date]
+
+# Ajustando o processo de retornos
+def process_returns_with_b3(df_b3_fechamento, assets):
+    """Processa os retornos utilizando os dados de fechamento mais recentes."""
+    # Transpor o DataFrame para que as datas sejam as linhas
+    df_b3_fechamento = df_b3_fechamento.set_index('Assets').transpose()
+    
+    # Garantir que as colunas sejam convertidas corretamente para valores numéricos
+    df_b3_fechamento = df_b3_fechamento.apply(pd.to_numeric, errors='coerce')
+    
+    # Verificar se os ativos solicitados estão presentes nas colunas do DataFrame
+    available_assets = df_b3_fechamento.columns
+    assets_to_use = [asset for asset in assets if asset in available_assets]
+
+    if not assets_to_use:
+        raise KeyError(f"Nenhum dos ativos solicitados está presente em df_b3_fechamento: {assets}")
+
+    # Seleciona os ativos presentes e usa os últimos 756 dias de dados (aproximadamente 3 anos)
+    df_b3_fechamento = df_b3_fechamento[assets_to_use].tail(756) 
+    
+    # Calculando os retornos logarítmicos
+    df_returns = np.log(df_b3_fechamento / df_b3_fechamento.shift(1))
+
+    return df_returns
+
+# Atualizando a função `get_risk_static_bundle` para refletir o uso correto do `df_b3_fechamento`
 @st.cache_resource(show_spinner=False)
 def get_risk_static_bundle(pl_signature: tuple, interpret_quantities: str = "delta"):
     """
-    pl_signature: (first_ts_int, last_ts_int, n)
-    Retorna um dict com tudo que é 'pesado' e não depende da data d da avaliação.
+    Atualiza a função para garantir o uso correto dos dados de fechamento e correção das posições.
     """
-    # 1) Universo de ativos de referência (usa suas funções)
+    # Verificar se o bundle já está no session_state
+    if '_risk_bundle' in st.session_state:
+        return st.session_state['_risk_bundle']  # Se já estiver no session_state, apenas retorna
+
+    # Caso não esteja no session_state, cria o bundle
+    b = {}
+
+    # Processar dados do portfólio
     default_assets, _, _ = processar_dados_port()
     df_base = pd.read_parquet('Dados/df_inicial.parquet')
-
-    # Preços & retornos do universo "default" (garante índices de datas)
     df_precos, df_completo = load_and_process_excel(df_base, default_assets)
     df_retorno = process_returns2(df_completo, default_assets)
     df_retorno = df_retorno.copy()
     df_retorno.index = pd.to_datetime(df_retorno.index)
-
-    # Para não perder histórico, abrimos universo com todos os que aparecerem
     assets_universe = sorted(set(default_assets) | set(df_retorno.columns))
-
-    # Recarrega com universo final (coerente com seu fluxo)
     df_precos_u, df_completo_u = load_and_process_excel(df_base, assets_universe)
-    df_retorno_u = process_returns2(df_completo_u, assets_universe)
+
+
+    # Processando os retornos com o df_b3_fechamento
+    df_b3_fechamento = load_b3_prices()  # Carregar os preços mais atualizados
+    df_retorno_u = process_returns_with_b3(df_b3_fechamento, default_assets)  # Usar a função ajustada para processar os retornos
     df_retorno_u.index = pd.to_datetime(df_retorno_u.index)
 
     trading_index = df_retorno_u.index
-
 
     trading_sig = (
         int(trading_index[0].value),
@@ -6207,40 +6302,56 @@ def get_risk_static_bundle(pl_signature: tuple, interpret_quantities: str = "del
         int(len(trading_index)),
     )
 
+    # Construção de positions_ts (exemplo de como fazer a construção das posições)
     positions_ts = build_positions_timeseries(
-        trading_index,                         # <- vai no parâmetro _trading_index
+        trading_index,
         interpret_quantities=interpret_quantities,
-        trading_sig=trading_sig                # <- entra no hash do cache_data
+        trading_sig=trading_sig
     )
 
+    # Adicionar dv01_pc ao bundle - Aqui você pode calcular ou carregar esses dados
+    # Exemplo de como calcular ou carregar 'dv01_pc' (deve ser adaptado ao seu caso)
     # DV01 por contrato (BBG) – estático
     file_bbg = "Dados/BBG - ECO DASH.xlsx"
     df_divone, _, _ = load_and_process_divone2(file_bbg, df_completo_u)
-    for cand in ("FUT_TICK_VAL","DV01","BPV","PVBP"):
+    
+    # Verificando se a chave 'DV01' existe na indexação de df_divone e processando
+    for cand in ("FUT_TICK_VAL", "DV01", "BPV", "PVBP"):
         if cand in df_divone.index:
             dv01_per_contract = pd.to_numeric(df_divone.loc[cand], errors="coerce").fillna(0.0)
             break
     else:
         # fallback: primeira linha
         dv01_per_contract = pd.to_numeric(df_divone.loc[df_divone.index[0]], errors="coerce").fillna(0.0)
+    # ou se for algum dado fixo
+    # df_dv01_pc = pd.Series(...)
 
-    # Posições históricas (em cima do trading_index)
-
-    # Assinatura hashable (para cache por data)
+    # Assinatura hashable para o cache
     bundle_signature = (
         int(trading_index[0].value), int(trading_index[-1].value),
         tuple(df_retorno_u.columns), len(df_retorno_u.columns)
     )
 
-    return {
-        "df_retorno_u": df_retorno_u,        # retornos (datas x ativos)
-        "df_precos_u":  df_completo_u,       # preços/níveis (datas x ativos)
+    # Criação do bundle e armazenamento no session_state
+    b = {
+        "df_retorno_u": df_retorno_u,
+        "df_precos_u": df_completo,
         "trading_index": trading_index,
         "cols_returns": list(df_retorno_u.columns),
-        "dv01_pc": dv01_per_contract,        # DV01 por contrato (Series)
-        "positions_ts": positions_ts,        # quantidades por dia (datas x ativos)
+        "positions_ts": positions_ts,
         "signature": bundle_signature,
+        "dv01_pc": dv01_per_contract,  # Incluindo 'dv01_pc' no bundle
     }
+
+    st.session_state['_risk_bundle'] = b  # Armazenar no session_state para evitar recalculo
+
+    return b
+
+# A partir disso, o código estará utilizando os preços mais atualizados, e as posições dos ativos serão corretamente mantidas mesmo quando não houver operações para determinado ativo.
+# Vamos aplicar essas mudanças agora.
+
+
+
 
 
 def fmt_rs_br(v, nd=0):
@@ -6356,7 +6467,10 @@ def simulate_nav_cota() -> None:
 
     # 1) Bundle estático e “ponte” no session_state
     pl_sig = (int(pl_series.index[0].value), int(pl_series.index[-1].value), len(pl_series))
-    bundle = get_risk_static_bundle(pl_sig, interpret_quantities="delta")  # ou "level"
+    bundle = get_risk_static_bundle(pl_sig, interpret_quantities="delta")
+
+    #Printar a parte de positions_ts
+    #st.write(bundle["positions_ts"])
     st.session_state["_risk_bundle"] = bundle
 
     #st.write(pl_series)
@@ -6493,8 +6607,8 @@ def simulate_nav_cota() -> None:
         # ─────────────── 6. métricas ──────────────────────────────
 
         # ───────────────────────────── 7. gráficos
-        st.altair_chart(plot_cota_altair(cota),  use_container_width=True)
-        st.altair_chart(plot_ret_diario(ret_total), use_container_width=True)
+        st.altair_chart(plot_cota_altair(cota, cdi_cum=cdi_cum), use_container_width=True)
+        st.altair_chart(plot_ret_diario(ret_total), use_container_width=True) 
 
         # ───────────────────────────── 8. cards de métricas
         # ─────────────── 8. caixinhas de métricas ─────────────────
@@ -7072,8 +7186,9 @@ def simulate_nav_cota() -> None:
     import plotly.graph_objects as go
 
     with tab_orcamento:
-        COL1, COL2 = st.columns(2)
-        with COL1:
+        col11,col22 = st.columns(2)
+        COL1, COLmeio, COL2 = st.columns([4.8, 0.2, 4.8])
+        with col11:
             st.subheader("Resumo de Orçamento")
             c1, c2  = st.columns(2)
             c1.metric("VaR (R$ / bps)",  var_display)
@@ -7081,19 +7196,40 @@ def simulate_nav_cota() -> None:
             # ---- orçamento de risco (1/2/3 bps) ----
             coll1,coll2 = st.columns(2)
             with coll1:
-                orcamento_bps_var = st.radio(
+                orcamento_bps_var = st.sidebar.radio(
                     "Orçamento de risco VaR (%)",
                 options=[1, 2, 3],
                 index=0,
                 horizontal=True
             )
             with coll2:
-                orcamento_bps_cvar = st.radio(
+                orcamento_bps_cvar = st.sidebar.radio(
                     "Orçamento de risco CVaR (%)",
                     options=[1, 2, 3],
                     index=2,
                     horizontal=True
                 )
+
+        with COLmeio:
+            # Adicionar linha vertical
+            st.html(
+                '''
+                        <div class="divider-vertical-lines"></div>
+                        <style>
+                            .divider-vertical-lines {
+                                border-left: 2px solid rgba(49, 51, 63, 0.2);
+                                height: 40vh;
+                                margin: auto;
+                            }
+                            @media (max-width: 768px) {
+                                .divider-vertical-lines {
+                                    display: none;
+                                }
+                            }
+                        </style>
+                        '''
+            )
+
 
 
 
@@ -7106,12 +7242,12 @@ def simulate_nav_cota() -> None:
     ultima_data_pico = is_peak[is_peak].index[-1] if is_peak.any() else cota.index[0]
     dias_em_dd = (cota.index[-1] - ultima_data_pico).days if dd_atual < 0 else 0
     with tab_orcamento:
-        with COL2:
+        with COL1:
             st.subheader("Resumo de DV01")
-            c4, c5, c6 = st.columns(3)
+            c4, c5= st.columns(2)
             c4.metric("DV01 Port (R$/bp / bps)", dv01_port_display)
             c5.metric("DV01 Stress (R$ / bps)",  dv01_strss_display)
-            c6.metric("CoVaR Total (R$ / bps)",  covar_tot_display)
+            #c6.metric("CoVaR Total (R$ / bps)",  covar_tot_display)
 
 
 
@@ -7156,10 +7292,15 @@ def simulate_nav_cota() -> None:
         # --- Gráfico: Drawdown histórico (linha azul, zero tracejado) ---
         with g1:
             fig_dd = go.Figure()
+
+            # Adicionar a linha do Drawdown
             fig_dd.add_trace(go.Scatter(
                 x=dd_series.index, y=dd_series.values,
-                mode="lines", name="Drawdown", line=dict(color="#1f77b4", width=2)
+                mode="lines", name="Drawdown", line=dict(color="#1f77b4", width=2),
+                fill='tozeroy',  # Preencher a área abaixo da linha com a cor desejada
+                fillcolor='rgba(173, 216, 230, 0.3)'  # Cor azul clarinho com transparência
             ))
+
             fig_dd.update_layout(
                 title="Drawdown",
                 xaxis_title="",
@@ -7171,6 +7312,7 @@ def simulate_nav_cota() -> None:
                     line=dict(width=1, dash="dot", color="#888")
                 )]
             )
+
             fig_dd.update_yaxes(tickformat=".2%")
             st.plotly_chart(fig_dd, use_container_width=True)
 
@@ -7341,11 +7483,11 @@ def simulate_nav_cota() -> None:
                 )
                 donut = base.mark_arc(outerRadius=80, innerRadius=55)
                 texto = alt.Chart(pd.DataFrame({"txt":[f"{pct:.2f}%"]})).mark_text(fontSize=18, fontWeight="bold").encode(text="txt:N")
-                st.altair_chart(donut | texto, use_container_width=False)
+                st.altair_chart(donut | texto, use_container_width=True)  # Ajustar altura do gráfico
             except Exception:
                 # fallback
                 st.progress(pct_clamped/100.0)
-        with COL1:
+        with col22:
             st.subheader("Consumo do orçamento (VaR e CVaR)")
             colA, colB = st.columns(2)
             with colA:
@@ -7359,7 +7501,7 @@ def simulate_nav_cota() -> None:
         import plotly.express as px
         import plotly.graph_objects as go
 
-        with COL2:
+        with COL1:
 
         # ===================== DV01 por CLASSE com CATEGORIAS empilhadas =====================
             st.subheader("DV01 por classe")
@@ -7464,6 +7606,7 @@ def simulate_nav_cota() -> None:
                             st.plotly_chart(fig, use_container_width=True)
 
                         # ---------------- donut: distribuição por ativo (Top-8 + Outros) ----------------
+                        PIE_HEIGHT = 340
                         with col_right:
                             df_norm = normalize_topN(dv01_asset_rs_dict, top_n=8, use_abs=True, only_positive=False)
                             if df_norm.empty:
@@ -7472,181 +7615,276 @@ def simulate_nav_cota() -> None:
                                 fig_p = go.Figure(go.Pie(
                                     labels=df_norm["label_short"],
                                     values=df_norm["pct"],
-                                    hole=0.55,
-                                    sort=False, direction="clockwise",
+                                    hole=0.55, sort=False, direction="clockwise",
                                     textinfo="percent+label",
-                                    textposition="inside",            # ← força rótulos dentro (sem linha)
-                                    insidetextorientation="radial"    # ← melhora leitura
+                                    textposition="inside",
+                                    insidetextorientation="radial"
                                 ))
                                 fig_p.update_traces(textfont=dict(size=12))
-                                fig_p.update_layout(margin=dict(l=10, r=10, t=10, b=10), showlegend=False)
+                                fig_p.update_layout(
+                                    margin=dict(l=10, r=10, t=10, b=10),
+                                    showlegend=False,
+                                    height=PIE_HEIGHT
+                                )
                                 st.plotly_chart(fig_p, use_container_width=True)
                                 st.caption("Distribuição do DV01 (|R$|): Top-8 + “Outros”.")
 
+
         # ========================== CoVaR por ativo (AJUSTES + PIZZA) ==========================
         # ===================== CoVaR por CLASSE (ativos empilhados) + donut =====================
-        st.subheader("CoVaR por classe")
+        #with COL2:
+        colll1, colllmeio, colll2 = st.columns([4.8, 0.2, 4.8])
+        with colll1:
 
-        covar_bps_dict = risco.get("CoVaR por ativo (bps)", {}) or {}
-        if not covar_bps_dict:
-            st.info("CoVaR por ativo indisponível para este portfólio.")
-        else:
-            import numpy as np, pandas as pd
-            import plotly.graph_objects as go
-
-            # ── mesma regra de classe usada no DV01 ───────────────────────────
-            def map_classe(a: str) -> str:
-                au = str(a).upper()
-                if au.startswith("DI_") or au.startswith("DI"):
-                    return "JUROS NOMINAIS BRASIL"
-                if au.startswith(("DAP","NTNB")):
-                    return "JUROS REAIS BRASIL"
-                if "TREASURY" in au:
-                    return "JUROS US"
-                if au.startswith("WDO"):
-                    return "MOEDA"
-                return "OUTROS"
-
-            def _short(s, n=22):
-                s = str(s);  return s if len(s) <= n else s[:n-1] + "…"
-
-            # ── base por ativo ────────────────────────────────────────────────
-            df_cv = pd.DataFrame({
-                "Ativo": list(covar_bps_dict.keys()),
-                "CoVaR_bps": [float(v) for v in covar_bps_dict.values()],
-            })
-            df_cv = df_cv[df_cv["CoVaR_bps"] != 0.0].copy()
-            if df_cv.empty:
-                st.info("Todos os CoVaR por ativo estão zerados.")
+            st.subheader("CoVaR por classe")
+            covar_bps_dict = risco.get("CoVaR por ativo (bps)", {}) or {}
+            if not covar_bps_dict:
+                st.info("CoVaR por ativo indisponível para este portfólio.")
             else:
-                df_cv["Classe"] = df_cv["Ativo"].map(map_classe)
+                import plotly.graph_objects as go
 
-                # wide: linhas = Classe, colunas = Ativo, valores = CoVaR (bps)
-                wide = (
-                    df_cv.pivot_table(index="Classe", columns="Ativo", values="CoVaR_bps", aggfunc="sum")
-                        .fillna(0.0)
-                )
+                # ── mesma regra de classe usada no DV01 ───────────────────────────
+                def map_classe(a: str) -> str:
+                    au = str(a).upper()
+                    if au.startswith("DI_") or au.startswith("DI"):
+                        return "JUROS NOMINAIS BRASIL"
+                    if au.startswith(("DAP","NTNB")):
+                        return "JUROS REAIS BRASIL"
+                    if "TREASURY" in au:
+                        return "JUROS US"
+                    if au.startswith("WDO"):
+                        return "MOEDA"
+                    return "OUTROS"
 
-                # ordem amigável de classes
-                classes_order = ["JUROS NOMINAIS BRASIL", "JUROS REAIS BRASIL", "JUROS US", "MOEDA", "OUTROS"]
-                present = [c for c in classes_order if c in wide.index] + [c for c in wide.index if c not in classes_order]
-                wide = wide.loc[present]
+                def _short(s, n=22):
+                    s = str(s);  return s if len(s) <= n else s[:n-1] + "…"
 
-                # remove ativos totalmente zerados (não aparecem na legenda)
-                wide = wide.loc[:, (wide != 0).any(axis=0)]
-                if wide.shape[1] == 0:
-                    st.info("Sem ativos com CoVaR diferente de zero para plotar.")
+                # ── base por ativo ────────────────────────────────────────────────
+                df_cv = pd.DataFrame({
+                    "Ativo": list(covar_bps_dict.keys()),
+                    "CoVaR_bps": [float(v) for v in covar_bps_dict.values()],
+                })
+
+                # Convertendo CoVaR de bps para percentual
+                df_cv["CoVaR_percent"] = df_cv["CoVaR_bps"]
+                df_cv = df_cv[df_cv["CoVaR_percent"] != 0.0].copy()
+
+                if df_cv.empty:
+                    st.info("Todos os CoVaR por ativo estão zerados.")
                 else:
-                    col_left, col_right = st.columns([7, 3])
+                    df_cv["Classe"] = df_cv["Ativo"].map(map_classe)
 
-                    # ---------------- barras empilhadas: Classe × (ativos) ----------------
-                    with col_left:
-                        fig = go.Figure()
+                    # wide: linhas = Classe, colunas = Ativo, valores = CoVaR (percentual)
+                    wide = (
+                        df_cv.pivot_table(index="Classe", columns="Ativo", values="CoVaR_percent", aggfunc="sum")
+                            .fillna(0.0)
+                    )
 
-                        # range do eixo X com base na soma dos positivos/negativos por classe
-                        pos_max = float(wide.clip(lower=0).sum(axis=1).max())
-                        neg_min = float(wide.clip(upper=0).sum(axis=1).min())
+                    # ordem amigável de classes
+                    classes_order = ["JUROS NOMINAIS BRASIL", "JUROS REAIS BRASIL", "JUROS US", "MOEDA", "OUTROS"]
+                    present = [c for c in classes_order if c in wide.index] + [c for c in wide.index if c not in classes_order]
+                    wide = wide.loc[present]
 
-                        # cada trace = 1 ativo empilhado por classe
-                        # (barmode="relative" empilha positivos e negativos)
-                        threshold = np.nanpercentile(np.abs(wide.values), 75) if wide.size else 0.0
-                        for ativo in wide.columns:
-                            x = wide[ativo]
-                            if (x == 0).all():
-                                continue
-                            fig.add_trace(go.Bar(
-                                y=wide.index,
-                                x=x,
-                                orientation="h",
-                                name=_short(ativo, 22),
-                                customdata=np.array([ativo]*len(x)),
-                                hovertemplate="<b>%{y}</b><br>Ativo: %{customdata}<br>CoVaR: %{x:,.2f} bps<extra></extra>",
-                                text=[f"{v:.2f}" if abs(v) >= threshold else "" for v in x],
-                                textposition="outside",
-                                cliponaxis=False,
-                            ))
+                    # remove ativos totalmente zerados (não aparecem na legenda)
+                    wide = wide.loc[:, (wide != 0).any(axis=0)]
+                    if wide.shape[1] == 0:
+                        st.info("Sem ativos com CoVaR diferente de zero para plotar.")
+                    else:
+                        col_left, col_right = st.columns([7, 3])
 
-                        fig.update_layout(
-                            barmode="relative",
-                            height=max(260, 64 * len(wide.index)),
-                            margin=dict(l=20, r=20, t=10, b=10),
-                            xaxis=dict(title="CoVaR (bps, com sinal)",
-                                    tickformat=",.2f", showgrid=True, gridcolor="#F3F4F6"),
-                            yaxis=dict(title=""),
-                            legend=dict(orientation="h", y=-0.25, x=0.5, xanchor="center", title="Ativos"),
-                            plot_bgcolor="white",
-                            shapes=[dict(type="line", xref="x", x0=0, x1=0, yref="paper", y0=0, y1=1,
-                                        line=dict(width=1, dash="dot", color="#9CA3AF"))],
-                        )
-                        pad = 0.12 * max(1.0, abs(pos_max), abs(neg_min))
-                        fig.update_xaxes(range=[neg_min - pad, pos_max + pad])
+                        # ---------------- barras empilhadas: Classe × (ativos) ----------------
+                        with col_left:
+                            fig = go.Figure()
 
-                        st.plotly_chart(fig, use_container_width=True)
+                            # range do eixo X com base na soma dos positivos/negativos por classe
+                            pos_max = float(wide.clip(lower=0).sum(axis=1).max())
+                            neg_min = float(wide.clip(upper=0).sum(axis=1).min())
 
-                    # ---------------- donut: distribuição (apenas positivos) ----------------
-                    with col_right:
-                        # só contribuições positivas contam na pizza
-                        df_norm = normalize_topN(
-                            dict(zip(df_cv["Ativo"], df_cv["CoVaR_bps"])),
-                            top_n=8, use_abs=False, only_positive=True
-                        )
-                        if df_norm.empty:
-                            st.info("Sem CoVaR positivo para normalizar.")
-                        else:
-                            fig_p = go.Figure(go.Pie(
-                                labels=df_norm["label_short"],
-                                values=df_norm["pct"],
-                                hole=0.55, sort=False, direction="clockwise",
-                                textinfo="percent+label",
-                                hovertemplate="<b>%{label}</b><br>Share: %{percent}<extra></extra>"
-                            ))
-                            fig_p.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-                            st.plotly_chart(fig_p, use_container_width=True)
-                            st.caption("Distribuição do CoVaR (apenas positivos): Top-8 + “Outros”.")
+                            # cada trace = 1 ativo empilhado por classe
+                            # (barmode="relative" empilha positivos e negativos)
+                            threshold = np.nanpercentile(np.abs(wide.values), 75) if wide.size else 0.0
+                            for ativo in wide.columns:
+                                x = wide[ativo]
+                                if (x == 0).all():
+                                    continue
+                                fig.add_trace(go.Bar(
+                                    y=wide.index,
+                                    x=x,
+                                    orientation="h",
+                                    name=_short(ativo, 22),
+                                    customdata=np.array([ativo]*len(x)),
+                                    hovertemplate="<b>%{y}</b><br>Ativo: %{customdata}<br>CoVaR: %{x:,.2f}%<extra></extra>",
+                                    text=[f"{v:.2f}%" if abs(v) >= threshold else "" for v in x],
+                                    textposition="outside",
+                                    cliponaxis=False,
+                                ))
 
+                            fig.update_layout(
+                                barmode="relative",
+                                margin=dict(l=20, r=20, t=10, b=10),
+                                xaxis=dict(title="CoVaR (%)", tickformat=",.2f", showgrid=True, gridcolor="#F3F4F6"),
+                                yaxis=dict(title=""),
+                                legend=dict(orientation="h", y=-0.25, x=0.5, xanchor="center", title="Ativos"),
+                                plot_bgcolor="white",
+                                shapes=[dict(type="line", xref="x", x0=0, x1=0, yref="paper", y0=0, y1=1,
+                                            line=dict(width=1, dash="dot", color="#9CA3AF"))],
+                            )
+                            pad = 0.12 * max(1.0, abs(pos_max), abs(neg_min))
+                            fig.update_xaxes(range=[neg_min - pad, pos_max + pad])
+
+                            st.plotly_chart(fig, use_container_width=True)
+
+                        # ---------------- donut: distribuição (apenas positivos) ----------------
+                        # ── CoVaR (pizza) ───────────────────────────────────────────────
+                        with col_right:
+                            df_norm = normalize_topN(
+                                dict(zip(df_cv["Ativo"], df_cv["CoVaR_bps"])),
+                                top_n=8, use_abs=False, only_positive=True
+                            )
+                            if df_norm.empty:
+                                st.info("Sem CoVaR positivo para normalizar.")
+                            else:
+                                fig_p = go.Figure(go.Pie(
+                                    labels=df_norm["label_short"],
+                                    values=df_norm["pct"],
+                                    hole=0.55, sort=False, direction="clockwise",
+                                    textinfo="percent+label",
+                                    textposition="inside",
+                                    insidetextorientation="radial"
+                                ))
+                                fig_p.update_traces(textfont=dict(size=12))
+                                fig_p.update_layout(
+                                    margin=dict(l=10, r=10, t=10, b=10),
+                                    showlegend=False,
+                                    height=PIE_HEIGHT
+                                )
+                                st.plotly_chart(fig_p, use_container_width=True)
+                                st.caption("Distribuição do CoVaR (apenas positivos): Top-8 + “Outros”.")
+
+        with colllmeio:
+            # Adicionar linha vertical
+            st.html(
+                '''
+                        <div class="divider-vertical-lines"></div>
+                        <style>
+                            .divider-vertical-lines {
+                                border-left: 2px solid rgba(49, 51, 63, 0.2);
+                                height: 40vh;
+                                margin: auto;
+                            }
+                            @media (max-width: 768px) {
+                                .divider-vertical-lines {
+                                    display: none;
+                                }
+                            }
+                        </style>
+                        '''
+            )
+        #with colll1:
         # ========================== Histórico empilhado (NOVO) ==========================
-        st.subheader("Histórico — composição normalizada")
-        st.subheader("Está errado ainda")
-        opt_freq = st.radio("Frequência do histórico", options=["Semanal","Diária"], horizontal=True, index=0)
+        with COL2:
+            st.subheader("Histórico de DV01 & CoVaR")
+            st.subheader("Em desenvolvimento")
+        opt_freq = "Diária"
         weekly = (opt_freq == "Semanal")
 
         # janelas: use o mesmo 'common' do app (período filtrado)
         dates_hist = pd.DatetimeIndex(common)
         dates_sig = (int(dates_hist[0].value), int(dates_hist[-1].value), int(len(dates_hist)))
-        
+
+        covar_tot_rs = capital0 * 0.01
+
+        #Gerar bundle
+    
         # DV01 normalizado (|R$|) — histórico
         df_hist_dv = build_history_normalized(
-            dates_hist, kind="dv01", top_n=8, weekly=True, only_positive=False, window=126, alpha=0.05
+            dates_hist, kind="dv01", top_n=8, weekly=True, only_positive=False, window=126, alpha=0.05, covar_tot_rs=covar_tot_rs
         )
+        #st.write(df_hist_dv)
 
         # CoVaR normalizado (apenas positivos) — histórico
         df_hist_cv = build_history_normalized(
-            dates_hist, kind="covar", top_n=8, weekly=True, only_positive=True, window=126, alpha=0.05
+            dates_hist, kind="covar", top_n=8, weekly=True, only_positive=True, window=126, alpha=0.05, covar_tot_rs=covar_tot_rs
         )
-        colH1, colH2 = st.columns(2)
+        #st.write(df_hist_cv)
 
-        with colH1:
-            st.caption("DV01 normalizado por ativo (área empilhada)")
-            if df_hist_dv.empty:
-                st.info("Sem histórico suficiente para DV01.")
-            else:
-                fig_area = px.area(df_hist_dv, x=df_hist_dv.index, y=df_hist_dv.columns)
-                fig_area.update_layout(margin=dict(l=10,r=10,t=10,b=10), legend_title_text="")
-                fig_area.update_yaxes(range=[0,1], tickformat=".0%")
+        #colH1, colH2 = st.columns(2)
+
+        #with colH1:
+        import plotly.express as px
+      
+
+        # Mapeamento de ativos para estratégias
+        estrategias = {
+            "Juros nominais": ['DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30', 'DI_31', 'DI_32', 'DI_33', 'DI_35'],
+            "Juros reais": ['DAP26', 'DAP27', 'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40', 'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'],
+            "Moeda": ['WDO1'],
+            "Juros US": ['TREASURY']
+        }
+
+        # Criar um mapeamento inverso de ativo -> estratégia
+        ativos_para_estrategia = {ativo: estrategia for estrategia, ativos in estrategias.items() for ativo in ativos}
+
+        # =========================================================================================================================
+        # Geração dos gráficos
+        # =========================================================================================================================
+
+        # DV01 normalizado por estratégia (área empilhada)
+        if df_hist_dv.empty:
+            st.info("Sem histórico suficiente para DV01.")
+        else:
+            with COL2:
+                st.caption("DV01 por estratégia (área empilhada)")
+                # 1. Agrupar os dados por estratégia (reutilizando a lógica)
+                existing_cols = [col for col in df_hist_dv.columns if col in ativos_para_estrategia]
+                df_hist_dv_filtrado = df_hist_dv[existing_cols]
+                mapper = {col: ativos_para_estrategia[col] for col in existing_cols}
+                df_hist_dv_estrategia = df_hist_dv_filtrado.groupby(by=mapper, axis=1).sum()
+
+                # 2. Normalizar os dados agrupados
+                #df_hist_dv_normalized = df_hist_dv_estrategia.divide(df_hist_dv_estrategia.sum(axis=1), axis=0)
+                df_hist_dv_normalized = df_hist_dv_estrategia
+
+                # 3. Plotar o gráfico de área empilhada
+                fig_area = px.area(df_hist_dv_normalized, x=df_hist_dv_normalized.index, y=df_hist_dv_normalized.columns,
+                                labels={'value': 'Proporção', 'variable': 'Estratégia'},
+                                title="DV01 Normalizado por Estratégia")
+                fig_area.update_layout(margin=dict(l=10, r=10, t=10, b=10), legend_title_text="")
+                # Limitar o eixo y a 6% (0.06)
+                fig_area.update_yaxes(range=[0, 0.06], tickformat=".0%", title="Proporção de DV01")
                 fig_area.update_traces(hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>")
+
+                # Exibir o gráfico
                 st.plotly_chart(fig_area, use_container_width=True)
 
-        with colH2:
-            st.caption("CoVaR normalizado por ativo (apenas positivos) — área empilhada")
-            if df_hist_cv.empty:
-                st.info("Sem histórico suficiente para CoVaR.")
-            else:
-                fig_area2 = px.area(df_hist_cv, x=df_hist_cv.index, y=df_hist_cv.columns)
-                fig_area2.update_layout(margin=dict(l=10,r=10,t=10,b=10), legend_title_text="")
-                fig_area2.update_yaxes(range=[0,1], tickformat=".0%")
+
+        # CoVaR normalizado por estratégia (apenas positivos) — área empilhada
+        if df_hist_cv.empty:
+            st.info("Sem histórico suficiente para CoVaR.")
+        else:
+            with colll2:
+                st.caption("CoVaR por estratégia (apenas positivos) — área empilhada")
+                # 1. Agrupar os dados por estratégia (reutilizando a lógica)
+                df_hist_cv_positive = df_hist_cv.clip(lower=0)
+                existing_cols = [col for col in df_hist_cv_positive.columns if col in ativos_para_estrategia]
+                df_hist_cv_filtrado = df_hist_cv_positive[existing_cols]
+                mapper = {col: ativos_para_estrategia[col] for col in existing_cols}
+                df_hist_cv_estrategia = df_hist_cv_filtrado.groupby(by=mapper, axis=1).sum()
+                
+                # 2. Normalizar os dados agrupados
+                #df_hist_cv_normalized = df_hist_cv_estrategia.divide(df_hist_cv_estrategia.sum(axis=1), axis=0)
+                df_hist_cv_normalized = df_hist_cv_estrategia
+                # 3. Plotar o gráfico de área empilhada
+                fig_area2 = px.area(df_hist_cv_normalized, x=df_hist_cv_normalized.index, y=df_hist_cv_normalized.columns,
+                                    labels={'value': 'Proporção', 'variable': 'Estratégia'},
+                                    title="CoVaR Normalizado por Estratégia (Positivos)")
+                fig_area2.update_layout(margin=dict(l=10, r=10, t=10, b=10), legend_title_text="")
+                fig_area2.update_yaxes(range=[0, 1], tickformat=".0%", title="Proporção de CoVaR")
                 fig_area2.update_traces(hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>")
                 st.plotly_chart(fig_area2, use_container_width=True)
+        
 
+                    
 
     #with tab_fundos:
     #    df_contratos_2 = read_atual_contratos()

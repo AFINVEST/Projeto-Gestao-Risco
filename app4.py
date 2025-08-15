@@ -7865,6 +7865,7 @@ def simulate_nav_cota() -> None:
             with colll2:
                 st.caption("CoVaR por estratégia (apenas positivos) — área empilhada")
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
+                st.write(df_hist_cv)
                 df_hist_cv_positive = df_hist_cv.clip(lower=0)
                 existing_cols = [col for col in df_hist_cv_positive.columns if col in ativos_para_estrategia]
                 df_hist_cv_filtrado = df_hist_cv_positive[existing_cols]

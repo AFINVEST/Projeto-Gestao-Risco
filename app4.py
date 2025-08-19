@@ -7857,7 +7857,6 @@ def simulate_nav_cota() -> None:
                 # Exibir o gráfico
                 st.plotly_chart(fig_area, use_container_width=True)
 
-
         # CoVaR normalizado por estratégia (apenas positivos) — área empilhada
         if df_hist_cv.empty:
             st.info("Sem histórico suficiente para CoVaR.")
@@ -7884,9 +7883,7 @@ def simulate_nav_cota() -> None:
                 fig_area2.update_traces(hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>")
                 st.plotly_chart(fig_area2, use_container_width=True)
         
-
-                    
-
+                
     #with tab_fundos:
     #    df_contratos_2 = read_atual_contratos()
     #    for col in df_contratos_2.columns:
@@ -7916,12 +7913,14 @@ def main_page():
     st.title("Dashboard de Análise de Risco de Portfólio")
     atualizar_base_fundos()
     att_parquet_supabase()
+
     file_pl = "Dados/pl_fundos.parquet"
     df_pl = pd.read_parquet(file_pl)
     file_bbg = "Dados/BBG - ECO DASH.xlsx"
-    
 
-    # Dicionário de pesos fixo (pode-se tornar dinâmico no futuro)
+    # ---------------------------
+    # Dicionário de pesos (base)
+    # ---------------------------
     dict_pesos = {
         'GLOBAL BONDS': 4,
         'HORIZONTE': 1,
@@ -7934,48 +7933,181 @@ def main_page():
         'AF DEB INCENTIVADAS': 3
     }
 
-    Weights = list(dict_pesos.values())
+    # ===========================================
+    # 1) Importar CSV de execuções (uma vez só)
+    # ===========================================
+    st.sidebar.write("## Importar execuções (.csv)")
+    csv_file = st.sidebar.file_uploader(
+        "Escolha o arquivo de execuções", type=["csv"], key="csv_execs_top"
+    )
 
+    def ler_execucoes_csv(uploaded_file):
+        """
+        Lê um CSV (sep=';', latin1, pula 1ª linha) e retorna:
+          - df_normalizado: ['Ativo','Qtd Executada','Preço','Preço por Qtd','Total Executado','Conta']
+          - exec_dict: {ativo: {'quantidade_executada','preco','preco_por_qtd','Conta'}}
+        Normaliza tickers:
+          - DI: remove 2 chars após 'DI' e mantém YY -> DI_YY
+          - DAP: remove 1 letra após 'DAP' e mantém YY -> DAPYY
+        """
+        import pandas as pd, re
+        df = pd.read_csv(uploaded_file, sep=";", encoding="latin1", skiprows=1)
+
+        obrig = ["Ativo", "Qtd Executada", "Preço", "Total Executado"]
+        faltando = [c for c in obrig if c not in df.columns]
+        if faltando:
+            raise ValueError(f"Colunas obrigatórias ausentes no CSV: {faltando}")
+
+        def br_to_float(s):
+            return (s.astype(str)
+                      .str.replace(".", "", regex=False)          # milhar
+                      .str.replace(",", ".", regex=False)         # decimal
+                      .str.replace(r"^(.+)-$", r"-\1", regex=True)  # 123,45- -> -123.45
+                      .astype(float))
+
+        df["Qtd Executada"]   = br_to_float(df["Qtd Executada"])
+        df["Preço"]           = br_to_float(df["Preço"])
+        df["Total Executado"] = br_to_float(df["Total Executado"])
+
+        # Normalização do ticker
+        def norm_ativo(a: str) -> str:
+            s = str(a).strip().upper().replace(" ", "")
+            m = re.match(r"^DI(?:[A-Z0-9]{1,2})(\d{2})$", s)
+            if m: return f"DI_{m.group(1)}"
+            m = re.match(r"^DAP[A-Z](\d{2})$", s)
+            if m: return f"DAP{m.group(1)}"
+            return s
+
+        df["Ativo"] = df["Ativo"].apply(norm_ativo)
+        df["Preço por Qtd"] = df["Total Executado"] / df["Qtd Executada"]
+        if "Conta" not in df.columns:
+            df["Conta"] = None
+
+        exec_dict = {}
+        for _, row in df.iterrows():
+            k = str(row["Ativo"])
+            exec_dict[k] = {
+                "quantidade_executada": float(row["Qtd Executada"]),
+                "preco":                float(row["Preço"]),
+                "preco_por_qtd":        float(row["Preço por Qtd"]),
+                "Conta": None if pd.isna(row["Conta"]) else str(row["Conta"]),
+            }
+
+        df_out = df[["Ativo", "Qtd Executada", "Preço", "Preço por Qtd", "Total Executado", "Conta"]].copy()
+        return df_out, exec_dict
+
+    # Lê CSV (se houver) e salva no estado
+    if csv_file is not None:
+        try:
+            df_csv, dict_csv = ler_execucoes_csv(csv_file)
+            st.session_state["execucoes_df"]   = df_csv
+            st.session_state["execucoes_dict"] = dict_csv
+            #st.sidebar.success("CSV importado com sucesso!")
+            with st.sidebar.expander("Prévia do CSV", expanded=False):
+                st.dataframe(df_csv.head(20))
+        except Exception as e:
+            st.sidebar.error(f"Falha ao ler CSV: {e}")
+            st.session_state.pop("execucoes_df", None)
+            st.session_state.pop("execucoes_dict", None)
+
+    # ===========================================
+    # 2) Ajuste automático de pesos pelo CSV
+    #     - somente DI  -> zera AF DEB INCENTIVADAS e GLOBAL BONDS
+    #     - somente DAP -> zera GLOBAL BONDS
+    #     Além disso, pré-seleciona esses fundos no multiselect com peso 0
+    # ===========================================
+    ativos_csv = list((st.session_state.get("execucoes_dict") or {}).keys())
+    fundos_zero_auto = []  # para pré-selecionar visualmente
+
+    if len(ativos_csv) > 0:
+        only_di  = all(a.startswith("DI")  for a in ativos_csv)
+        only_dap = all(a.startswith("DAP") for a in ativos_csv)
+
+        if only_di:
+            for f in ("AF DEB INCENTIVADAS", "GLOBAL BONDS"):
+                if f in dict_pesos:
+                    dict_pesos[f] = 0.0
+                    fundos_zero_auto.append(f)
+            #st.sidebar.info("Detectado CSV apenas com DI → zerados: AF DEB INCENTIVADAS e GLOBAL BONDS.")
+        elif only_dap:
+            if "GLOBAL BONDS" in dict_pesos:
+                dict_pesos["GLOBAL BONDS"] = 0.0
+                fundos_zero_auto.append("GLOBAL BONDS")
+            #st.sidebar.info("Detectado CSV apenas com DAP → zerado: GLOBAL BONDS.")
+
+    # ===========================================
+    # 3) Ajuste manual de pesos (mostra zeros)
+    #    Os fundos zerados automaticamente já aparecem pré-selecionados
+    # ===========================================
     st.sidebar.write("## Pesos dos Fundos")
     st.sidebar.write("Caso queira, defina os pesos de cada fundo:")
-    fundos = st.sidebar.multiselect("Selecione os Fundos:",
-                                    list(dict_pesos.keys()),
-                                    None)
+
+    # default do multiselect = fundos zerados automaticamente (se houver)
+    fundos = st.sidebar.multiselect(
+        "Selecione os Fundos:", list(dict_pesos.keys()),
+        default=fundos_zero_auto if fundos_zero_auto else None
+    )
     if fundos:
         for fundo in fundos:
             peso = st.sidebar.number_input(
-                f"Peso para {fundo}:", min_value=0.0, value=1.0, step=0.1
+                f"Peso para {fundo}:", min_value=0.0, value=float(dict_pesos[fundo]), step=0.1
             )
             dict_pesos[fundo] = peso
+
     Weights = list(dict_pesos.values())
 
-    df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(
-        df_pl, Weights)
-    
-    # guarda no estado para não refazer se o usuário mudar só filtros visuais
+    # Processa PL com os pesos (já ajustados, se houve CSV)
+    df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(df_pl, Weights)
+
+    # guarda no estado
     st.session_state.setdefault("df_pl_processado", df_pl_processado)
     st.session_state.setdefault("df_precos_ajustados_base", None)
 
+    # universo de preços
     df = pd.read_parquet('Dados/df_inicial.parquet')
 
     default_assets, quantidade_inicial, portifolio_default = processar_dados_port()
+
+    # ===========================================
+    # 4) Restante do app
+    #    (mesmo CSV será usado para distribuir posições em "Adicionar Ativos")
+    # ===========================================
     st.sidebar.write("## OPÇÕES DO DASHBOARD")
-    opti = st.sidebar.radio("Escolha uma opção:", [
-                            "Ver Portfólio", "Adicionar Ativos", "Remover Ativos", "Simular Cota"])
+    opti = st.sidebar.radio(
+        "Escolha uma opção:",
+        ["Ver Portfólio", "Adicionar Ativos", "Remover Ativos", "Simular Cota"]
+    )
+
     if opti == "Adicionar Ativos":
         st.sidebar.write("## Ativos do Portfólio")
 
-        default_or_not = st.sidebar.checkbox(
-            "Usar ativos portfólio", value=False)
+        # NÃO re-solicitamos CSV aqui — usamos o mesmo já lido no topo.
+        # Se quiser permitir trocar, você pode manter um segundo uploader,
+        # mas o pedido foi usar o MESMO CSV para tudo.
+
+        default_or_not = st.sidebar.checkbox("Usar ativos portfólio", value=False)
+
+        # lista de colunas disponíveis para selecionar
+        lista_todos_ativos = list(df.columns)
+
+        # se houver CSV, sugerir como default os ativos presentes no CSV que existam no universo
+        csv_defaults = []
+        exec_dict = st.session_state.get("execucoes_dict") or {}
+        if exec_dict:
+            csv_defaults = [a for a in exec_dict.keys() if a in lista_todos_ativos]
 
         if default_or_not:
-            assets = st.sidebar.multiselect("Selecione os ativos:",
-                                            list(df.columns),
-                                            default_assets)
+            default_sel = default_assets if not csv_defaults else csv_defaults
+            assets = st.sidebar.multiselect("Selecione os ativos:", lista_todos_ativos, default=default_sel)
         else:
-            assets = st.sidebar.multiselect("Selecione os ativos:",
-                                            list(df.columns),
-                                            'WDO1')
+            default_sel = ["WDO1"] if not csv_defaults else csv_defaults
+            assets = st.sidebar.multiselect("Selecione os ativos:", lista_todos_ativos, default=default_sel)
+
+        # avisa se algum ativo do CSV não existe no universo do app
+        if exec_dict and csv_defaults != list(exec_dict.keys()):
+            faltantes = [a for a in exec_dict.keys() if a not in lista_todos_ativos]
+            if faltantes:
+                st.sidebar.warning(f"Ativos no CSV fora do universo do app (ignorados): {', '.join(faltantes)}")
 
         if len(assets) > 0:
             df_precos, df_completo = load_and_process_excel(df, assets)
@@ -7983,71 +8115,71 @@ def main_page():
             var_ativos = var_not_parametric(df_retorno).abs()
             df_precos_ajustados = adjust_prices_with_var(df_precos, var_ativos)
 
-            # ---------------------
-            # ENTRADA DE QUANTIDADES
-            # ---------------------
+            # --------------------- ENTRADA DE QUANTIDADES ---------------------
             qtd_input = []
             quantidade_nomes = {}
-            # Função para obter o último weekday
 
             last_weekday = get_last_weekday()
             df_b3_fechamento = load_b3_prices()
             ultimo_dia_dados_b3 = df_b3_fechamento.columns[-1]
-            ultimo_dia_dados_b3 = datetime.datetime.strptime(
-                ultimo_dia_dados_b3, "%Y-%m-%d")
+            ultimo_dia_dados_b3 = datetime.datetime.strptime(ultimo_dia_dados_b3, "%Y-%m-%d")
 
             data_compra_todos = st.sidebar.date_input(
-                "Dia de Compra dos Ativos:", value=ultimo_dia_dados_b3, max_value=ultimo_dia_dados_b3)
+                "Dia de Compra dos Ativos:", value=ultimo_dia_dados_b3, max_value=ultimo_dia_dados_b3
+            )
 
-            # Conferir se a data escolhida esta dentre as colunas do df_b3_fechamento
             data_compra_todos2 = str(data_compra_todos)
             if data_compra_todos2 not in df_b3_fechamento.columns:
-                st.sidebar.error(
-                    f"Data de compra inválida! Possível final de semana ou feriado.")
+                st.sidebar.error("Data de compra inválida! Possível final de semana ou feriado.")
                 st.stop()
-            # Converter datas disponíveis para lista
-            # Criar o selectbox
-            st.html(
-                '''
+
+            st.html("""
                 <style>
-                div[data-testid="stDateInput"] input {
-                    color: black; /* Define o texto */
-                                                    }
-                
-                </style>   
-        
-                '''
-            )
-            # Garante que "quantidade_inicial" esteja em st.session_state
+                div[data-testid="stDateInput"] input { color: black; }
+                </style>
+            """)
 
             data_compra_todos = data_compra_todos.strftime("%Y-%m-%d")
             precos_user = {}
 
+            # NOVO: acesso rápido ao dicionário importado
+            exec_dict = st.session_state.get("execucoes_dict", {})
+
             for col in df_precos_ajustados.index:
-                # Verifica se existe valor em st.session_state["quantidade_inicial"] para a ação col
-                # Número de contratos
+                # Defaults vindos do CSV se existir; senão, seus defaults antigos (1 e 0.0)
+                info = exec_dict.get(col, {})
+                default_qtd   = int(info.get("quantidade_executada", 1) or 1)
+                default_preco = float(info.get("preco_por_qtd", 0.0) or 0.0)
+
                 val = st.sidebar.number_input(
                     f"Quantidade para {col}:",
                     min_value=-10000,
-                    value=1,
-                    step=1
+                    value=default_qtd,
+                    step=1,
+                    key=f"qtd_{col}"
                 )
-                # Preço (você pode ou não persistir em session_state)
-                precos_user[col] = st.sidebar.number_input(
+                preco_val = st.sidebar.number_input(
                     f"Preço de {col}:",
                     min_value=0.0,
-                    value=0.0,
-                    step=0.5
+                    value=default_preco,
+                    step=0.5,
+                    key=f"preco_{col}"
                 )
 
                 qtd_input.append(val)
                 quantidade_nomes[col] = val
+                precos_user[col] = preco_val
 
             quantidade = np.array(qtd_input)
 
-            data_compra = {}
-            for ativo in assets:
-                data_compra[ativo] = data_compra_todos
+            data_compra = {ativo: data_compra_todos for ativo in assets}
+
+            # (opcional) guardar também o mapeamento de Conta por ativo, se veio no CSV:
+            conta_por_ativo = {}
+            for a in assets:
+                if a in exec_dict and exec_dict[a].get("Conta") is not None:
+                    conta_por_ativo[a] = exec_dict[a]["Conta"]
+            st.session_state["conta_por_ativo"] = conta_por_ativo
             # Valor do Portfólio (soma simples)
             vp = df_precos_ajustados['Valor Fechamento'] * abs(quantidade)
             vp_soma = vp.sum()

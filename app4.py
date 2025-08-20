@@ -319,7 +319,7 @@ def processar_dados_port():
 #               'WDO1': '2025-01-17', 'TREASURY': '2025-01-17'}
 
 
-def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_contratos):
+def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_contratos,df_view):
     """
     Verifica ou cria um parquet de portfólio. Exibe dois DataFrames:
       1) Posição atual salva no parquet.
@@ -537,6 +537,8 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
         except Exception as e:
             st.error(f"Erro ao processar o ativo {asset}: {e}")
 
+
+
     # -----------------------------------------------------------------------
     # 1) Exibir o "Portfólio Atual" (linhas já salvas no parquet)
     # 2) Exibir as "Novas Operações"
@@ -546,8 +548,8 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
     col_p1, col_p3, col_p2 = st.columns([4.9, 0.2, 4.9])
 
     with col_p1:
-        #st.subheader("Portfólio Atual (já salvo)")
-        #st.table(df_portifolio_salvo.set_index('Ativo'))
+        st.subheader("Portfólio Atual")
+        st.table(df_view)
 
         # Agrupar para ver quantidades consolidadas do portfólio atual
         df_atual = df_portifolio_salvo.groupby('Ativo', as_index=False)[
@@ -6054,6 +6056,39 @@ def _normalize_topN_from_dict(d: dict, top_n=8, use_abs=True, only_positive=Fals
     else:
         return (s / float(s.sum()))
     #return (s)
+# ============================================================
+# HISTÓRICO NORMALIZADO (Top-N + Outros) PARA ÁREA EMPILHADA
+# ============================================================
+def _normalize_topN_signed(d: dict, top_n=8, covar_tot_rs: float | None = None) -> pd.Series:
+    """Seleciona Top-N por |valor|, agrega 'Outros' com sinal preservado
+       e normaliza mantendo o sinal.
+       - Se covar_tot_rs != 0, divide por esse total (mantém unidades relativas).
+       - Senão, usa normalização L1 (divide pela soma de |valores|)."""
+
+
+    s = pd.Series(d, dtype=float)
+    s = s.replace({np.inf: np.nan, -np.inf: np.nan}).dropna()
+    if s.empty:
+        return pd.Series(dtype=float)
+
+    # Top-N por magnitude, mas mantendo os sinais originais
+    order = s.abs().sort_values(ascending=False)
+    if len(order) > top_n:
+        keep_idx = order.index[:top_n]
+        top = s.loc[keep_idx]
+        outros_val = s.loc[order.index[top_n:]].sum()  # soma COM sinal
+        if outros_val != 0:
+            top = pd.concat([top, pd.Series({"Outros": outros_val})])
+    else:
+        top = s.loc[order.index]
+
+    if covar_tot_rs and float(covar_tot_rs) != 0.0:
+        return top / float(covar_tot_rs)
+
+    denom = top.abs().sum()
+    if denom == 0:
+        return pd.Series(dtype=float)
+    return top / denom  # shares assinadas (somatório dos |shares| = 1)
 
 def build_history_normalized(
     dates: pd.DatetimeIndex,
@@ -6061,28 +6096,21 @@ def build_history_normalized(
     top_n: int = 8,
     weekly: bool = True,
     only_positive: bool = False,
-    window: int = 126,          # janela para risco (CoVaR)
-    alpha: float = 0.05,        # VaR para CoVaR
+    window: int = 126,
+    alpha: float = 0.05,
     pl_series: pd.Series | None = None,
     covar_tot_rs: float | None = None
-
 ) -> pd.DataFrame:
-    """Retorna df (datas x ativosTopN+Outros) com shares (0..1) normalizados por linha."""
-    #if not only_positive:
-    #    covar_tot_rs = 0.0 
     b = st.session_state.get("_risk_bundle")
     if b is None:
         raise RuntimeError("Bundle não encontrado em session_state['_risk_bundle'].")
 
-    # Redução semanal (sexta) para aliviar custo
     if weekly:
         dates = pd.DatetimeIndex(dates).to_series().groupby(pd.Grouper(freq="W-FRI")).last().dropna().index
 
-    rows = []
-    idxs = []
+    rows, idxs = [], []
     for d in dates:
         date_val = int(pd.Timestamp(d).value)
-        # calcula só o necessário por data
         res = calc_contribs_for_date_cached(
             date_val=date_val,
             window=window,
@@ -6091,15 +6119,18 @@ def build_history_normalized(
             return_dv01=(kind=="dv01"),
             return_covar=(kind=="covar"),
         )
+
         if kind == "dv01":
-            series_map = res["dv01_R$"]
-            norm = _normalize_topN_from_dict(series_map, top_n=top_n, use_abs=True, only_positive=False, covar_tot_rs=covar_tot_rs)
-            #norm = series_map
+            series_map = res["dv01_R$"]                         # ← COM sinal
+            norm = _normalize_topN_signed(
+                series_map, top_n=top_n, covar_tot_rs=covar_tot_rs
+            )
         else:
             series_map = res["covar_R$"]
-            # para CoVaR você pediu positivos → only_positive=True
-            norm = _normalize_topN_from_dict(series_map, top_n=top_n, use_abs=False, only_positive=True, covar_tot_rs=covar_tot_rs)
-            #norm = series_map
+            # CoVaR: mantém só positivos e normaliza por soma (0..1)
+            norm = _normalize_topN_from_dict(
+                series_map, top_n=top_n, use_abs=False, only_positive=True, covar_tot_rs=covar_tot_rs
+            )
         if norm.empty:
             continue
         rows.append(norm)
@@ -6108,8 +6139,7 @@ def build_history_normalized(
     if not rows:
         return pd.DataFrame()
 
-    df_out = pd.DataFrame(rows, index=idxs).sort_index().fillna(0.0)
-    return df_out
+    return pd.DataFrame(rows, index=idxs).sort_index().fillna(0.0)
 
 @st.cache_data(show_spinner=False)
 def calc_contribs_for_date_cached(
@@ -6472,6 +6502,8 @@ def simulate_nav_cota() -> None:
     #Printar a parte de positions_ts
     #st.write(bundle["positions_ts"])
     st.session_state["_risk_bundle"] = bundle
+    #Escrever a position
+
 
     #st.write(pl_series)
     # o retorno de calcular_metricas_por_pl é     return {    "PL_ref (R$)"       : float(pl_ref),    "VaR (bps)"         : float(var_bps),    "CVaR (bps)"        : float(cvar_bps),    "VaR (R$)"          : float(var_R),    "CVaR (R$)"         : float(cvar_R),    "Stress DV01 (R$)"  : float(stress_R),    "Stress DV01 (bps)" : float(stress_bps),}
@@ -6587,6 +6619,10 @@ def simulate_nav_cota() -> None:
 
     mu_excesso   = excesso_diario.mean()        # retorno médio diário
     sigma_excesso = excesso_diario.std()        # desvio-padrão diário
+    
+    dd_series = (cota / cota.cummax()) - 1
+    dd_atual = float(dd_series.iloc[-1])
+
 
     sharpe_cdi = (mu_excesso / sigma_excesso) * np.sqrt(252)
     c1, c2, c3, c4, c5, c6 = st.columns(6)
@@ -7196,12 +7232,27 @@ def simulate_nav_cota() -> None:
             # ---- orçamento de risco (1/2/3 bps) ----
             coll1,coll2 = st.columns(2)
             with coll1:
+                st.write(dd_atual)
+                var_base_pct = 0.01
+                var_cut_pct  = 0.005     # 0.5%
+                gatilho_dd   = 0.03      # -3%
+
+                var_efetivo_pct = var_base_pct - var_cut_pct if dd_atual <= gatilho_dd else var_base_pct
+
+                var_efetivo_bps = var_efetivo_pct * 100
+                if var_efetivo_bps == 0.5:
+                    index = 0
+                elif var_efetivo_bps == 1.0:
+                    index = 1
+                st.write(var_efetivo_bps)
+
                 orcamento_bps_var = st.sidebar.radio(
                     "Orçamento de risco VaR (%)",
-                options=[1, 2, 3],
-                index=0,
+                options=[0.5,1, 2, 3],
+                index=index,
                 horizontal=True
-            )
+                )
+
             with coll2:
                 orcamento_bps_cvar = st.sidebar.radio(
                     "Orçamento de risco CVaR (%)",
@@ -7234,8 +7285,7 @@ def simulate_nav_cota() -> None:
 
 
     # ======================= DRAWNDOWN: série, atual e dias =======================
-    dd_series = (cota / cota.cummax()) - 1
-    dd_atual = float(dd_series.iloc[-1])
+
 
     rolling_max = cota.cummax()
     is_peak = (cota == rolling_max)
@@ -7487,7 +7537,7 @@ def simulate_nav_cota() -> None:
             except Exception:
                 # fallback
                 st.progress(pct_clamped/100.0)
-        with col22:
+        with col11:
             st.subheader("Consumo do orçamento (VaR e CVaR)")
             colA, colB = st.columns(2)
             with colA:
@@ -7638,6 +7688,19 @@ def simulate_nav_cota() -> None:
 
             st.subheader("CoVaR por classe")
             covar_bps_dict = risco.get("CoVaR por ativo (bps)", {}) or {}
+            pl_ref = float(risco.get("PL_ref (R$)", 0.0))
+            covar_tot_rs = capital0 * 0.01   # o mesmo que você usou no histórico
+
+            s_bps = pd.Series(covar_bps_dict, dtype=float).clip(lower=0)           # só positivos
+            s_rs  = s_bps * pl_ref / 1e4                                           # bps -> R$
+
+            # usa o mesmo normalizador da área (Top-N + "Outros" e divide pelo budget)
+            df_norm = _normalize_topN_from_dict(
+                s_rs.to_dict(), top_n=8, use_abs=False, only_positive=True, covar_tot_rs=covar_tot_rs
+            )
+            # df_norm agora são frações do orçamento; use isso para o donut
+            labels = df_norm.index.tolist()
+            values = df_norm.values.tolist()
             if not covar_bps_dict:
                 st.info("CoVaR por ativo indisponível para este portfólio.")
             else:
@@ -7936,9 +7999,13 @@ def main_page():
     # ===========================================
     # 1) Importar CSV de execuções (uma vez só)
     # ===========================================
-    st.sidebar.write("## Importar execuções (.csv)")
+    st.sidebar.write("## Arquivo da Operação (csv)")
+
     csv_file = st.sidebar.file_uploader(
-        "Escolha o arquivo de execuções", type=["csv"], key="csv_execs_top"
+        "Escolha o arquivo de execuções", 
+        type=["csv"], 
+        key="csv_execs_top",
+        label_visibility="collapsed"
     )
 
     def ler_execucoes_csv(uploaded_file):
@@ -8075,7 +8142,7 @@ def main_page():
     st.sidebar.write("## OPÇÕES DO DASHBOARD")
     opti = st.sidebar.radio(
         "Escolha uma opção:",
-        ["Ver Portfólio", "Adicionar Ativos", "Remover Ativos", "Simular Cota"]
+        ["Ver Portfólio", "Adicionar Ativos", "Remover Ativos", "Simular Cota"], index=3
     )
 
     if opti == "Adicionar Ativos":
@@ -8133,7 +8200,8 @@ def main_page():
                 st.sidebar.error("Data de compra inválida! Possível final de semana ou feriado.")
                 st.stop()
 
-            st.html("""
+            st.html(
+            """
                 <style>
                 div[data-testid="stDateInput"] input { color: black; }
                 </style>
@@ -8657,8 +8725,149 @@ def main_page():
                             '''
                 )
 
+
+            # 1) Contratos atuais
+            df_contratos = read_atual_contratos_cached()
+
+            # 2) PL e pesos
+            file_pl = "Dados/pl_fundos.parquet"
+            df_pl = pd.read_parquet(file_pl)
+
+            dict_pesos = {
+                'GLOBAL BONDS': 4,
+                'HORIZONTE': 1,
+                'JERA2026': 1,
+                'REAL FIM': 1,
+                'BH FIRF INFRA': 1,
+                'BORDEAUX INFRA': 1,
+                'TOPAZIO INFRA': 1,
+                'MANACA INFRA FIRF': 1,
+                'AF DEB INCENTIVADAS': 3
+            }
+
+            # zera pesos de fundos sem contratos
+            for idx, row in df_contratos.iterrows():
+                if str(idx).strip().lower() == 'total':
+                    continue
+                tem_contrato = any(int(row[a]) != 0 for a in default_assets if a in row.index)
+                if not tem_contrato:
+                    dict_pesos[idx] = 0
+
+            Weights = list(dict_pesos.values())
+
+            # 3) Processa portfólio e preços/retornos
+            df_pl_processado, soma_pl, soma_pl_sem_pesos = process_portfolio(df_pl, Weights)
+            df_precos, df_completo = load_and_process_excel(df, default_assets)
+            df_retorno = process_returns(df_completo, default_assets)
+            var_ativos = var_not_parametric(df_retorno).abs()
+
+            # 4) Preços ajustados pelo VaR (mantenha numérico até o fim)
+            if st.session_state.get("df_precos_ajustados_base") is None:
+                st.session_state["df_precos_ajustados_base"] = adjust_prices_with_var(df_precos, var_ativos)
+
+            df_precos_ajustados = st.session_state["df_precos_ajustados_base"].copy()
+            df_precos_ajustados = adjust_prices_with_var(df_precos, var_ativos)
+
+            # 5) Calcula valores e contratos por fundo (numérico!)
+            df_precos_ajustados = calculate_portfolio_values(df_precos_ajustados, df_pl_processado, var_bps)
+            df_pl_processado = calculate_contracts_per_fund(df_pl_processado, df_precos_ajustados)
+
+            # 6) >>> GARANTIR COLUNA 'Quantidade' <<<
+            # monte o mapa de quantidades a partir do seu dicionário quantidade_inicial
+            quantidade_map = {asset: int(quantidade_inicial.get(asset, 0)) for asset in default_assets}
+
+            df_precos_ajustados = df_precos_ajustados.copy()
+            if 'Quantidade' not in df_precos_ajustados.columns:
+                if 'Ativo' in df_precos_ajustados.columns:
+                    # se houver coluna 'Ativo', alinha por ela
+                    df_precos_ajustados['Quantidade'] = df_precos_ajustados['Ativo'].map(quantidade_map).fillna(0)
+                else:
+                    # caso contrário, alinha pelo índice
+                    df_precos_ajustados['Quantidade'] = pd.Index(df_precos_ajustados.index).map(quantidade_map).fillna(0)
+
+            # garanta tipo numérico
+            df_precos_ajustados['Quantidade'] = pd.to_numeric(df_precos_ajustados['Quantidade'], errors='coerce').fillna(0)
+
+            # 7) Agora podemos gerar o df_pl_processado_input
+            df_pl_processado_input = calculate_contracts_per_fund_input(df_pl_processado, df_precos_ajustados)
+
+            # ===================== df_view =====================
+
+            # base do filtered_df
+            filtered_df = df_pl_processado_input.copy()
+
+            # adiciona linha Total (numérico!)
+            sum_row = filtered_df.select_dtypes(include='number').sum()
+            sum_row['Fundos/Carteiras Adm'] = 'Total'
+            if 'Adm' in filtered_df.columns:
+                sum_row['Adm'] = ''
+            filtered_df = pd.concat([filtered_df, sum_row.to_frame().T], ignore_index=True)
+            filtered_df.index = filtered_df['Fundos/Carteiras Adm']
+
+            # substitui colunas "Contratos X" pelos números atuais de df_contratos (se existir a coluna base)
+            col_contratos = [c for c in filtered_df.columns if c.startswith('Contratos ')]
+            for col in col_contratos:
+                base = col.replace('Contratos ', '')
+                if base in df_contratos.columns:
+                    filtered_df[col] = df_contratos[base]
+
+            # identifica colunas e linha Total
+            contract_cols = [c for c in filtered_df.columns if str(c).startswith('Contratos')]
+            non_contract_cols = [c for c in filtered_df.columns if c not in contract_cols]
+            total_label = next((idx for idx in filtered_df.index if str(idx).strip().lower() == 'total'), None)
+
+            # garante numérico nas colunas de contratos
+            df_num = filtered_df[contract_cols].apply(pd.to_numeric, errors='coerce').fillna(0)
+
+            # atualiza somatório na linha Total
+            sum_by_col = df_num.drop(index=total_label, errors='ignore').sum(axis=0) if total_label is not None else df_num.sum(axis=0)
+            if total_label is not None:
+                filtered_df.loc[total_label, contract_cols] = sum_by_col.round().astype(int)
+
+            # mantém apenas contratos com soma != 0
+            keep_contract_cols = [c for c in contract_cols if abs(sum_by_col.get(c, 0)) != 0]
+            df_view = filtered_df[non_contract_cols + keep_contract_cols].copy()
+
+            # renomeia "Contratos XXX" -> "XXX"
+            rename_map = {c: c.replace('Contratos ', '') for c in keep_contract_cols}
+            df_view = df_view.rename(columns=rename_map)
+            asset_cols_clean = list(rename_map.values())
+
+            # arredonda para inteiros (preservando NaN)
+            if asset_cols_clean:
+                df_view[asset_cols_clean] = (
+                    df_view[asset_cols_clean]
+                    .apply(pd.to_numeric, errors='coerce')
+                    .round(0)
+                    .astype('Int64')
+                )
+
+            # remove colunas cujo total (exceto Total) seja 0
+            if asset_cols_clean and total_label is not None:
+                zero_cols = [c for c in asset_cols_clean
+                            if (pd.to_numeric(df_view.loc[df_view.index != total_label, c], errors='coerce')
+                                .fillna(0).sum() == 0)]
+                if zero_cols:
+                    df_view = df_view.drop(columns=zero_cols, errors='ignore')
+                    asset_cols_clean = [c for c in asset_cols_clean if c not in zero_cols]
+
+            # ordena ativos por soma absoluta descrescente
+            if asset_cols_clean:
+                soma_abs = {
+                    c: abs(pd.to_numeric(df_view.loc[df_view.index != total_label, c], errors='coerce').fillna(0).sum())
+                    for c in asset_cols_clean
+                }
+                order_assets = sorted(asset_cols_clean, key=lambda k: soma_abs[k], reverse=True)
+                df_view = df_view[non_contract_cols + order_assets]
+
+            # drop de colunas auxiliares
+            drop_cols = ['Fundos/Carteiras Adm', 'PL', 'Weights', 'PL_atualizado', 'Adm']
+            drop_cols += [c for c in df_view.columns if str(c).startswith('Max')]
+            df_view = df_view.drop(columns=drop_cols, errors='ignore')
             df_port, key, soma_pl_sem_pesos = checkar_portifolio(
-                assets, quantidade_nomes, precos_user, data_compra, filtered_df)
+                assets, quantidade_nomes, precos_user, data_compra, filtered_df, df_view)
+
+
             
             if key == True:
                 atualizar_parquet_fundos(
@@ -8686,6 +8895,7 @@ def main_page():
             # -------------------------------------------------
             # Armazena dados em chaves "temporárias" p/ callback
             # -------------------------------------------------
+
 
         else:
             st.write("Nenhum Ativo selecionado.")

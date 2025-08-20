@@ -105,7 +105,19 @@ df_b3 = pd.read_parquet('Dados/df_preco_de_ajuste_atual.parquet')
 
 # Fazer o merge dos dataframes
 df_precos = pd.concat([df_b3, df_ntnb], axis=0)
+#Preencher dados faltantes com a coluna anterior
+id_col = "Assets"
+date_cols = [c for c in df_precos.columns if c != id_col]
+
+# 2) ordena as colunas por data (importante para o ffill horizontal)
+date_cols = sorted(date_cols, key=pd.to_datetime)
+df_precos = df_precos[[id_col] + date_cols]
+
+# 3) forward fill na horizontal (datas)
+df_precos[date_cols] = df_precos[date_cols].ffill(axis=1)
+
 df_precos.to_parquet('Dados/df_preco_de_ajuste_atual_completo.parquet')
+
 dados = pd.read_excel(r'Z:\Asset Management\FUNDOS e CLUBES\Gerencial\dashboard LFT.xlsx', sheet_name='Historico preços')
 #Renomear a coluna 'Unnamed: 0' para 'Data'
 dados.rename(columns={'Unnamed: 0': 'Data'}, inplace=True)

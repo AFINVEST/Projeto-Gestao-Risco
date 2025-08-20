@@ -5269,15 +5269,17 @@ def load_lft_series() -> pd.Series:
 
     return df.set_index("Data")["lft_ret"].astype(float)
 
+from collections import defaultdict
+
 def analisar_dados_fundos2(
         soma_pl_sem_pesos: float,
         df_b3_fechamento : pd.DataFrame | None = None,
         df_ajuste        : pd.DataFrame | None = None,
         basefundos       : dict[str, pd.DataFrame] | None = None
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict]:
     import numpy as np, pandas as pd
 
-    # ───────── 1. entradas
+    # ───────── 1) Entradas e normalizações ─────────
     if df_b3_fechamento is None:
         df_b3_fechamento = load_b3_prices()
     if df_ajuste is None:
@@ -5285,36 +5287,47 @@ def analisar_dados_fundos2(
     if basefundos is None:
         basefundos = load_basefundos()
 
-    preco_lookup = df_b3_fechamento.set_index("Assets")          # lookup rápido
-    dolar        = preco_lookup.loc["WDO1", df_b3_fechamento.columns[-1]]
+    # (a) normaliza colunas de data
+    df_b3 = df_b3_fechamento.copy()
+    assert "Assets" in df_b3.columns, "df_b3_fechamento precisa ter coluna 'Assets'."
 
-    # prepara df_ajuste com cabeçalhos-data
+    # Colunas de data como Timestamp ordenadas
+    date_cols_b3 = pd.to_datetime(df_b3.columns[1:], errors="coerce")
+    df_b3.columns = ["Assets"] + list(date_cols_b3)
+    df_b3 = df_b3.loc[:, ["Assets"] + sorted([c for c in df_b3.columns[1:] if pd.notna(c)])]
+
+    # Converte pt-BR -> float, se necessário (ex: 22.304,03)
+    prices_only = df_b3.columns[1:]
+    if df_b3[prices_only].select_dtypes(include="object").size > 0:
+        df_b3[prices_only] = (df_b3[prices_only]
+            .replace({r"\.": "", ",": "."}, regex=True)
+            .apply(pd.to_numeric, errors="coerce"))
+
+    # ffill horizontal para evitar gaps; indexing rápido
+    preco_lookup = (df_b3.set_index("Assets")
+                        .sort_index(axis=1)
+                        .ffill(axis=1))
+
+    # (b) df_ajuste com datas coerentes (string YYYY-MM-DD para chavear .get)
     df_ajuste = df_ajuste.copy()
     df_ajuste.columns = (["Assets"] +
                          [pd.to_datetime(c, errors="coerce").strftime("%Y-%m-%d")
                           for c in df_ajuste.columns[1:]])
     df_ajuste.set_index("Assets", inplace=True)
 
+    # ───────── 2) Acumuladores ─────────
     pnl_cash, pnl_bps = {}, {}
-    despesas_cash : dict[str, pd.Series] = {}        # novo!
+    despesas_cash : dict[str, pd.Series] = {}
 
-    PU_FINAL = 100_000  # já existia
-    #Tenho os valores atuais dos ativos em df_b3_fechamento
-    #Formula pra calcular a desepesas do DI vai ser:
-    # despesas = (PU_final - PU_atual) * 0.03 * qtd * 0.005
-    # Onde PU_final é 100000, PU_atual é o valor atual do ativo, qtd é a quantidade de contratos
-    #Contratos de DAP e TREASURY são fixos, então não entram na fórmula
-    #Contrato de dolar também é fixo, então não entra na fórmula
+    # ► NOVO: financeiro diário de NTNB (por data)
+    financeiro_ntnb_daily = defaultdict(float)  # {Timestamp: float}
 
-    DESPESAS_FIXAS = {
-        "DAP"     : 3.0,
-        "DI"      : 3.0,
-        "TREASURY": 10.0,
-        "WDO1"    : 1.0,
-    }
+    PU_FINAL = 100_000
+    DESPESAS_FIXAS = {"DAP":3.0, "DI":3.0, "TREASURY":10.0, "WDO1":1.0}
 
+    dolar = preco_lookup.loc["WDO1", preco_lookup.columns[-1]] if "WDO1" in preco_lookup.index else 1.0
 
-    # ───────── 2. loop fundos / operações
+    # ───────── 3) Loop fundos / operações ─────────
     for fundo, df_f in basefundos.items():
         if 'Ativo' in df_f.columns:
             df_f = df_f.set_index('Ativo')
@@ -5325,88 +5338,81 @@ def analisar_dados_fundos2(
 
         for ativo, linha in df_f.iterrows():
             for col_q in cols_qtd:
-                qtd = float(linha[col_q])        # garante número
-                if pd.isna(qtd) or qtd == 0:
+                qtd = float(linha[col_q]) if pd.notna(linha[col_q]) else 0.0
+                if qtd == 0: 
                     continue
 
-                data_op  = col_q.split()[0]
-                p_compra = linha[col_q.replace("Quantidade", "Preco_Compra")]
-                pl_op    = linha[col_q.replace("Quantidade", "PL")]
-
-                # ------------------- DESPESA FIXA --------------------------
-                if fundo.upper() == "TOTAL":
+                # datas coerentes
+                data_op = pd.to_datetime(col_q.split()[0], errors="coerce")
+                if pd.isna(data_op):
                     continue
-                else:
-                    # 2) ROOT do ativo
+
+                p_compra = linha.get(col_q.replace("Quantidade", "Preco_Compra"), np.nan)
+                pl_op    = linha.get(col_q.replace("Quantidade", "PL"), np.nan)
+
+                # ─── despesas fixas ───────────────────────────────────
+                if fundo.upper() != "TOTAL":
                     raiz = ativo.split("_")[0]
-                    if raiz.startswith(("DAP", "DI")):   # normaliza
-                        raiz = raiz[:3]                  # “DAP30” → “DAP”,  “DI_27”→“DI”
-                        
-                    # 3) calcula despesa
+                    if raiz.startswith(("DAP","DI")):
+                        raiz = raiz[:3]
+                    # custo por ativo
                     if raiz == "DI":
                         try:
-                            # preço na data da operação (melhor) – se não houver, usa último fechamento
-                            PU_atual = preco_lookup.at[ativo, data_op]
-                        except KeyError:
-                            PU_atual = preco_lookup.at[ativo, df_b3_fechamento.columns[-1]]
-
+                            PU_atual = float(preco_lookup.at[ativo, data_op])
+                        except Exception:
+                            PU_atual = float(preco_lookup.at[ativo, preco_lookup.columns[-1]])
                         custo_op = (PU_FINAL - PU_atual) * 0.03 * abs(qtd) * 0.005
-                        #st.write(f"Despesa DI: {custo_op:.2f} para {ativo} no dia {data_op}")
-                        #st.write(f"PU atual: {PU_atual:.2f}, PU final: {PU_FINAL:.2f}, qtd: {qtd}")
-                        #st.write(preco_lookup)
                     elif raiz == "WDO1":
                         try:
-                            # preço na data da operação (melhor) – se não houver, usa último fechamento
-                            PU_atual = preco_lookup.at[ativo, data_op]
-                        except KeyError:
-                            PU_atual = preco_lookup.at[ativo, df_b3_fechamento.columns[-1]]
-                        #st.write(f"PU atual: {PU_atual:.2f} para {ativo} no dia {data_op}")
-                        #custo_op = (PU_atual) * 10 *  0.02 * abs(qtd) * 0.005
-                        custo_op = (PU_atual) *  0.02 * abs(qtd) * 0.005
-                        #st.write(f"Despesa DI: {custo_op:.2f} para {ativo} no dia {data_op}")
-                        #st.write(f"PU atual: {PU_atual:.2f}, PU final: {PU_FINAL:.2f}, qtd: {qtd}")
-                        #st.write(preco_lookup)
-
+                            PU_atual = float(preco_lookup.at[ativo, data_op])
+                        except Exception:
+                            PU_atual = float(preco_lookup.at[ativo, preco_lookup.columns[-1]])
+                        custo_op = (PU_atual) * 0.02 * abs(qtd) * 0.005
                     else:
-                        # custo fixo por contrato
                         custo_op = DESPESAS_FIXAS.get(raiz, 0.0) * abs(qtd)
 
                     if custo_op:
-                        despesas_cash.setdefault("Despesas", pd.Series()).at[data_op] = \
-                            despesas_cash.get("Despesas", pd.Series()).get(data_op, 0.0) + custo_op
+                        dkey = data_op.strftime("%Y-%m-%d")
+                        despesas_cash.setdefault("Despesas", pd.Series()).at[dkey] = \
+                            despesas_cash.get("Despesas", pd.Series()).get(dkey, 0.0) + custo_op
 
                 usa_bps = not pd.isna(pl_op) and pl_op != 0
                 p_ant   = p_compra
 
-                for data_fech in df_b3_fechamento.columns[1:]:
+                # itera todas as datas de mercado a partir de data_op
+                for data_fech in preco_lookup.columns:
                     if data_fech < data_op:
                         continue
 
-                    try:
-                        p_fech = preco_lookup.at[ativo, data_fech]
-                    except KeyError:
-                        break       # sem preço, pula resto
+                    p_fech = preco_lookup.get(data_fech, pd.Series()).get(ativo, np.nan)
+                    if not np.isfinite(p_fech):
+                        # sem preço mesmo após ffill → pula esta data (não faz break)
+                        continue
 
-                    # regra de rendimento
+                    # ─── regra de P&L e financeiro NTNB ─────────────────────────
                     if ativo == "TREASURY":
-                        rend = (p_fech - p_ant) * qtd * dolar / 10_000
+                        rend = (p_fech - (p_ant if np.isfinite(p_ant) else p_fech)) * qtd * dolar / 10_000
                     elif "DAP" in ativo:
                         if data_fech == data_op:
-                            rend = 0
+                            rend = 0.0
                         else:
-                            ajuste = df_ajuste.get(data_fech, pd.Series()).get(ativo, 0)
+                            ajuste = df_ajuste.get(data_fech.strftime("%Y-%m-%d"), pd.Series()).get(ativo, 0.0)
                             rend   = ajuste * qtd
                     elif "DI" in ativo:
                         if data_fech == data_op:
-                            rend = (p_fech - p_ant) * qtd
+                            rend = (p_fech - (p_ant if np.isfinite(p_ant) else p_fech)) * qtd
                         else:
-                            ajuste = df_ajuste.get(data_fech, pd.Series()).get(ativo, 0)
+                            ajuste = df_ajuste.get(data_fech.strftime("%Y-%m-%d"), pd.Series()).get(ativo, 0.0)
                             rend   = ajuste * qtd
+                    elif "NTNB" in ativo:
+                        # P&L (se quiser manter NTNB no df_pnl)
+                        rend = (p_fech - (p_ant if np.isfinite(p_ant) else p_fech)) * qtd
+                        # ► financeiro do dia (acumula por data)
+                        financeiro_ntnb_daily[data_fech] += float(p_fech) * float(qtd)
                     else:
-                        rend = (p_fech - p_ant) * qtd
+                        rend = (p_fech - (p_ant if np.isfinite(p_ant) else p_fech)) * qtd
 
                     chave = f"{ativo} - {fundo} - P&L"
-
                     pnl_cash.setdefault(chave, pd.Series()).at[data_fech] = \
                         pnl_cash.get(chave, pd.Series()).get(data_fech, 0.0) + rend
 
@@ -5416,13 +5422,13 @@ def analisar_dados_fundos2(
 
                     p_ant = p_fech
 
-    # ───────── 3. saída limpa
+    # ───────── 4) Saídas limpas ─────────
     df_final    = pd.DataFrame(pnl_cash).T.fillna(0.0)
     df_final_pl = pd.DataFrame(pnl_bps ).T.fillna(0.0)
-    df_despesas = (pd.DataFrame(despesas_cash)
-                    .T                       # 1 linha (“Despesas”)
-                    .rename_axis("Conta")    # deixa claro
-    )
+
+    # Despesas
+    df_despesas = (pd.DataFrame(despesas_cash).T.rename_axis("Conta"))
+    # normaliza colunas de data em df_despesas (string->Timestamp)
     df_despesas.columns = pd.to_datetime(df_despesas.columns, errors="coerce")
     df_despesas = df_despesas.loc[:, ~df_despesas.columns.isna()].fillna(0.0)
 
@@ -5430,14 +5436,22 @@ def analisar_dados_fundos2(
     ZERO_EPS = 1e-9
     df_final_pl = df_final_pl.mask(df_final.abs() < ZERO_EPS, 0.0)
 
+    # remove linhas agregadas 'Total' se houver
     df_final["Total"]    = df_final.sum(axis=1)
     df_final_pl["Total"] = df_final_pl.sum(axis=1)
-    #Preciso dropar todos os indices que tem 'Total' no nome
-    df_final = df_final[~df_final.index.str.contains("Total")]
+    df_final    = df_final[~df_final.index.str.contains("Total")]
     df_final_pl = df_final_pl[~df_final_pl.index.str.contains("Total")]
 
-    return df_final, df_final_pl, df_despesas
+    # ► Série/Dict do financeiro NTNB por dia
+    if len(financeiro_ntnb_daily):
+        serie_ntnb = pd.Series(financeiro_ntnb_daily, dtype=float)
+        serie_ntnb.index = pd.to_datetime(serie_ntnb.index)
+        serie_ntnb = serie_ntnb.sort_index()
+        dict_ntnb  = {d.strftime("%Y-%m-%d"): float(v) for d, v in serie_ntnb.items()}
+    else:
+        dict_ntnb = {}
 
+    return df_final, df_final_pl, df_despesas, dict_ntnb
 # ---------------------------------------------------------------
 #  FUNÇÃO AUXILIAR – gráfico Altair da cota
 # ---------------------------------------------------------------
@@ -6430,12 +6444,19 @@ def simulate_nav_cota() -> None:
     c2.metric("PL Risco", f"R$ {capital0:,.0f}", help=f"{pct*100:.1f} % do PL")
 
     # ───────────────────────────── 3. P&L diário (regra Portfólio)
-    df_pnl, _ , df_despesas = analisar_dados_fundos2(
+    df_pnl, _ , df_despesas, financeiro_ntnb = analisar_dados_fundos2(
         soma_pl_sem_pesos = pl_total,
         df_b3_fechamento  = load_b3_prices(),
         df_ajuste         = load_ajustes(),
         basefundos        = load_basefundos()
     )
+    serie_ntnb = pd.Series(financeiro_ntnb, dtype=float)
+    serie_ntnb.index = pd.to_datetime(serie_ntnb.index)
+
+    # alinha com pl_series (ambos com DatetimeIndex)
+    serie_ntnb = serie_ntnb.reindex(pl_series.index).ffill()     # se quiser manter último valor
+    pct_ntnb_no_pl = (serie_ntnb / pl_series).clip(lower=0)
+    st.write(pct_ntnb_no_pl)
 
     pnl = (df_pnl
            .drop(columns="Total", errors="ignore")
@@ -6623,8 +6644,137 @@ def simulate_nav_cota() -> None:
     dd_series = (cota / cota.cummax()) - 1
     dd_atual = float(dd_series.iloc[-1])
 
+    
 
     sharpe_cdi = (mu_excesso / sigma_excesso) * np.sqrt(252)
+
+    import plotly.graph_objects as go
+    # ---- Helpers de cálculo por janela ----
+    def _slice_window(ser: pd.Series, kind: str) -> pd.Series:
+        idx = ser.index
+        if idx.empty: return ser.iloc[0:0]
+        end = idx[-1]
+
+        if kind == "NO MÊS":
+            start = end.to_period("M").to_timestamp()
+            start = idx[idx.get_indexer([start], method="bfill")[0]]
+            return ser.loc[start:end]
+
+        if kind == "ANO":  # YTD
+            start = pd.Timestamp(end.year, 1, 1)
+            start = idx[idx.get_indexer([start], method="bfill")[0]]
+            return ser.loc[start:end]
+
+        if kind.endswith("MESES"):
+            m = int(kind.split()[0])               # 12, 24, 36, 48, 60
+            win = min(int(round(21*m)), len(ser))  # ~21 pregões/mês
+            return ser.iloc[-win:]
+
+        if kind == "TOTAL":
+            return ser
+
+        raise ValueError(kind)
+
+    def _cum_ret(ser): 
+        ser = ser.dropna()
+        return float((1+ser).prod()-1) if len(ser) else np.nan
+
+    def _ann_vol(ser):
+        ser = ser.dropna()
+        return float(ser.std()*np.sqrt(252)) if len(ser) >= 5 else np.nan
+
+    def _sharpe_excess(ret_ser, cdi_ser):
+        x = (ret_ser - cdi_ser).dropna()
+        if len(x) < 5 or x.std() == 0: return np.nan
+        return float((x.mean()/x.std())*np.sqrt(252))
+
+    # ---- Colunas/horizontes na ordem do print ----
+    COLS = ["ANO", "NO MÊS", "12 MESES", "24 MESES", "36 MESES", "48 MESES", "60 MESES", "TOTAL"]
+
+    # ---- Monta a tabela base (valores numéricos) ----
+    rows = {"RENTABILIDADE": [], "VOLATILIDADE": [], "ÍNDICE DE SHARPE": [], "%CDI": []}
+    for col in COLS:
+        r = _slice_window(ret_total, col)
+        c = _slice_window(cdi_series,  col)
+
+        ret    = _cum_ret(r)
+        cdi    = _cum_ret(c)
+        vol    = _ann_vol(r)
+        sharpe = _sharpe_excess(r, c)
+
+        rows["RENTABILIDADE"].append(ret)
+        rows["VOLATILIDADE"].append(vol)
+        rows["ÍNDICE DE SHARPE"].append(sharpe)
+        rows["%CDI"].append(ret/cdi if (cdi is not None and np.isfinite(cdi) and cdi != 0) else np.nan)
+
+    df_kpis = pd.DataFrame(rows, index=COLS).T  # linhas = métricas, colunas = horizontes
+
+    # ---- Formatação (strings a exibir) ----
+    def _fmt_pct(x):    return "—" if (x is None or not np.isfinite(x)) else f"{x:.2%}"
+    def _fmt_sharpe(x): return "—" if (x is None or not np.isfinite(x)) else f"{x:.2f}"
+
+    tbl_display = {}
+    tbl_display["VOLATILIDADE"]     = [_fmt_pct(v)    for v in df_kpis.loc["VOLATILIDADE"]]
+    tbl_display["ÍNDICE DE SHARPE"] = [_fmt_sharpe(v) for v in df_kpis.loc["ÍNDICE DE SHARPE"]]
+
+    # Rentabilidade com %CDI embaixo (itálico, menor)
+    rent_fmt = []
+    for val, cdi_ratio in zip(df_kpis.loc["RENTABILIDADE"], df_kpis.loc["%CDI"]):
+        main = _fmt_pct(val)
+        if cdi_ratio is None or not np.isfinite(cdi_ratio):
+            rent_fmt.append(main)
+        else:
+            rent_fmt.append(
+                f"{main}<br><span style='font-size:11px; font-style:italic; color:#555'>({cdi_ratio:.0%} do CDI)</span>"
+            )
+    tbl_display["RENTABILIDADE"] = rent_fmt
+
+    # ---------- montar valores por COLUNA (células centralizadas) ----------
+    row_labels = ["<b>RENTABILIDADE</b>", "<b>VOLATILIDADE</b>", "<b>ÍNDICE DE SHARPE</b>"]
+    rent_cols   = tbl_display["RENTABILIDADE"]
+    vol_cols    = tbl_display["VOLATILIDADE"]
+    sharpe_cols = tbl_display["ÍNDICE DE SHARPE"]
+
+    col_blocks = []
+    for j in range(len(COLS)):
+        col_blocks.append([rent_cols[j], vol_cols[j], sharpe_cols[j]])   # 3 linhas
+
+    # ---------- cores: negativos em vermelho (regra: v < 0) ----------
+    font_colors_rows = []  # 3 x N
+    for row_name in ["RENTABILIDADE", "VOLATILIDADE", "ÍNDICE DE SHARPE"]:
+        row_colors = []
+        for v in df_kpis.loc[row_name]:
+            row_colors.append("#D62728" if (isinstance(v, (int,float)) and np.isfinite(v) and v < 0) else "#111")
+        font_colors_rows.append(row_colors)
+    # transpõe para N colunas x 3 linhas
+    font_colors_cols = list(map(list, zip(*font_colors_rows)))
+    fill_colors_cols = [["#FFFFFF"]*3 for _ in range(len(COLS))]
+
+    # ---------- header azul-escuro ----------
+    header_fill = "#0A2240"   # azul escuro
+    header_font = "#FFFFFF"
+
+    fig_tbl = go.Figure(data=[go.Table(
+        header=dict(
+            values=[""] + COLS,
+            fill_color=header_fill,
+            font=dict(color=header_font, size=12),
+            align="center",
+            height=30
+        ),
+        cells=dict(
+            # 1ª coluna = rótulos; demais = uma coluna por horizonte
+            values=[row_labels] + col_blocks,
+            align=["center"] * (len(COLS) + 1),   # <- centraliza TODAS as células
+            height=38,
+            fill_color=[["#F7F8FA"]*3] + fill_colors_cols,
+            font=dict(color=[["#111"]*3] + font_colors_cols, size=12)
+        )
+    )])
+    fig_tbl.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+
+    # ============================== UI / EXIBIÇÃO ==================================
+
     c1, c2, c3, c4, c5, c6 = st.columns(6)
 
     c1.metric("Retorno carteira",  f"{ret_acum:,.2%}")
@@ -6636,7 +6786,9 @@ def simulate_nav_cota() -> None:
     
 
     aba_cart,tab_orcamento = st.tabs(["Histortico Carteira", "Portfolio Atual"])
+    
     with aba_cart:
+
         st.header("Simulação de Cota – Carteira")
 
         # ───────────────────────────── 6. métricas
@@ -7386,6 +7538,8 @@ def simulate_nav_cota() -> None:
             )
             fig_vol.update_yaxes(tickformat=".2%")
             st.plotly_chart(fig_vol, use_container_width=True)
+        st.subheader("Índices Históricos")
+        st.plotly_chart(fig_tbl, use_container_width=True)
 
 
 

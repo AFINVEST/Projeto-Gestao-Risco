@@ -8947,40 +8947,40 @@ def main_page():
 
             # ===================== df_view =====================
 
-            # base do filtered_df
-            filtered_df = df_pl_processado_input.copy()
+           # base do fitlered_df2
+            fitlered_df2 = df_pl_processado_input.copy()
 
             # adiciona linha Total (numérico!)
-            sum_row = filtered_df.select_dtypes(include='number').sum()
+            sum_row = fitlered_df2.select_dtypes(include='number').sum()
             sum_row['Fundos/Carteiras Adm'] = 'Total'
-            if 'Adm' in filtered_df.columns:
+            if 'Adm' in fitlered_df2.columns:
                 sum_row['Adm'] = ''
-            filtered_df = pd.concat([filtered_df, sum_row.to_frame().T], ignore_index=True)
-            filtered_df.index = filtered_df['Fundos/Carteiras Adm']
+            fitlered_df2 = pd.concat([fitlered_df2, sum_row.to_frame().T], ignore_index=True)
+            fitlered_df2.index = fitlered_df2['Fundos/Carteiras Adm']
 
             # substitui colunas "Contratos X" pelos números atuais de df_contratos (se existir a coluna base)
-            col_contratos = [c for c in filtered_df.columns if c.startswith('Contratos ')]
+            col_contratos = [c for c in fitlered_df2.columns if c.startswith('Contratos ')]
             for col in col_contratos:
                 base = col.replace('Contratos ', '')
                 if base in df_contratos.columns:
-                    filtered_df[col] = df_contratos[base]
+                    fitlered_df2[col] = df_contratos[base]
 
             # identifica colunas e linha Total
-            contract_cols = [c for c in filtered_df.columns if str(c).startswith('Contratos')]
-            non_contract_cols = [c for c in filtered_df.columns if c not in contract_cols]
-            total_label = next((idx for idx in filtered_df.index if str(idx).strip().lower() == 'total'), None)
+            contract_cols = [c for c in fitlered_df2.columns if str(c).startswith('Contratos')]
+            non_contract_cols = [c for c in fitlered_df2.columns if c not in contract_cols]
+            total_label = next((idx for idx in fitlered_df2.index if str(idx).strip().lower() == 'total'), None)
 
             # garante numérico nas colunas de contratos
-            df_num = filtered_df[contract_cols].apply(pd.to_numeric, errors='coerce').fillna(0)
+            df_num = fitlered_df2[contract_cols].apply(pd.to_numeric, errors='coerce').fillna(0)
 
             # atualiza somatório na linha Total
             sum_by_col = df_num.drop(index=total_label, errors='ignore').sum(axis=0) if total_label is not None else df_num.sum(axis=0)
             if total_label is not None:
-                filtered_df.loc[total_label, contract_cols] = sum_by_col.round().astype(int)
+                fitlered_df2.loc[total_label, contract_cols] = sum_by_col.round().astype(int)
 
             # mantém apenas contratos com soma != 0
             keep_contract_cols = [c for c in contract_cols if abs(sum_by_col.get(c, 0)) != 0]
-            df_view = filtered_df[non_contract_cols + keep_contract_cols].copy()
+            df_view = fitlered_df2[non_contract_cols + keep_contract_cols].copy()
 
             # renomeia "Contratos XXX" -> "XXX"
             rename_map = {c: c.replace('Contratos ', '') for c in keep_contract_cols}
@@ -9018,6 +9018,7 @@ def main_page():
             drop_cols = ['Fundos/Carteiras Adm', 'PL', 'Weights', 'PL_atualizado', 'Adm']
             drop_cols += [c for c in df_view.columns if str(c).startswith('Max')]
             df_view = df_view.drop(columns=drop_cols, errors='ignore')
+
             df_port, key, soma_pl_sem_pesos = checkar_portifolio(
                 assets, quantidade_nomes, precos_user, data_compra, filtered_df, df_view)
 

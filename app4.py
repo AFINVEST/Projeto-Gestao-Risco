@@ -5329,6 +5329,9 @@ def analisar_dados_fundos2(
 
     # ───────── 3) Loop fundos / operações ─────────
     for fundo, df_f in basefundos.items():
+        #Se o fundo for Total skipa
+        if fundo.upper() == "TOTAL":
+            continue
         if 'Ativo' in df_f.columns:
             df_f = df_f.set_index('Ativo')
         elif df_f.index.name is None:
@@ -6454,9 +6457,12 @@ def simulate_nav_cota() -> None:
     serie_ntnb.index = pd.to_datetime(serie_ntnb.index)
 
     # alinha com pl_series (ambos com DatetimeIndex)
-    serie_ntnb = serie_ntnb.reindex(pl_series.index).ffill()     # se quiser manter último valor
-    pct_ntnb_no_pl = (serie_ntnb / pl_series).clip(lower=0)
-    st.write(pct_ntnb_no_pl)
+    pl_series2 = pl_series.copy()
+    pl_series2 = pl_series2 / 100
+    serie_ntnb = serie_ntnb.reindex(pl_series2.index)
+
+    pct_ntnb_no_pl = (serie_ntnb / pl_series2).clip(lower=0)
+
 
     pnl = (df_pnl
            .drop(columns="Total", errors="ignore")
@@ -6577,8 +6583,14 @@ def simulate_nav_cota() -> None:
     custo_total_sem_perf = custo_adm + custo_extra + custo_fixo + desp_series
     
 
+    #FAZER O AJUSTE DA PERDA DE MARGEM EM LFT COM A COMPRA DE NTNB
+    #Preencher pct_ntnb_no_pl com 0
+    serie_ntnb = serie_ntnb.reindex(common)
+    serie_ntnb = serie_ntnb.fillna(0)
+    capital_ajustado = capital_dia - serie_ntnb
+
     # ───────────────────────────── 5. ganho de ajuste com LFT
-    ganho_lft    = capital_dia * lft_series        # já existia
+    ganho_lft    = capital_ajustado * lft_series        # já existia
     ganho_total_pre_perf  = pnl + ganho_lft - custo_total_sem_perf   # ▼ subtrai custos
     capital_ini_dia = capital_dia.shift(1, fill_value=capital0)
 
@@ -7384,10 +7396,10 @@ def simulate_nav_cota() -> None:
             # ---- orçamento de risco (1/2/3 bps) ----
             coll1,coll2 = st.columns(2)
             with coll1:
-                st.write(dd_atual)
+                #st.write(dd_atual)
                 var_base_pct = 0.01
                 var_cut_pct  = 0.005     # 0.5%
-                gatilho_dd   = 0.03      # -3%
+                gatilho_dd   = 0.05      # -5%
 
                 var_efetivo_pct = var_base_pct - var_cut_pct if dd_atual <= gatilho_dd else var_base_pct
 
@@ -7396,7 +7408,7 @@ def simulate_nav_cota() -> None:
                     index = 0
                 elif var_efetivo_bps == 1.0:
                     index = 1
-                st.write(var_efetivo_bps)
+                #st.write(var_efetivo_bps)
 
                 orcamento_bps_var = st.sidebar.radio(
                     "Orçamento de risco VaR (%)",

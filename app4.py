@@ -7546,7 +7546,7 @@ def simulate_nav_cota() -> None:
 
             # --- Gráfico: Volatilidade histórica (uma linha) ---
             # Para ficar parecido ao print, use a vol rolling de 21 dias (1M).
-        vol_anualizada = ret_total.expanding(min_periods=5).std() * np.sqrt(252)
+        vol_anualizada = ret_total.expanding(min_periods=2).std() * np.sqrt(252)
 
         with g2:
             fig_vol = go.Figure()

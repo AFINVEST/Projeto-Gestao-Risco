@@ -6766,24 +6766,36 @@ def simulate_nav_cota() -> None:
     header_fill = "#0A2240"   # azul escuro
     header_font = "#FFFFFF"
 
+    # Tamanhos (ajuste se quiser)
+    HEADER_H = 28
+    CELL_H   = 30
+    EXTRA    = 15   # folga mínima p/ bordas internas
+
+    n_rows = len(row_labels)  # nº de linhas da tabela
+
     fig_tbl = go.Figure(data=[go.Table(
         header=dict(
             values=[""] + COLS,
             fill_color=header_fill,
             font=dict(color=header_font, size=12),
             align="center",
-            height=30
+            height=HEADER_H
         ),
         cells=dict(
-            # 1ª coluna = rótulos; demais = uma coluna por horizonte
             values=[row_labels] + col_blocks,
-            align=["center"] * (len(COLS) + 1),   # <- centraliza TODAS as células
-            height=38,
-            fill_color=[["#F7F8FA"]*3] + fill_colors_cols,
-            font=dict(color=[["#111"]*3] + font_colors_cols, size=12)
+            align=["center"] * (len(COLS) + 1),
+            height=CELL_H,
+            fill_color=[["#F7F8FA"]*n_rows] + fill_colors_cols,
+            font=dict(color=[["#111"]*n_rows] + font_colors_cols, size=12)
         )
     )])
-    fig_tbl.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+
+    # Remova padding (inexistente) e controle a altura
+    fig_tbl.update_layout(
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=HEADER_H + CELL_H * n_rows + EXTRA,
+        paper_bgcolor="rgba(0,0,0,0)"
+    )
 
     # ============================== UI / EXIBIÇÃO ==================================
 
@@ -7399,8 +7411,8 @@ def simulate_nav_cota() -> None:
                 #st.write(dd_atual)
                 var_base_pct = 0.01
                 var_cut_pct  = 0.005     # 0.5%
-                gatilho_dd   = 0.05      # -5%
-
+                gatilho_dd   = -0.05      # -5%
+                # 0,0016
                 var_efetivo_pct = var_base_pct - var_cut_pct if dd_atual <= gatilho_dd else var_base_pct
 
                 var_efetivo_bps = var_efetivo_pct * 100
@@ -7488,17 +7500,19 @@ def simulate_nav_cota() -> None:
             vols_finais[nome] = np.nan
 
 
-    
-
-
     with aba_cart:
+        st.subheader("Índices Históricos")
+        st.plotly_chart(fig_tbl, use_container_width=True)
         st.subheader("Resumo de Volatilidade")
-        c7, c8, c9, c10 = st.columns(4)
-        c7.metric("Vol (últ. 1M)", f"{vols_finais['1M']:,.2%}" if np.isfinite(vols_finais['1M']) else "—")
-        c8.metric("Vol (últ. 6M)", f"{vols_finais['6M']:,.2%}" if np.isfinite(vols_finais['6M']) else "—")
-        c9.metric("Vol (últ. 1Y)", f"{vols_finais['1Y']:,.2%}" if np.isfinite(vols_finais['1Y']) else "—",
-                help="Se não houver 252 dias, usa tudo que existir e anualiza.")
-        c10.metric("Drawdown corrente", f"{dd_atual:,.2%}", help=f"Dias no DD: {dias_em_dd}d")
+        #c7, c8, c9, c10 = st.columns(4)
+        #c7.metric("Vol (últ. 1M)", f"{vols_finais['1M']:,.2%}" if np.isfinite(vols_finais['1M']) else "—")
+        #c8.metric("Vol (últ. 6M)", f"{vols_finais['6M']:,.2%}" if np.isfinite(vols_finais['6M']) else "—")
+        #c9.metric("Vol (últ. 1Y)", f"{vols_finais['1Y']:,.2%}" if np.isfinite(vols_finais['1Y']) else "—",
+        #        help="Se não houver 252 dias, usa tudo que existir e anualiza.")
+        #c10.metric("Drawdown corrente", f"{dd_atual:,.2%}", help=f"Dias no DD: {dias_em_dd}d")
+        c7, c8 = st.columns(2)
+        c7.metric("Vol (ultimos 21 dias)", f"{vols_finais['1M']:,.2%}" if np.isfinite(vols_finais['1M']) else "—")
+        c8.metric("Drawdown corrente", f"{dd_atual:,.2%}", help=f"Dias no DD: {dias_em_dd}d")
 
         # ======================= GRÁFICOS LADO A LADO (AZUIS) ========================
         g1, g2 = st.columns(2)
@@ -7532,14 +7546,16 @@ def simulate_nav_cota() -> None:
 
             # --- Gráfico: Volatilidade histórica (uma linha) ---
             # Para ficar parecido ao print, use a vol rolling de 21 dias (1M).
-            vol_1m_rolling = ret_total.rolling(21, min_periods=5).std() * np.sqrt(252)
+        vol_anualizada = ret_total.expanding(min_periods=5).std() * np.sqrt(252)
 
         with g2:
             fig_vol = go.Figure()
             fig_vol.add_trace(go.Scatter(
-                x=vol_1m_rolling.index, y=vol_1m_rolling.values,
-                mode="lines", name="Vol 1M (rolling)",
-                line=dict(color="#1f77b4", width=2)
+                x=vol_anualizada.index,
+                y=vol_anualizada.values,
+                mode="lines",
+                name="Vol anualizada (expanding)",
+                line=dict(width=2)
             ))
             fig_vol.update_layout(
                 title="Volatilidade",
@@ -7550,8 +7566,7 @@ def simulate_nav_cota() -> None:
             )
             fig_vol.update_yaxes(tickformat=".2%")
             st.plotly_chart(fig_vol, use_container_width=True)
-        st.subheader("Índices Históricos")
-        st.plotly_chart(fig_tbl, use_container_width=True)
+
 
 
 
@@ -8093,7 +8108,7 @@ def simulate_nav_cota() -> None:
             with colll2:
                 st.caption("CoVaR por estratégia (apenas positivos) — área empilhada")
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
-                st.write(df_hist_cv)
+                #st.write(df_hist_cv)
                 df_hist_cv_positive = df_hist_cv.clip(lower=0)
                 existing_cols = [col for col in df_hist_cv_positive.columns if col in ativos_para_estrategia]
                 df_hist_cv_filtrado = df_hist_cv_positive[existing_cols]

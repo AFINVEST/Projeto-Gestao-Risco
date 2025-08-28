@@ -5697,6 +5697,9 @@ def calcular_metricas_por_pl(
     common_idx = df_retorno.index.intersection(pl_series.index)
     data_eff = _choose_effective_date(data, common_idx)
 
+    #Mudar para a ultima data disponivel em pl_series
+    data_eff = pl_series.index[-1]
+
     # ---------------- 3) Ajustes e retornos até a data ----------------
     df_retorno_hist = df_retorno.loc[df_retorno.index <= data_eff].copy()
     var_ativos = var_not_parametric(df_retorno_hist).abs()

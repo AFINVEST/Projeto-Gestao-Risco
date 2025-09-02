@@ -6595,7 +6595,9 @@ def simulate_nav_cota() -> None:
     # ───────────────────────────── 5. ganho de ajuste com LFT
     ganho_lft    = capital_ajustado * lft_series        # já existia
     ganho_total_pre_perf  = pnl + ganho_lft - custo_total_sem_perf   # ▼ subtrai custos
-    capital_ini_dia = capital_dia.shift(1, fill_value=capital0)
+
+    capital_ini_dia = capital_dia.shift(1)
+    capital_ini_dia.iloc[0] = float(capital_dia.iloc[0])
 
     ret_preperf    = ganho_total_pre_perf / capital_ini_dia
 
@@ -6799,7 +6801,7 @@ def simulate_nav_cota() -> None:
         height=HEADER_H + CELL_H * n_rows + EXTRA,
         paper_bgcolor="rgba(0,0,0,0)"
     )
-
+    
     # ============================== UI / EXIBIÇÃO ==================================
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
@@ -6960,7 +6962,7 @@ def simulate_nav_cota() -> None:
         #)
 
         # ───────────────────── Retorno Mensal ───────────────────────
-        st.write("## Retorno Mensal da Carteira")
+        #st.write("## Retorno Mensal da Carteira")
         ret_mensal_port = (1 + ret_total ).resample("M").prod().sub(1)
         ret_mensal_cdi  = (1 + cdi_series).resample("M").prod().sub(1)          \
                                         .reindex(ret_mensal_port.index)      \
@@ -6984,59 +6986,180 @@ def simulate_nav_cota() -> None:
         # ------------------------------------------------------------------
         import plotly.graph_objects as go
 
-        fig = go.Figure()
+        #fig = go.Figure()
+#
+        ## — Carteira
+        #fig.add_trace(
+        #    go.Bar(
+        #        x=ordem,
+        #        y=ret_mensal_port.values,
+        #        name="Carteira",
+        #        marker_color="#084594",
+        #        text=[f"{v:.1%}" for v in ret_mensal_port.values],
+        #        textposition="outside",
+        #        textfont=dict(color="#084594", size=11),
+        #    )
+        #)
+#
+        ## — CDI
+        #fig.add_trace(
+        #    go.Bar(
+        #        x=ordem,
+        #        y=ret_mensal_cdi.values,
+        #        name="CDI",
+        #        marker_color="#6d91f5",
+        #        text=[f"{v:.1%}" for v in ret_mensal_cdi.values],
+        #        textposition="outside",
+        #        textfont=dict(color="#6d91f5", size=11),
+        #    )
+        #)
+#
+        ## — layout geral
+        #fig.update_layout(
+        #    height=460,
+        #    barmode="group",          # <-- barras lado‑a‑lado
+        #    bargap=0.25,
+        #    yaxis=dict(title="", tickformat=".1%"),
+        #    xaxis=dict(title="", tickangle=0),
+        #    legend=dict(orientation="h", y=-0.25, x=0.5, xanchor="center"),
+        #    margin=dict(l=20, r=20, t=10, b=70),
+        #    plot_bgcolor="white",
+        #)
+#
+        ## grade horizontal suave
+        #fig.update_yaxes(showgrid=True, gridcolor="rgba(0,0,0,0.05)")
+#
+        #st.plotly_chart(fig, use_container_width=True)
+        #with st.expander("Detalhe diário"):
+            #st.dataframe(out_renomeado.style.format(detalhe_fmt))
+            #st.download_button(
+            #label="⬇️ Baixar planilha (Excel)",
+            #data=buf,
+            #file_name=f"simulacao_{common[0]:%Y%m%d}_{common[-1]:%Y%m%d}.xlsx",
+            #mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            #use_container_width=True
+            #    )
+        # ===================== Rentabilidade histórica (sempre CDI; célula 2 linhas) =====================
+        st.write("## Rentabilidade histórica")
 
-        # — Carteira
-        fig.add_trace(
-            go.Bar(
-                x=ordem,
-                y=ret_mensal_port.values,
-                name="Carteira",
-                marker_color="#084594",
-                text=[f"{v:.1%}" for v in ret_mensal_port.values],
-                textposition="outside",
-                textfont=dict(color="#084594", size=11),
+        import numpy as np, pandas as pd
+        import plotly.graph_objects as go
+
+        # 1) Séries mensais (carteira e CDI)
+        ret_mensal_port = (1 + ret_total).resample("M").prod().sub(1)
+        ret_mensal_cdi  = (1 + cdi_series).resample("M").prod().sub(1).reindex(ret_mensal_port.index).fillna(method="ffill")
+
+        # 2) Helpers
+        MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
+        def mes_pt(dt): return MESES[dt.month-1]
+
+        acum_port = (1 + ret_mensal_port).cumprod() - 1
+        acum_cdi  = (1 + ret_mensal_cdi ).cumprod() - 1
+
+        anos = sorted(ret_mensal_port.index.year.unique(), reverse=True)
+        cols = MESES + ["No ano", "Acumulado"]
+
+        # 3) Monta matriz de células (string HTML) e matriz de cores (negativos)
+        linhas_display = []   # cada item -> dict {col: html}
+        linhas_colors  = []   # cada item -> dict {col: color}
+
+        for ano in anos:
+            row_vals   = {c: "—" for c in cols}
+            row_colors = {c: "#111111" for c in cols}
+
+            idx_ano = ret_mensal_port.index[ret_mensal_port.index.year == ano]
+            if len(idx_ano) == 0:
+                continue
+
+            # meses do ano
+            for dt in idx_ano:
+                m   = mes_pt(dt)
+                rp  = float(ret_mensal_port.loc[dt])
+                rc  = float(ret_mensal_cdi .loc[dt])
+                ratio = (rp/rc) if (np.isfinite(rc) and rc != 0) else np.nan
+
+                top    = f"{rp:.2%}"
+                bottom = f"<span style='font-size:11px; color:#555'>({(ratio if np.isfinite(ratio) else float('nan')):.0%} do CDI)</span>" \
+                        if np.isfinite(ratio) else "<span style='font-size:11px; color:#555'>(— do CDI)</span>"
+                row_vals[m]   = f"{top}<br>{bottom}"
+                row_colors[m] = "#d62728" if rp < 0 else "#111111"
+
+            # "No ano" (geométrico dentro do ano)
+            rp_y = float((1 + ret_mensal_port.loc[idx_ano]).prod() - 1)
+            rc_y = float((1 + ret_mensal_cdi .loc[idx_ano]).prod() - 1)
+            ratio_y = (rp_y/rc_y) if (np.isfinite(rc_y) and rc_y != 0) else np.nan
+            row_vals["No ano"]   = f"{rp_y:.2%}<br><span style='font-size:11px; color:#555'>({(ratio_y if np.isfinite(ratio_y) else float('nan')):.0%} do CDI)</span>" \
+                                if np.isfinite(ratio_y) else f"{rp_y:.2%}<br><span style='font-size:11px; color:#555'>(— do CDI)</span>"
+            row_colors["No ano"] = "#d62728" if rp_y < 0 else "#111111"
+
+            # "Acumulado" (desde o início da série até o último mês do ano)
+            dt_last = idx_ano[-1]
+            rp_acc  = float(acum_port.loc[dt_last])
+            rc_acc  = float(acum_cdi .loc[dt_last])
+            ratio_a = (rp_acc/rc_acc) if (np.isfinite(rc_acc) and rc_acc != 0) else np.nan
+            row_vals["Acumulado"]   = f"{rp_acc:.2%}<br><span style='font-size:11px; color:#555'>({(ratio_a if np.isfinite(ratio_a) else float('nan')):.0%} do CDI)</span>" \
+                                    if np.isfinite(ratio_a) else f"{rp_acc:.2%}<br><span style='font-size:11px; color:#555'>(— do CDI)</span>"
+            row_colors["Acumulado"] = "#d62728" if rp_acc < 0 else "#111111"
+
+            linhas_display.append(row_vals)
+            linhas_colors .append(row_colors)
+
+        # 4) Constrói Table (Plotly) — uma linha por ano
+        # primeira coluna (ANO)
+        anos_col = [str(a) for a in anos]
+
+        # segunda coluna: nome do fundo + “% do CDI” na mesma célula do título (opcional)
+        # Se não tiver um nome, mantenha vazio:
+        serie_col = ["" for _ in anos]
+
+        # colunas numéricas (células HTML) e cores
+        values_cols = []
+        colors_cols = []
+        for col in cols:
+            values_cols.append([linhas_display[i][col] for i in range(len(anos))])
+            colors_cols.append([linhas_colors [i][col] for i in range(len(anos))])
+
+        # zebra
+        fill_rows = [["#FFFFFF" if (i % 2 == 0) else "#F7F8FA" for i in range(len(anos))]]
+        fill_cols_matrix = fill_rows * (2 + len(cols))
+
+        # cores do texto (duas primeiras colunas fixas escuras)
+        font_colors_matrix = []
+        font_colors_matrix.append(["#111111"] * len(anos))   # ANO
+        font_colors_matrix.append(["#111111"] * len(anos))   # Série (vazia)
+        font_colors_matrix.extend(colors_cols)               # números coloridos
+
+        # larguras
+        col_widths = [42, 220] + [64] * len(cols)
+
+        fig_hist = go.Figure(data=[go.Table(
+            columnwidth = col_widths,
+            header=dict(
+                values=["ANO", ""] + cols,
+                fill_color="#0A2240",
+                font=dict(color="#FFFFFF", size=12),
+                align="center",
+                height=28
+            ),
+            cells=dict(
+                values=[anos_col, serie_col] + values_cols,
+                align=["left","left"] + ["center"]*len(cols),
+                height=30,
+                fill_color=fill_cols_matrix,
+                font=dict(color=font_colors_matrix, size=12)
             )
+        )])
+
+        fig_hist.update_layout(
+            margin=dict(l=0, r=0, t=0, b=0),
+            height = 28 + 30*len(anos) + 15,
+            paper_bgcolor="rgba(0,0,0,0)"
         )
 
-        # — CDI
-        fig.add_trace(
-            go.Bar(
-                x=ordem,
-                y=ret_mensal_cdi.values,
-                name="CDI",
-                marker_color="#6d91f5",
-                text=[f"{v:.1%}" for v in ret_mensal_cdi.values],
-                textposition="outside",
-                textfont=dict(color="#6d91f5", size=11),
-            )
-        )
+        st.plotly_chart(fig_hist, use_container_width=True)
 
-        # — layout geral
-        fig.update_layout(
-            height=460,
-            barmode="group",          # <-- barras lado‑a‑lado
-            bargap=0.25,
-            yaxis=dict(title="", tickformat=".1%"),
-            xaxis=dict(title="", tickangle=0),
-            legend=dict(orientation="h", y=-0.25, x=0.5, xanchor="center"),
-            margin=dict(l=20, r=20, t=10, b=70),
-            plot_bgcolor="white",
-        )
-
-        # grade horizontal suave
-        fig.update_yaxes(showgrid=True, gridcolor="rgba(0,0,0,0.05)")
-
-        st.plotly_chart(fig, use_container_width=True)
-        with st.expander("Detalhe diário"):
-            st.dataframe(out_renomeado.style.format(detalhe_fmt))
-            st.download_button(
-            label="⬇️ Baixar planilha (Excel)",
-            data=buf,
-            file_name=f"simulacao_{common[0]:%Y%m%d}_{common[-1]:%Y%m%d}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-                )
+        st.subheader("Índices Históricos")
+        st.plotly_chart(fig_tbl, use_container_width=True)
 
     with aba_cart:
 
@@ -7184,6 +7307,15 @@ def simulate_nav_cota() -> None:
         mask = (df_full.index >= ini) & (df_full.index <= fim)
         df_periodo = df_full.loc[mask]
 
+        # base de retorno de cada dia = capital no início do dia
+        base_diaria = capital_ini_dia.reindex(df_periodo.index)
+
+        # contribuição diária por componente (em pontos percentuais de retorno)
+        ret_comp_diario = df_periodo.div(base_diaria, axis=0)
+
+        # contribuição do período (aritmética: soma dos retornos diários)
+        contrib = ret_comp_diario.sum()   # <- mantém a mesma semântica de "p.p. de retorno"
+
         # ---------------------------------------------------------------
         # 3. Contribuição em p.p. de retorno
         # ---------------------------------------------------------------
@@ -7207,20 +7339,19 @@ def simulate_nav_cota() -> None:
         # ---------------------------------------------------------------
         # 3. Contribuição em p.p. de retorno
         # ---------------------------------------------------------------
-        contrib = (df_periodo.sum() / capital_ini).copy()          # Series
+        #contrib = (df_periodo.sum() / capital_ini).copy()          # Series
+
 
         # 3‑B) renomeia / consolida componentes ------------------------
+        contrib.index = (pd.Index(contrib.index.astype(str))
+                 .str.replace(r"\s+", " ", regex=True))  # colapsa múltiplos espaços
         mapa = {
-            "Ajuste LFT":   "Caixa",
-            "Custos Fixos": "Custos/Despesas",
-            "Despesas Op":  "Custos/Despesas",
-            "Taxa Perf":    "Custos/Despesas",   # <<< NOVO
+            "Ajuste LFT":   "Caixa",
+            "Custos Fixos": "Custos/Despesas",
+            "Despesas Op":  "Custos/Despesas",
+            "Taxa Perf":    "Custos/Despesas",
         }
-        
-        contrib = (contrib
-                .groupby(lambda x: mapa.get(x, x))   # aplica o mapa
-                .sum())                              # soma Custos + Despesas
-
+        contrib = contrib.groupby(lambda x: mapa.get(x, x)).sum()
         # 3‑C)  ► acrescenta CDI e impõe a ordem final ------------------
         d0 = cdi_cum.index[cdi_cum.index.get_indexer([ini_eff], method="pad")[0]]
         d1 = cdi_cum.index[cdi_cum.index.get_indexer([fim_eff], method="pad")[0]]
@@ -7231,16 +7362,19 @@ def simulate_nav_cota() -> None:
 
         ret_cdi_periodo = (cdi_cum.loc[d1] / base) - 1
 
-        df_wf = contrib.reset_index().rename(columns={"index": "Componente",
-                                                    0:      "ret_pl"})
+        # já tem ini_eff e fim_eff
+        perf_total_geom = float((1 + ret_total.loc[ini_eff:fim_eff]).prod() - 1)
 
-        # ‑‑ Performance (total)
+        df_wf = contrib.to_frame("ret_pl").reset_index().rename(columns={"index": "Componente"})
+
         if "Performance" not in df_wf["Componente"].values:
             df_wf = pd.concat([df_wf,
                             pd.DataFrame({"Componente": ["Performance"],
-                                            "ret_pl":    [df_wf["ret_pl"].sum()]})],
+                                            "ret_pl":    [perf_total_geom]})],
                             ignore_index=True)
-
+        else:
+            df_wf.loc[df_wf["Componente"]=="Performance","ret_pl"] = perf_total_geom
+            
         # ‑‑ CDI (benchmark)
         df_wf = pd.concat([df_wf,
                         pd.DataFrame({"Componente": ["CDI"],
@@ -7342,9 +7476,92 @@ def simulate_nav_cota() -> None:
             st.dataframe(df_wf.set_index("Componente")[["ret_pl"]]
                         .rename(columns={"ret_pl": "pontos‑percentuais"})
                         .style.format({"pontos‑percentuais": "{:+.2%}"}))
+        
         # 3) Botões de download
 
-        # ------------- gráfico Waterfall plot ------------------------
+    # ------------- gráfico Waterfall plot ------------------------
+    # ===================== VOL HISTÓRICA POR ATIVO (usando df_retorno) =====================
+    st.subheader("Volatilidade histórica por ativo")
+    default_assets, quantidade_inicial, portifolio_default = processar_dados_port()
+
+    df_base = pd.read_parquet('Dados/df_inicial.parquet')
+    df_precos, df_completo = load_and_process_excel(df_base, default_assets)
+
+    df_retorno = process_returns2(df_completo, default_assets)
+
+    # 1) Preparação: garantir índice datetime, ordenar e alinhar ao período 'common'
+    df_ret = df_retorno.copy()
+    if not isinstance(df_ret.index, pd.DatetimeIndex):
+        df_ret.index = pd.to_datetime(df_ret.index)
+
+    df_ret = (df_ret.sort_index()
+                    .apply(pd.to_numeric, errors="coerce"))   # força numérico
+    df_ret = df_ret.loc[:, df_ret.columns.notna()]            # remove col vazia
+    df_ret = df_ret.dropna(how="all")                         # remove linhas 100% NaN
+
+    # 2) Função de vol anualizada (mín. 5 observações p/ calcular)
+    def _ann_vol_df(df: pd.DataFrame) -> pd.Series:
+        if df.shape[0] < 5:
+            return pd.Series(np.nan, index=df.columns)
+        return df.std(skipna=True) * np.sqrt(252)
+
+    # 3) Janelas alvo
+    WINS = {"1M": 21, "3M": 63, "6M": 126, "1Y": 252, "TOTAL": None}
+
+    vol_cols = {}
+    for nome, win in WINS.items():
+        sub = df_ret if win is None else df_ret.tail(win)
+        vol_cols[nome] = _ann_vol_df(sub)
+
+    df_vol = pd.DataFrame(vol_cols)
+    df_vol.index.name = "Ativo"
+
+    # Ordena por 1Y (se existir), do maior p/ menor
+    ord_col = "1Y" if "1Y" in df_vol.columns else "TOTAL"
+    df_vol = df_vol.sort_values(ord_col, ascending=False)
+
+
+    df_show = df_vol.copy()
+    # 5) Renderização em tabela (Plotly) com formatação %
+    def _fmt_pct(x):
+        try:
+            return "—" if not np.isfinite(float(x)) else f"{float(x):.2%}"
+        except Exception:
+            return "—"
+
+    vals = [[a for a in df_show.index]]  # primeira coluna = Ativo
+    for col in df_show.columns:
+        vals.append([_fmt_pct(v) for v in df_show[col]])
+
+    # zebra
+    zebra = [["#FFFFFF" if (i % 2 == 0) else "#F7F8FA" for i in range(len(df_show))]]
+    fill_matrix = zebra * (1 + len(df_show.columns))
+
+    fig_vol_assets = go.Figure(data=[go.Table(
+        columnwidth=[220] + [90]*len(df_show.columns),
+        header=dict(
+            values=["Ativo"] + list(df_show.columns),
+            fill_color="#0A2240",
+            font=dict(color="#FFFFFF", size=12),
+            align="center",
+            height=28
+        ),
+        cells=dict(
+            values=vals,
+            align=["left"] + ["center"]*len(df_show.columns),
+            height=30,
+            fill_color=fill_matrix,
+            font=dict(color="#111111", size=12)
+        )
+    )])
+
+    fig_vol_assets.update_layout(
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=28 + 30*len(df_show) + 15,
+        paper_bgcolor="rgba(0,0,0,0)"
+    )
+
+    st.plotly_chart(fig_vol_assets, use_container_width=True)
     #with aba_div01:
     #st.header("Análise Portfolio Compilado")
 
@@ -7504,8 +7721,7 @@ def simulate_nav_cota() -> None:
 
 
     with aba_cart:
-        st.subheader("Índices Históricos")
-        st.plotly_chart(fig_tbl, use_container_width=True)
+   
         st.subheader("Resumo de Volatilidade")
         #c7, c8, c9, c10 = st.columns(4)
         #c7.metric("Vol (últ. 1M)", f"{vols_finais['1M']:,.2%}" if np.isfinite(vols_finais['1M']) else "—")

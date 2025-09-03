@@ -5996,7 +5996,7 @@ def calcular_metricas_por_pl(
         st.write("CoVaR (% de 1bp):", covar_pct_1bp)
 
 
-    return out, default_assets
+    return out, default_assets, quantidades
 
 # ============================================================
 # POSIÇÕES HISTÓRICAS (delta ou nível) a partir do Supabase
@@ -6539,7 +6539,7 @@ def simulate_nav_cota() -> None:
     # o retorno de calcular_metricas_por_pl é     return {    "PL_ref (R$)"       : float(pl_ref),    "VaR (bps)"         : float(var_bps),    "CVaR (bps)"        : float(cvar_bps),    "VaR (R$)"          : float(var_R),    "CVaR (R$)"         : float(cvar_R),    "Stress DV01 (R$)"  : float(stress_R),    "Stress DV01 (bps)" : float(stress_bps),}
     # um dicionário com as métricas de risco
     # e o PL de referência (PL_ref) para o dia
-    risco, default_assets = calcular_metricas_por_pl(pl_series, data=common[-1], alpha=0.05, tick_val=100.0)
+    risco, default_assets,posicoes_atuais = calcular_metricas_por_pl(pl_series, data=common[-1], alpha=0.05, tick_val=100.0)
     #st.write(risco)
 
     if pnl.empty:
@@ -6825,7 +6825,8 @@ def simulate_nav_cota() -> None:
 
         # ───────────────────────────── 7. gráficos
         st.altair_chart(plot_cota_altair(cota, cdi_cum=cdi_cum), use_container_width=True)
-        st.altair_chart(plot_ret_diario(ret_total), use_container_width=True) 
+        #Tirando gráficos de retorno diário
+        #st.altair_chart(plot_ret_diario(ret_total), use_container_width=True) 
 
         # ───────────────────────────── 8. cards de métricas
         # ─────────────── 8. caixinhas de métricas ─────────────────
@@ -7030,15 +7031,15 @@ def simulate_nav_cota() -> None:
         #fig.update_yaxes(showgrid=True, gridcolor="rgba(0,0,0,0.05)")
 #
         #st.plotly_chart(fig, use_container_width=True)
-        #with st.expander("Detalhe diário"):
-            #st.dataframe(out_renomeado.style.format(detalhe_fmt))
-            #st.download_button(
-            #label="⬇️ Baixar planilha (Excel)",
-            #data=buf,
-            #file_name=f"simulacao_{common[0]:%Y%m%d}_{common[-1]:%Y%m%d}.xlsx",
-            #mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            #use_container_width=True
-            #    )
+        with st.expander("Detalhe diário"):
+            st.dataframe(out_renomeado.style.format(detalhe_fmt))
+            st.download_button(
+            label="⬇️ Baixar planilha (Excel)",
+            data=buf,
+            file_name=f"simulacao_{common[0]:%Y%m%d}_{common[-1]:%Y%m%d}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+                )
         # ===================== Rentabilidade histórica (sempre CDI; célula 2 linhas) =====================
         st.write("## Rentabilidade histórica")
 
@@ -7110,40 +7111,39 @@ def simulate_nav_cota() -> None:
 
         # segunda coluna: nome do fundo + “% do CDI” na mesma célula do título (opcional)
         # Se não tiver um nome, mantenha vazio:
-        serie_col = ["" for _ in anos]
+        #serie_col = ["" for _ in anos]
 
         # colunas numéricas (células HTML) e cores
         values_cols = []
         colors_cols = []
         for col in cols:
             values_cols.append([linhas_display[i][col] for i in range(len(anos))])
-            colors_cols.append([linhas_colors [i][col] for i in range(len(anos))])
+            colors_cols.append([linhas_colors[i][col] for i in range(len(anos))])
 
-        # zebra
+        # zebra (uma lista por coluna)
         fill_rows = [["#FFFFFF" if (i % 2 == 0) else "#F7F8FA" for i in range(len(anos))]]
-        fill_cols_matrix = fill_rows * (2 + len(cols))
+        fill_cols_matrix = fill_rows * (1 + len(cols))   # 1 = "ANO" + N cols de meses
 
-        # cores do texto (duas primeiras colunas fixas escuras)
+        # cores do texto (primeira coluna fixa escura)
         font_colors_matrix = []
         font_colors_matrix.append(["#111111"] * len(anos))   # ANO
-        font_colors_matrix.append(["#111111"] * len(anos))   # Série (vazia)
         font_colors_matrix.extend(colors_cols)               # números coloridos
 
-        # larguras
-        col_widths = [42, 220] + [64] * len(cols)
+        # larguras (ajuste se quiser)
+        col_widths = [60] + [64] * len(cols)
 
         fig_hist = go.Figure(data=[go.Table(
-            columnwidth = col_widths,
+            columnwidth=col_widths,
             header=dict(
-                values=["ANO", ""] + cols,
+                values=["ANO"] + cols,
                 fill_color="#0A2240",
                 font=dict(color="#FFFFFF", size=12),
                 align="center",
                 height=28
             ),
             cells=dict(
-                values=[anos_col, serie_col] + values_cols,
-                align=["left","left"] + ["center"]*len(cols),
+                values=[anos_col] + values_cols,
+                align=["left"] + ["center"] * len(cols),
                 height=30,
                 fill_color=fill_cols_matrix,
                 font=dict(color=font_colors_matrix, size=12)
@@ -7152,7 +7152,7 @@ def simulate_nav_cota() -> None:
 
         fig_hist.update_layout(
             margin=dict(l=0, r=0, t=0, b=0),
-            height = 28 + 30*len(anos) + 15,
+            height=28 + 30*len(anos) + 15,
             paper_bgcolor="rgba(0,0,0,0)"
         )
 
@@ -7481,6 +7481,7 @@ def simulate_nav_cota() -> None:
 
     # ------------- gráfico Waterfall plot ------------------------
     # ===================== VOL HISTÓRICA POR ATIVO (usando df_retorno) =====================
+
     st.subheader("Volatilidade histórica por ativo")
     default_assets, quantidade_inicial, portifolio_default = processar_dados_port()
 
@@ -7489,40 +7490,97 @@ def simulate_nav_cota() -> None:
 
     df_retorno = process_returns2(df_completo, default_assets)
 
-    # 1) Preparação: garantir índice datetime, ordenar e alinhar ao período 'common'
+    # 1) Preparação: garantir índice datetime, ordenar e alinhar ao período
     df_ret = df_retorno.copy()
     if not isinstance(df_ret.index, pd.DatetimeIndex):
         df_ret.index = pd.to_datetime(df_ret.index)
 
     df_ret = (df_ret.sort_index()
-                    .apply(pd.to_numeric, errors="coerce"))   # força numérico
+                .apply(pd.to_numeric, errors="coerce"))   # força numérico
     df_ret = df_ret.loc[:, df_ret.columns.notna()]            # remove col vazia
     df_ret = df_ret.dropna(how="all")                         # remove linhas 100% NaN
 
-    # 2) Função de vol anualizada (mín. 5 observações p/ calcular)
+    # 2) Funções de vol anualizada
     def _ann_vol_df(df: pd.DataFrame) -> pd.Series:
         if df.shape[0] < 5:
             return pd.Series(np.nan, index=df.columns)
         return df.std(skipna=True) * np.sqrt(252)
 
+    def _ann_vol_ser(ser: pd.Series) -> float:
+        ser = ser.dropna()
+        if ser.shape[0] < 5:
+            return np.nan
+        return float(ser.std(skipna=True) * np.sqrt(252))
+
     # 3) Janelas alvo
     WINS = {"1M": 21, "3M": 63, "6M": 126, "1Y": 252, "TOTAL": None}
 
+    # 4) Vol por ATIVO (como você já fazia)
     vol_cols = {}
     for nome, win in WINS.items():
         sub = df_ret if win is None else df_ret.tail(win)
         vol_cols[nome] = _ann_vol_df(sub)
 
-    df_vol = pd.DataFrame(vol_cols)
-    df_vol.index.name = "Ativo"
+    df_vol_assets = pd.DataFrame(vol_cols)
+    df_vol_assets.index.name = "Ativo"
 
-    # Ordena por 1Y (se existir), do maior p/ menor
-    ord_col = "1Y" if "1Y" in df_vol.columns else "TOTAL"
-    df_vol = df_vol.sort_values(ord_col, ascending=False)
+    # 5) ==== Carteira (atual) — pesos financeiros (quantidade × preço do df_precos) ====
 
+    # ativos presentes tanto em retornos quanto nas posições
+    ativos_validos = df_ret.columns.intersection(posicoes_atuais.index)
 
-    df_show = df_vol.copy()
-    # 5) Renderização em tabela (Plotly) com formatação %
+    # preços unitários por ativo vindos do df_precos (ignora o índice; pega a única linha)
+    # Se algum ativo não existir em df_precos, fica NaN → substituímos por 0.0
+    precos = (df_precos.reindex(columns=ativos_validos)
+                    .apply(pd.to_numeric, errors="coerce")
+                    .iloc[0]              # única linha (ex.: índice 1801)
+                    .fillna(0.0))
+
+    # quantidades atuais (coerce → float)
+    qty = (posicoes_atuais.reindex(ativos_validos)
+        .astype(float)
+        .fillna(0.0))
+
+    # notionals = quantidade × preço
+    notional = qty * precos
+
+    gross = float(np.abs(notional).sum())
+    net   = float(notional.sum())
+
+    # Normalização robusta:
+    # - Se NET não for muito pequeno vs GROSS, usa NET (pesos com sinal e soma ≈ 1)
+    # - Caso contrário (near-hedged), usa GROSS para evitar explosões de peso
+    if gross > 0:
+        if abs(net) >= 0.1 * gross:
+            weights = notional / net
+        else:
+            weights = notional / gross
+    else:
+        # tudo zerado → sem carteira
+        weights = pd.Series(0.0, index=ativos_validos)
+
+    # garante alinhamento com as colunas do df_ret
+    weights = weights.reindex(df_ret.columns).fillna(0.0)
+
+    # série de retorno da carteira (histórico ponderado pelos pesos financeiros atuais)
+    ret_port = (df_ret * weights).sum(axis=1)
+
+    # vols da carteira por janela
+    vol_port = {}
+    for nome, win in WINS.items():
+        sub = ret_port if win is None else ret_port.tail(win)
+        vol_port[nome] = _ann_vol_ser(sub)
+
+    row_port = pd.DataFrame(vol_port, index=["Carteira (atual)"])
+
+    # 6) Ordena ativos por 1Y (ou TOTAL) e monta tabela final com a carteira no topo
+    ord_col = "1Y" if "1Y" in df_vol_assets.columns else "TOTAL"
+    df_assets_sorted = df_vol_assets.sort_values(ord_col, ascending=False)
+
+    df_show = pd.concat([row_port, df_assets_sorted], axis=0)
+    df_show.index.name = "Ativo"
+
+    # 7) Renderização em tabela (Plotly) com formatação %
     def _fmt_pct(x):
         try:
             return "—" if not np.isfinite(float(x)) else f"{float(x):.2%}"

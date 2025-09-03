@@ -29,18 +29,70 @@ LOOKBACK_DAYS = 120  # ajuste se quiser
 # Índices dos fundos que compõem o TOTAL (mesma regra original)
 INDICES_TOTAL = [0, 7, 10, 14, 15, 16, 17, 20, 25]
 
+# <<< IGNORAR FUNDOS EM DUP-CHECK >>>
+IGNORE_FUND_DUPES = {"BORDEAUX FIM"}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Feriados BR (nacionais): fixos + móveis (Carnaval, Sexta Santa, Corpus Christi)
+# ──────────────────────────────────────────────────────────────────────────────
+def _easter_sunday(year: int) -> date:
+    """Computa Páscoa (Meeus/Jones/Butcher)."""
+    a = year % 19
+    b = year // 100
+    c = year % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = ((h + l - 7 * m + 114) % 31) + 1
+    return date(year, month, day)
+
+def _holidays_br_year(year: int) -> set[date]:
+    """Feriados nacionais (civis + móveis)."""
+    pascoa = _easter_sunday(year)
+    carnaval_ter = pascoa - timedelta(days=47)
+    carnaval_seg = pascoa - timedelta(days=48)
+    sexta_santa = pascoa - timedelta(days=2)
+    corpus_christi = pascoa + timedelta(days=60)
+
+    fixed = {
+        date(year, 1, 1),   # Confraternização Universal
+        date(year, 4, 21),  # Tiradentes
+        date(year, 5, 1),   # Dia do Trabalhador
+        date(year, 9, 7),   # Independência
+        date(year, 10, 12), # N. Sra. Aparecida
+        date(year, 11, 2),  # Finados
+        date(year, 11, 15), # Procl. República
+        date(year, 12, 25), # Natal
+        date(year, 11, 20), # Consciência Negra (nacional desde 2024)
+    }
+    mobiles = {carnaval_seg, carnaval_ter, sexta_santa, corpus_christi}
+    return fixed | mobiles
+
+def _is_business_day(d: date) -> bool:
+    """Dia útil nacional (seg–sex) e não feriado nacional."""
+    if d is None:
+        return False
+    if d.weekday() >= 5:  # 5=sábado, 6=domingo
+        return False
+    return d not in _holidays_br_year(d.year)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Funções de apoio
 # ──────────────────────────────────────────────────────────────────────────────
 def get_last_value(row, date_columns):
     """Encontra o último valor não nulo/não vazio em uma linha."""
-    for date in reversed(date_columns):
-        value = row.get(date, "--")
+    for date_col in reversed(date_columns):
+        value = row.get(date_col, "--")
         if pd.notna(value) and value != "--":
             return value
     return "--"
-
 
 def _txt_to_float(txt: str) -> float:
     """Converte 'R$ 1.234.567,89' → 1234567.89   e '--' → 0.0"""
@@ -52,19 +104,16 @@ def _txt_to_float(txt: str) -> float:
     except ValueError:
         return 0.0
 
-
 def _float_to_txt(val: float) -> str:
     """Converte 1234567.89 → 'R$ 1.234.567,89'"""
     inteiro, frac = f"{val:,.2f}".split(".")
     inteiro = inteiro.replace(",", ".")
     return f"R$ {inteiro},{frac}"
 
-
 def _list_date_columns(df: pd.DataFrame) -> list[str]:
     """Retorna colunas que são datas no formato YYYY-MM-DD, ordenadas."""
     cols = [c for c in df.columns if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(c))]
     return sorted(cols)
-
 
 def _to_date(s: str) -> date | None:
     try:
@@ -72,48 +121,55 @@ def _to_date(s: str) -> date | None:
     except Exception:
         return None
 
-
 def _find_repeated_dates_for_rescrape(df: pd.DataFrame,
                                       lookback_days: int,
                                       ignore_set: set[str]) -> set[date]:
     """
-    Procura, nas últimas `lookback_days`, valores repetidos (igual ao dia anterior)
-    que NÃO pertencem ao `ignore_set`. Retorna o conjunto de datas a re-scrapar.
+    Procura, nas últimas `lookback_days`, valores repetidos (igual ao dia ÚTIL anterior)
+    que NÃO pertencem ao `ignore_set`. Mantém colunas de fds/feriados, mas NÃO as considera
+    na verificação de duplicados. Retorna o conjunto de datas (DIAS ÚTEIS) a re-scrapar.
     """
     if df.empty:
         return set()
 
-    date_cols = _list_date_columns(df)
-    if not date_cols:
+    all_date_cols = _list_date_columns(df)
+    if not all_date_cols:
         return set()
 
-    # Limitar às últimas N datas
     cutoff = datetime.today().date() - timedelta(days=lookback_days)
-    date_cols_recent = [c for c in date_cols if (_to_date(c) and _to_date(c) >= cutoff)]
-    if len(date_cols_recent) < 2:
+    recent_cols = [c for c in all_date_cols if (_to_date(c) and _to_date(c) >= cutoff)]
+    if len(recent_cols) < 2:
+        return set()
+
+    # Apenas DIAS ÚTEIS para verificação de duplicados
+    recent_biz_cols = [c for c in recent_cols if _is_business_day(_to_date(c))]
+    if len(recent_biz_cols) < 2:
         return set()
 
     dates_to_refresh = set()
 
     # Itera linhas exceto TOTAL
     mask_not_total = df["Fundos/Carteiras Adm"].astype(str) != "TOTAL"
-    df_fundos = df.loc[mask_not_total, ["Fundos/Carteiras Adm"] + date_cols_recent].copy()
+    df_fundos = df.loc[mask_not_total, ["Fundos/Carteiras Adm"] + recent_biz_cols].copy()
 
-    # Para cada fundo, compara com a coluna anterior
+    # Para cada fundo, compara com a coluna do dia ÚTIL anterior (ignora fds/feriado)
     for _, row in df_fundos.iterrows():
-        vals = row[date_cols_recent].tolist()
-        for j in range(1, len(date_cols_recent)):
+        fund_name = str(row["Fundos/Carteiras Adm"]).strip()
+        vals = row[recent_biz_cols].tolist()
+        for j in range(1, len(recent_biz_cols)):
             v_prev = vals[j - 1]
             v_curr = vals[j]
             if pd.isna(v_curr) or pd.isna(v_prev):
                 continue
             if (str(v_curr) == str(v_prev)) and (str(v_curr).strip() not in ignore_set):
-                d = _to_date(date_cols_recent[j])
+                # <<< IGNORA BORDEAUX FIM NA DETECÇÃO DE DUPLICADOS (sem PL) >>>
+                if fund_name in IGNORE_FUND_DUPES:
+                    continue
+                d = _to_date(recent_biz_cols[j])
                 if d:
                     dates_to_refresh.add(d)
 
     return dates_to_refresh
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 def main():
@@ -163,11 +219,11 @@ def main():
             df_todos = df_todos[["Fundos/Carteiras Adm"]]
             last_date = None
 
-        # 2) Determina datas novas e datas que precisam re-scrape por “repetidos”
+        # 2) Determina datas novas (mantém TODOS os dias) e datas que precisam re-scrape (apenas dias úteis)
         start_date = last_date + timedelta(days=1) if last_date else datetime(2025, 1, 1)
         end_date = datetime.today()
 
-        # conjunto com datas novas
+        # conjunto com datas novas (todos os dias, inclusive fds/feriado)
         new_dates = set()
         if start_date <= end_date:
             d = start_date.date()
@@ -175,17 +231,16 @@ def main():
                 new_dates.add(d)
                 d += timedelta(days=1)
 
-        # conjunto com datas “repetidas” (para re-scrape)
+        # conjunto com datas “repetidas” (para re-scrape) — APENAS DIAS ÚTEIS
         ignore_dupes = {"--", ZERO_TXT, "R$0,00", "R$0", "R$ 0,00"}
         dates_repeated = _find_repeated_dates_for_rescrape(df_todos, LOOKBACK_DAYS, ignore_dupes)
 
-        # calendário final de scrape
+        # calendário final de scrape: datas novas (todas) ∪ repetidas (úteis)
         dates_to_scrape = sorted(new_dates.union(dates_repeated))
 
         if not dates_to_scrape:
-            print("Nenhuma data nova ou repetida para atualizar.")
+            print("Nenhuma data nova ou repetida (dia útil) para atualizar.")
             # Ainda assim, reforça a regra de zerar AF DEB ≥ CUTOFF_DATE e salva
-            # (para garantir consistência caso o arquivo tenha sido editado fora)
             date_cols_all = _list_date_columns(df_todos)
             for col in date_cols_all:
                 dcol = _to_date(col)
@@ -193,7 +248,6 @@ def main():
                     df_todos.loc[df_todos["Fundos/Carteiras Adm"] == TARGET_FUND, col] = ZERO_TXT
                     soma = df_todos.loc[INDICES_TOTAL, col].apply(_txt_to_float).sum()
                     df_todos.loc[df_todos["Fundos/Carteiras Adm"] == "TOTAL", col] = _float_to_txt(soma)
-            # Atualiza “Último Valor” e salva
             _finalize_and_save(df_todos)
             return
 
@@ -272,7 +326,6 @@ def main():
     finally:
         driver.quit()
 
-
 def _finalize_and_save(df_todos: pd.DataFrame) -> None:
     """Atualiza 'Último Valor', ordena colunas, aplica forward-fill de '--' e salva parquet."""
     date_columns = _list_date_columns(df_todos)
@@ -293,7 +346,6 @@ def _finalize_and_save(df_todos: pd.DataFrame) -> None:
 
     # Salvar parquet
     df_todos.to_parquet(PARQUET_PATH, index=False)
-
 
 if __name__ == "__main__":
     main()

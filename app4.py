@@ -6742,13 +6742,13 @@ def simulate_nav_cota() -> None:
             rent_fmt.append(main)
         else:
             rent_fmt.append(
-                f"{main}<br><span style='font-size:11px; font-style:italic; color:#555'>({cdi_ratio:.0%} do CDI)</span>"
+                f"{main}<br><span style='font-size:11px; font-style:italic; color:#555'>({cdi_ratio:.0%})</span>"
             )
-    tbl_display["RENTABILIDADE"] = rent_fmt
+    tbl_display["RENTABILIDADE <br>        %CDI"] = rent_fmt
 
     # ---------- montar valores por COLUNA (células centralizadas) ----------
-    row_labels = ["<b>RENTABILIDADE</b>", "<b>VOLATILIDADE</b>", "<b>ÍNDICE DE SHARPE</b>"]
-    rent_cols   = tbl_display["RENTABILIDADE"]
+    row_labels = ["<b>RENTABILIDADE <br>        %CDI</b>", "<b>VOLATILIDADE</b>", "<b>ÍNDICE DE SHARPE</b>"]
+    rent_cols   = tbl_display["RENTABILIDADE <br>        %CDI"]
     vol_cols    = tbl_display["VOLATILIDADE"]
     sharpe_cols = tbl_display["ÍNDICE DE SHARPE"]
 
@@ -6812,6 +6812,93 @@ def simulate_nav_cota() -> None:
     c4.metric("Vol. anual",        f"{vol_anual:,.2%}")
     c5.metric("Sharpe",  f"{sharpe_cdi:,.2f}")
     c6.metric("Máx. Drawdown",     f"{max_dd:,.2%}")
+
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### Horizonte para *attribution*")
+    opcao = st.sidebar.selectbox(
+        "Tipo de recorte",
+        ("Dia", "Mês", "Período"),
+        index=1           # ← “Mês” como default
+    )
+    # ----------------------------------------------------------------------------
+    # lista de todas as datas válidas já filtradas pelo restante do app
+    # (common já é DatetimeIndex ordenado)
+    datas_disponiveis = common
+
+    # =============================== DIA ========================================
+    if opcao == "Dia":
+        dia_escolhido = st.sidebar.date_input(
+            "Escolha o dia",
+            value=datas_disponiveis[-1].date(),              # default = último
+            min_value=datas_disponiveis[0].date(),
+            max_value=datas_disponiveis[-1].date()
+        )
+        dia_escolhido = pd.to_datetime(dia_escolhido)
+
+        # se o usuário escolheu dia sem P&L, ajusta para o dia útil anterior
+        if dia_escolhido not in datas_disponiveis:
+            dia_escolhido = datas_disponiveis[datas_disponiveis.get_loc(
+                dia_escolhido, method="pad")]
+
+        ini = fim = dia_escolhido
+
+    # =============================== MÊS ========================================
+    elif opcao == "Mês":
+        # gera lista de meses disponíveis
+        meses_idx = (datas_disponiveis.to_period("M")
+                                .unique()
+                                .sort_values())
+
+        mes_strs  = [m.strftime("%b / %Y") for m in meses_idx]
+        mes_map   = dict(zip(mes_strs, meses_idx))
+
+        mes_sel_str = st.sidebar.selectbox(
+            "Escolha o mês",
+            mes_strs,
+            index=len(mes_strs)-1          # default = último mês
+        )
+        mes_sel = mes_map[mes_sel_str]
+
+        ini = mes_sel.to_timestamp("D")                # 1º dia do mês
+        fim = (mes_sel + 1).to_timestamp("D") - pd.Timedelta(days=1)
+
+        # garante que ini/fim caem dentro das datas disponíveis
+        ini_pos = datas_disponiveis.get_indexer([ini], method="bfill")[0]
+        ini     = datas_disponiveis[ini_pos]
+
+        fim_pos = datas_disponiveis.get_indexer([fim], method="ffill")[0]
+        fim     = datas_disponiveis[fim_pos]
+
+    # ============================ PERÍODO =======================================
+    else:   # “Período”
+        ini = st.sidebar.date_input(
+            "Início",
+            value=datas_disponiveis[0].date(),
+            min_value=datas_disponiveis[0].date(),
+            max_value=datas_disponiveis[-1].date(),
+            key="per_ini"
+        )
+        fim = st.sidebar.date_input(
+            "Fim",
+            value=datas_disponiveis[-1].date(),
+            min_value=datas_disponiveis[0].date(),
+            max_value=datas_disponiveis[-1].date(),
+            key="per_fim"
+        )
+        if ini > fim:
+            st.sidebar.error("Data inicial > final.")
+            st.stop()
+
+        ini = pd.to_datetime(ini)
+        fim = pd.to_datetime(fim)
+
+        # ajusta para datas efetivamente disponíveis
+        ini_pos = datas_disponiveis.get_indexer([ini], method="bfill")[0]
+        ini     = datas_disponiveis[ini_pos]
+
+        fim_pos = datas_disponiveis.get_indexer([fim], method="ffill")[0]
+        fim     = datas_disponiveis[fim_pos]
+
     
 
     aba_cart,tab_orcamento = st.tabs(["Histortico Carteira", "Portfolio Atual"])
@@ -6824,7 +6911,36 @@ def simulate_nav_cota() -> None:
         # ─────────────── 6. métricas ──────────────────────────────
 
         # ───────────────────────────── 7. gráficos
-        st.altair_chart(plot_cota_altair(cota, cdi_cum=cdi_cum), use_container_width=True)
+        idx = cota.index
+        if len(idx) == 0:
+            st.warning("Série de cota vazia para o recorte selecionado.")
+        else:
+            # posição do início dentro do índice
+            i0 = idx.get_loc(ini) if ini in idx else idx.get_indexer([ini], method="bfill")[0]
+            base_pos = max(0, i0 - 1)                 # d-1 (ou o próprio início se não houver anterior)
+            d0 = idx[base_pos]                        # timestamp do ponto-base
+
+            # fatias [d0, fim]
+            cota_slice    = cota.loc[d0:fim]
+            cdi_cum_slice = cdi_cum.loc[d0:fim]
+
+            # normalização: valor = 1 em d0
+            base_cota = float(cota.loc[d0])
+            base_cdi  = float(cdi_cum.loc[d0])
+            # evita divisão por zero — cota é cumprod, então não deveria ser 0; mas protegemos:
+            if base_cota == 0: base_cota = 1.0
+            if base_cdi  == 0: base_cdi  = 1.0
+
+            cota_recorte_normalizada    = cota_slice / base_cota
+            cdi_cum_recorte_normalizada = cdi_cum_slice / base_cdi
+
+            st.altair_chart(
+                plot_cota_altair(
+                    cota_recorte_normalizada,
+                    cdi_cum=cdi_cum_recorte_normalizada
+                ),
+                use_container_width=True
+            )
         #Tirando gráficos de retorno diário
         #st.altair_chart(plot_ret_diario(ret_total), use_container_width=True) 
 
@@ -7080,7 +7196,7 @@ def simulate_nav_cota() -> None:
                 ratio = (rp/rc) if (np.isfinite(rc) and rc != 0) else np.nan
 
                 top    = f"{rp:.2%}"
-                bottom = f"<span style='font-size:11px; color:#555'>({(ratio if np.isfinite(ratio) else float('nan')):.0%} do CDI)</span>" \
+                bottom = f"<span style='font-size:11px; color:#555'>({(ratio if np.isfinite(ratio) else float('nan')):.0%})</span>" \
                         if np.isfinite(ratio) else "<span style='font-size:11px; color:#555'>(— do CDI)</span>"
                 row_vals[m]   = f"{top}<br>{bottom}"
                 row_colors[m] = "#d62728" if rp < 0 else "#111111"
@@ -7089,7 +7205,7 @@ def simulate_nav_cota() -> None:
             rp_y = float((1 + ret_mensal_port.loc[idx_ano]).prod() - 1)
             rc_y = float((1 + ret_mensal_cdi .loc[idx_ano]).prod() - 1)
             ratio_y = (rp_y/rc_y) if (np.isfinite(rc_y) and rc_y != 0) else np.nan
-            row_vals["No ano"]   = f"{rp_y:.2%}<br><span style='font-size:11px; color:#555'>({(ratio_y if np.isfinite(ratio_y) else float('nan')):.0%} do CDI)</span>" \
+            row_vals["No ano"]   = f"{rp_y:.2%}<br><span style='font-size:11px; color:#555'>({(ratio_y if np.isfinite(ratio_y) else float('nan')):.0%})</span>" \
                                 if np.isfinite(ratio_y) else f"{rp_y:.2%}<br><span style='font-size:11px; color:#555'>(— do CDI)</span>"
             row_colors["No ano"] = "#d62728" if rp_y < 0 else "#111111"
 
@@ -7098,7 +7214,7 @@ def simulate_nav_cota() -> None:
             rp_acc  = float(acum_port.loc[dt_last])
             rc_acc  = float(acum_cdi .loc[dt_last])
             ratio_a = (rp_acc/rc_acc) if (np.isfinite(rc_acc) and rc_acc != 0) else np.nan
-            row_vals["Acumulado"]   = f"{rp_acc:.2%}<br><span style='font-size:11px; color:#555'>({(ratio_a if np.isfinite(ratio_a) else float('nan')):.0%} do CDI)</span>" \
+            row_vals["Acumulado"]   = f"{rp_acc:.2%}<br><span style='font-size:11px; color:#555'>({(ratio_a if np.isfinite(ratio_a) else float('nan')):.0%})</span>" \
                                     if np.isfinite(ratio_a) else f"{rp_acc:.2%}<br><span style='font-size:11px; color:#555'>(— do CDI)</span>"
             row_colors["Acumulado"] = "#d62728" if rp_acc < 0 else "#111111"
 
@@ -7107,7 +7223,10 @@ def simulate_nav_cota() -> None:
 
         # 4) Constrói Table (Plotly) — uma linha por ano
         # primeira coluna (ANO)
-        anos_col = [str(a) for a in anos]
+        anos_col = [
+            f"{a}<br><span style='font-size:11px; color:#555'>%CDI</span>"
+            for a in anos
+        ]
 
         # segunda coluna: nome do fundo + “% do CDI” na mesma célula do título (opcional)
         # Se não tiver um nome, mantenha vazio:
@@ -7214,91 +7333,6 @@ def simulate_nav_cota() -> None:
         # ---------------------------------------------------------------
         # 2. Seletor de horizonte
         # ---------------------------------------------------------------
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("### Horizonte para *attribution*")
-        opcao = st.sidebar.selectbox(
-            "Tipo de recorte",
-            ("Dia", "Mês", "Período"),
-            index=1           # ← “Mês” como default
-        )
-        # ----------------------------------------------------------------------------
-        # lista de todas as datas válidas já filtradas pelo restante do app
-        # (common já é DatetimeIndex ordenado)
-        datas_disponiveis = common
-
-        # =============================== DIA ========================================
-        if opcao == "Dia":
-            dia_escolhido = st.sidebar.date_input(
-                "Escolha o dia",
-                value=datas_disponiveis[-1].date(),              # default = último
-                min_value=datas_disponiveis[0].date(),
-                max_value=datas_disponiveis[-1].date()
-            )
-            dia_escolhido = pd.to_datetime(dia_escolhido)
-
-            # se o usuário escolheu dia sem P&L, ajusta para o dia útil anterior
-            if dia_escolhido not in datas_disponiveis:
-                dia_escolhido = datas_disponiveis[datas_disponiveis.get_loc(
-                    dia_escolhido, method="pad")]
-
-            ini = fim = dia_escolhido
-
-        # =============================== MÊS ========================================
-        elif opcao == "Mês":
-            # gera lista de meses disponíveis
-            meses_idx = (datas_disponiveis.to_period("M")
-                                    .unique()
-                                    .sort_values())
-
-            mes_strs  = [m.strftime("%b / %Y") for m in meses_idx]
-            mes_map   = dict(zip(mes_strs, meses_idx))
-
-            mes_sel_str = st.sidebar.selectbox(
-                "Escolha o mês",
-                mes_strs,
-                index=len(mes_strs)-1          # default = último mês
-            )
-            mes_sel = mes_map[mes_sel_str]
-
-            ini = mes_sel.to_timestamp("D")                # 1º dia do mês
-            fim = (mes_sel + 1).to_timestamp("D") - pd.Timedelta(days=1)
-
-            # garante que ini/fim caem dentro das datas disponíveis
-            ini_pos = datas_disponiveis.get_indexer([ini], method="bfill")[0]
-            ini     = datas_disponiveis[ini_pos]
-
-            fim_pos = datas_disponiveis.get_indexer([fim], method="ffill")[0]
-            fim     = datas_disponiveis[fim_pos]
-
-        # ============================ PERÍODO =======================================
-        else:   # “Período”
-            ini = st.sidebar.date_input(
-                "Início",
-                value=datas_disponiveis[0].date(),
-                min_value=datas_disponiveis[0].date(),
-                max_value=datas_disponiveis[-1].date(),
-                key="per_ini"
-            )
-            fim = st.sidebar.date_input(
-                "Fim",
-                value=datas_disponiveis[-1].date(),
-                min_value=datas_disponiveis[0].date(),
-                max_value=datas_disponiveis[-1].date(),
-                key="per_fim"
-            )
-            if ini > fim:
-                st.sidebar.error("Data inicial > final.")
-                st.stop()
-
-            ini = pd.to_datetime(ini)
-            fim = pd.to_datetime(fim)
-
-            # ajusta para datas efetivamente disponíveis
-            ini_pos = datas_disponiveis.get_indexer([ini], method="bfill")[0]
-            ini     = datas_disponiveis[ini_pos]
-
-            fim_pos = datas_disponiveis.get_indexer([fim], method="ffill")[0]
-            fim     = datas_disponiveis[fim_pos]
 
         # ─────────── intervalo escolhido pronto ───────────
         st.sidebar.success(f"Intervalo: {ini:%d/%m/%Y} → {fim:%d/%m/%Y}")
@@ -7482,7 +7516,7 @@ def simulate_nav_cota() -> None:
     # ------------- gráfico Waterfall plot ------------------------
     # ===================== VOL HISTÓRICA POR ATIVO (usando df_retorno) =====================
 
-    st.subheader("Volatilidade histórica por ativo")
+        
     default_assets, quantidade_inicial, portifolio_default = processar_dados_port()
 
     df_base = pd.read_parquet('Dados/df_inicial.parquet')
@@ -7619,7 +7653,7 @@ def simulate_nav_cota() -> None:
         paper_bgcolor="rgba(0,0,0,0)"
     )
 
-    st.plotly_chart(fig_vol_assets, use_container_width=True)
+    
     #with aba_div01:
     #st.header("Análise Portfolio Compilado")
 
@@ -7687,25 +7721,42 @@ def simulate_nav_cota() -> None:
             coll1,coll2 = st.columns(2)
             with coll1:
                 #st.write(dd_atual)
-                var_base_pct = 0.01
-                var_cut_pct  = 0.005     # 0.5%
-                gatilho_dd   = -0.05      # -5%
-                # 0,0016
-                var_efetivo_pct = var_base_pct - var_cut_pct if dd_atual <= gatilho_dd else var_base_pct
+                var_base_pct = 0.01   # 1,00% (fração)
+                cut_50      = 0.5     # fator de corte (50%)
 
-                var_efetivo_bps = var_efetivo_pct * 100
-                if var_efetivo_bps == 0.5:
-                    index = 0
-                elif var_efetivo_bps == 1.0:
-                    index = 1
-                #st.write(var_efetivo_bps)
+                gatilho_dd_3 = -0.03  # -3%
+                gatilho_dd_5 = -0.05  # -5%
+
+                # Começa no orçamento base
+                var_efetivo_pct = var_base_pct
+
+                # Primeiro corte: se dd_atual <= -3%, reduz 50% (→ 0,50%)
+                if pd.notna(dd_atual) and dd_atual <= gatilho_dd_3:
+                    var_efetivo_pct *= cut_50
+
+                # Segundo corte: se dd_atual <= -5%, reduz mais 50% (→ 0,25%)
+                if pd.notna(dd_atual) and dd_atual <= gatilho_dd_5:
+                    var_efetivo_pct *= cut_50
+
+                # Para o UI (valores em % como você já usa no radio)
+                var_efetivo_pct_ui = var_efetivo_pct * 100.0  # 0.25, 0.5, 1.0, ...
+
+                # Opções do seletor (agora inclui 0,25%)
+                opcoes_pct = [0.25, 0.5, 1.0, 2.0, 3.0]
+
+                # Seleção padrão: tenta bater exatamente, senão escolhe a mais próxima
+                try:
+                    index = opcoes_pct.index(round(var_efetivo_pct_ui, 2))
+                except ValueError:
+                    index = min(range(len(opcoes_pct)), key=lambda i: abs(opcoes_pct[i] - var_efetivo_pct_ui))
 
                 orcamento_bps_var = st.sidebar.radio(
                     "Orçamento de risco VaR (%)",
-                options=[0.5,1, 2, 3],
-                index=index,
-                horizontal=True
+                    options=opcoes_pct,
+                    index=index,
+                    horizontal=True
                 )
+
 
             with coll2:
                 orcamento_bps_cvar = st.sidebar.radio(
@@ -7735,8 +7786,9 @@ def simulate_nav_cota() -> None:
                         '''
             )
 
-
-
+        with col22:
+            st.subheader("Volatilidade histórica por ativo")
+            st.plotly_chart(fig_vol_assets, use_container_width=True)
 
     # ======================= DRAWNDOWN: série, atual e dias =======================
 
@@ -8422,9 +8474,96 @@ def simulate_nav_cota() -> None:
     #    #d6.metric("Stress DV01 (R$)", f"{risco['Stress DV01 (R$)']:,.2f}")
 
 
+import time
 
-        
-    
+def _load_users_from_secrets() -> dict:
+    users = st.secrets.get("users", {})
+    if not isinstance(users, dict) or not users:
+        st.error("⚠️ Configure usuários em `.streamlit/secrets.toml` na seção [users].")
+        return {}
+    return users
+
+def _check_password(username: str, password: str, users: dict) -> bool:
+    try:
+        import bcrypt
+    except ImportError:
+        st.error("⚠️ Dependência ausente: instale com `pip install bcrypt`.")
+        return False
+
+    if not username or not password: 
+        return False
+    hashed = users.get(username)
+    if not hashed:
+        return False
+    try:
+        return bcrypt.checkpw(password.encode("utf-8"), str(hashed).encode("utf-8"))
+    except Exception:
+        return False
+
+def _session_expired(last_seen: float, timeout_min: int) -> bool:
+    if last_seen is None: 
+        return True
+    return (time.time() - float(last_seen)) > (timeout_min * 60)
+
+def login_gate() -> bool:
+    """
+    Exibe login se necessário, controla sessão (timeout) e botão de logout.
+    Retorna True se o usuário estiver autenticado, senão False.
+    """
+    # Config
+    timeout_min = int(st.secrets.get("auth", {}).get("session_timeout_min", 60))
+
+    # Sessão ativa?
+    auth = st.session_state.get("_auth", {})
+    if auth.get("ok") is True and auth.get("user"):
+        # Verifica expiração
+        if _session_expired(auth.get("last_seen"), timeout_min):
+            st.session_state.pop("_auth", None)
+            st.warning("🔒 Sessão expirada. Faça login novamente.")
+            st.rerun()
+
+        # Atualiza last_seen
+        auth["last_seen"] = time.time()
+        st.session_state["_auth"] = auth
+
+        # Cabeçalho da sessão + logout
+        with st.sidebar.expander("Sessão", expanded=True):
+            st.markdown(f"**Usuário:** `{auth['user']}`")
+            if st.button("Sair"):
+                st.session_state.pop("_auth", None)
+                st.rerun()
+        return True
+
+    # Não autenticado → mostra formulário de login
+    users = _load_users_from_secrets()
+    if not users:
+        return False
+
+    st.markdown("### 🔐 Login")
+    with st.form("login_form", clear_on_submit=False):
+        col1, col2 = st.columns([1,1])
+        username = col1.text_input("Usuário", value="", autocomplete="username")
+        password = col2.text_input("Senha", value="", type="password", autocomplete="current-password")
+        lembrar  = st.checkbox("Manter conectado nesta sessão", value=True)
+        submitted = st.form_submit_button("Entrar")
+
+    if submitted:
+        if _check_password(username.strip(), password, users):
+            st.session_state["_auth"] = {
+                "ok": True,
+                "user": username.strip(),
+                "last_seen": time.time(),
+                # Se quiser implementar “lembrar” com query params/cookie, use este flag:
+                "remember": bool(lembrar),
+            }
+            st.success("✅ Login efetuado.")
+            st.rerun()
+        else:
+            st.error("❌ Usuário ou senha inválidos.")
+
+    # Bloqueia app até logar
+    return False
+
     
 
 # ==========================================================
@@ -11160,7 +11299,45 @@ if "current_page" not in st.session_state:
     st.session_state["current_page"] = "main"
 
 if st.session_state["current_page"] == "main":
+    def _check_secrets():
+        try:
+            users = st.secrets["users"]
+        except Exception:
+            st.error("Secrets não encontrados. Verifique .streamlit/secrets.toml ou os Secrets na Cloud.")
+            st.stop()
+
+        if not isinstance(users, dict) or not users:
+            st.error("⚠️ Configure usuários em .streamlit/secrets.toml na seção [users].")
+            st.stop()
+
+        # opcional: log leve
+        st.caption(f"Users configurados: {', '.join(users.keys())}")
+
+    _check_secrets()
+
+    login_gate()
+    if not login_gate():
+        st.stop()  # bloqueia o resto do app até logar
     main_page()
 else:
+    def _check_secrets():
+        try:
+            users = st.secrets["users"]
+            st.write(users)
+        except Exception:
+            st.error("Secrets não encontrados. Verifique .streamlit/secrets.toml ou os Secrets na Cloud.")
+            st.stop()
+
+        if not isinstance(users, dict) or not users:
+            st.error("⚠️ Configure usuários em .streamlit/secrets.toml na seção [users].")
+            st.stop()
+
+        # opcional: log leve
+        st.caption(f"Users configurados: {', '.join(users.keys())}")
+
+    _check_secrets()
+    login_gate()
+    if not login_gate():
+        st.stop()  # bloqueia o resto do app até logar
     main_page()
 # --------------------------------------------------------

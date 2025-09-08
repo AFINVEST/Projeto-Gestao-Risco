@@ -11299,13 +11299,9 @@ if "current_page" not in st.session_state:
     st.session_state["current_page"] = "main"
 
 if st.session_state["current_page"] == "main":
-    login_gate()
-    if not login_gate():
-        st.stop()  # bloqueia o resto do app até logar
+
     main_page()
 else:
-    login_gate()
-    if not login_gate():
-        st.stop()  # bloqueia o resto do app até logar
+
     main_page()
 # --------------------------------------------------------

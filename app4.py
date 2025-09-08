@@ -11299,43 +11299,11 @@ if "current_page" not in st.session_state:
     st.session_state["current_page"] = "main"
 
 if st.session_state["current_page"] == "main":
-    def _check_secrets():
-        try:
-            users = st.secrets["users"]
-        except Exception:
-            st.error("Secrets não encontrados. Verifique .streamlit/secrets.toml ou os Secrets na Cloud.")
-            st.stop()
-
-        if not isinstance(users, dict) or not users:
-            st.error("⚠️ Configure usuários em .streamlit/secrets.toml na seção [users].")
-            st.stop()
-
-        # opcional: log leve
-        st.caption(f"Users configurados: {', '.join(users.keys())}")
-
-    _check_secrets()
-
     login_gate()
     if not login_gate():
         st.stop()  # bloqueia o resto do app até logar
     main_page()
 else:
-    def _check_secrets():
-        try:
-            users = st.secrets["users"]
-            st.write(users)
-        except Exception:
-            st.error("Secrets não encontrados. Verifique .streamlit/secrets.toml ou os Secrets na Cloud.")
-            st.stop()
-
-        if not isinstance(users, dict) or not users:
-            st.error("⚠️ Configure usuários em .streamlit/secrets.toml na seção [users].")
-            st.stop()
-
-        # opcional: log leve
-        st.caption(f"Users configurados: {', '.join(users.keys())}")
-
-    _check_secrets()
     login_gate()
     if not login_gate():
         st.stop()  # bloqueia o resto do app até logar

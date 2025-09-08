@@ -6194,7 +6194,7 @@ def calc_contribs_for_date_cached(
         return {"dv01_R$": {}, "covar_R$": {}, "pesos": {}}
 
     # Ajuste para usar o índice correto no pandas (DataFrame com Timestamps)
-    df_hist = rets.loc[:d, cols].tail(window)
+    df_hist = rets.loc[:d, cols]
     if df_hist.empty:
         return {"dv01_R$": {}, "covar_R$": {}, "pesos": {}}
 
@@ -6235,26 +6235,40 @@ def calc_contribs_for_date_cached(
         out["dv01_R$"] = dv01_R_d.to_dict()
 
     # ---------- CoVaR(d) ----------
+    # ---------- CoVaR(d) ----------
     if return_covar:
-        # Retorno do portfólio com os pesos na data
-        port_ret = (df_hist * pesos_d.reindex(df_hist.columns).values).sum(axis=1)
-        std_p = float(port_ret.std())
+        # 1) Pesos re-normalizados para colunas válidas de df_hist
+        w_eff = pesos_d.reindex(df_hist.columns).fillna(0.0)
+        sw = float(w_eff.sum())
+        if sw > 0:
+            w_eff = w_eff / sw
 
-        if std_p == 0 or np.isnan(std_p):
+        # 2) Retorno do portfólio com pesos efetivos
+        port_ret = (df_hist * w_eff.values).sum(axis=1)
+
+        # 3) Covariância com o portfólio (robusta)
+        df_tmp = df_hist.copy()
+        df_tmp["PORT"] = port_ret.values
+        covm = df_tmp.cov()
+        var_p = float(covm.loc["PORT", "PORT"])
+        if var_p == 0 or np.isnan(var_p):
             out["covar_R$"] = {c: 0.0 for c in cols}
         else:
-            # Calculando a covariância e o beta
-            cov = df_hist.cov()
-            var_p = float(port_ret.var())
-            cov_port = cov[port_ret.name] if port_ret.name in cov.columns else df_hist.apply(lambda x: x.cov(port_ret))
-            beta = cov_port / var_p
+            beta = covm["PORT"].drop("PORT") / var_p
 
-            # VaR do portfólio (retorno) no alfa
-            var_port = abs(np.nanpercentile(port_ret.values, alpha*100.0))
+            # 4) VaR (consistência com seu método "bom")
+            var_port = abs(np.quantile(port_ret.values, alpha))
 
-            mvar = beta * var_port  # mVaR (ret)
-            covar_R = (mvar.reindex(cols).fillna(0.0) * pesos_d * mv_total_d).astype(float)
-            out["covar_R$"] = covar_R.to_dict()
+            # 5) MV só do subconjunto com retornos (consistência do dinheiro)
+            precos_eff = b["df_precos_u"][df_hist.columns].loc[:d].ffill().tail(1).squeeze()
+            pos_eff    = b["positions_ts"][df_hist.columns].loc[:d].tail(1).squeeze().abs()
+            mv_total_eff = float((pd.to_numeric(precos_eff, errors="coerce").fillna(0.0) *
+                                pd.to_numeric(pos_eff,    errors="coerce").fillna(0.0)).sum())
+
+            mvar = beta * var_port
+            covar_R = (mvar.reindex(df_hist.columns).fillna(0.0) * w_eff * mv_total_eff).astype(float)
+            out["covar_R$"] = covar_R.reindex(cols).fillna(0.0).to_dict()
+
 
     return out
 
@@ -6375,7 +6389,7 @@ def get_risk_static_bundle(pl_signature: tuple, interpret_quantities: str = "del
         dv01_per_contract = pd.to_numeric(df_divone.loc[df_divone.index[0]], errors="coerce").fillna(0.0)
     # ou se for algum dado fixo
     # df_dv01_pc = pd.Series(...)
-
+    
     # Assinatura hashable para o cache
     bundle_signature = (
         int(trading_index[0].value), int(trading_index[-1].value),
@@ -6384,7 +6398,7 @@ def get_risk_static_bundle(pl_signature: tuple, interpret_quantities: str = "del
 
     # Criação do bundle e armazenamento no session_state
     b = {
-        "df_retorno_u": df_retorno_u,
+        "df_retorno_u": df_retorno,
         "df_precos_u": df_completo,
         "trading_index": trading_index,
         "cols_returns": list(df_retorno_u.columns),
@@ -8357,7 +8371,6 @@ def simulate_nav_cota() -> None:
         # ========================== Histórico empilhado (NOVO) ==========================
         with COL2:
             st.subheader("Histórico de DV01 & CoVaR")
-            st.subheader("Em desenvolvimento")
         opt_freq = "Diária"
         weekly = (opt_freq == "Semanal")
 
@@ -8377,9 +8390,8 @@ def simulate_nav_cota() -> None:
 
         # CoVaR normalizado (apenas positivos) — histórico
         df_hist_cv = build_history_normalized(
-            dates_hist, kind="covar", top_n=8, weekly=True, only_positive=True, window=126, alpha=0.05, covar_tot_rs=covar_tot_rs
+            dates_hist, kind="covar", top_n=8, weekly=True, only_positive=False, window=126, alpha=0.05, covar_tot_rs=covar_tot_rs
         )
-        #st.write(df_hist_cv)
 
         #colH1, colH2 = st.columns(2)
 
@@ -8421,9 +8433,10 @@ def simulate_nav_cota() -> None:
                 # 3. Plotar o gráfico de área empilhada
                 fig_area = px.area(df_hist_dv_normalized, x=df_hist_dv_normalized.index, y=df_hist_dv_normalized.columns,
                                 labels={'value': 'Proporção', 'variable': 'Estratégia'},
-                                title="DV01 Normalizado por Estratégia")
-                fig_area.update_layout(margin=dict(l=10, r=10, t=10, b=10), legend_title_text="")
-                # Limitar o eixo y a 6% (0.06)
+                                title=" ")
+                fig_area.update_layout( 
+                    margin=dict(l=16, r=16, t=16, b=16))
+                        # Limitar o eixo y a 6% (0.06)
                 fig_area.update_yaxes(range=[0, 0.06], tickformat=".0%", title="Proporção de DV01")
                 fig_area.update_traces(hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>")
 
@@ -8435,7 +8448,7 @@ def simulate_nav_cota() -> None:
             st.info("Sem histórico suficiente para CoVaR.")
         else:
             with colll2:
-                st.caption("CoVaR por estratégia (apenas positivos) — área empilhada")
+                st.caption("CoVaR por estratégia — área empilhada")
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
                 #st.write(df_hist_cv)
                 df_hist_cv_positive = df_hist_cv.clip(lower=0)
@@ -8450,7 +8463,7 @@ def simulate_nav_cota() -> None:
                 # 3. Plotar o gráfico de área empilhada
                 fig_area2 = px.area(df_hist_cv_normalized, x=df_hist_cv_normalized.index, y=df_hist_cv_normalized.columns,
                                     labels={'value': 'Proporção', 'variable': 'Estratégia'},
-                                    title="CoVaR Normalizado por Estratégia (Positivos)")
+                                    title=" ")
                 fig_area2.update_layout(margin=dict(l=10, r=10, t=10, b=10), legend_title_text="")
                 fig_area2.update_yaxes(range=[0, 1], tickformat=".0%", title="Proporção de CoVaR")
                 fig_area2.update_traces(hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>")
@@ -8475,8 +8488,6 @@ def simulate_nav_cota() -> None:
 import json
 import time
 from pathlib import Path
-
-import streamlit as st
 import bcrypt
 
 
@@ -8484,16 +8495,6 @@ import bcrypt
 # Helpers
 # -------------------------------------------------------------------
 def _load_auth_json(path: str):
-    """
-    Lê JSON no formato:
-    {
-    "auth": { "session_timeout_min": 360 },
-    "users": {
-        "admin": "$2b$12$....",
-        "ana":   "$2b$12$...."
-    }
-    }
-    """
     p = Path(path)
     if not p.exists():
         return {}, 60

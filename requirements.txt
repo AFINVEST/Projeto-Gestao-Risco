@@ -11,3 +11,4 @@ altair
 plotly
 typing
 XlsxWriter
+bcrypt

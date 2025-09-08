@@ -8472,88 +8472,117 @@ def simulate_nav_cota() -> None:
 #
 #
     #    #d6.metric("Stress DV01 (R$)", f"{risco['Stress DV01 (R$)']:,.2f}")
-
-
+import json
 import time
+from pathlib import Path
 
-def _load_users_from_secrets() -> dict:
-    users = st.secrets.get("users", {})
-    if not isinstance(users, dict) or not users:
-        st.error("⚠️ Configure usuários em `.streamlit/secrets.toml` na seção [users].")
-        return {}
-    return users
+import streamlit as st
+import bcrypt
 
-def _check_password(username: str, password: str, users: dict) -> bool:
+
+# -------------------------------------------------------------------
+# Helpers
+# -------------------------------------------------------------------
+def _load_auth_json(path: str):
+    """
+    Lê JSON no formato:
+    {
+    "auth": { "session_timeout_min": 360 },
+    "users": {
+        "admin": "$2b$12$....",
+        "ana":   "$2b$12$...."
+    }
+    }
+    """
+    p = Path(path)
+    if not p.exists():
+        return {}, 60
     try:
-        import bcrypt
-    except ImportError:
-        st.error("⚠️ Dependência ausente: instale com `pip install bcrypt`.")
-        return False
-
-    if not username or not password: 
-        return False
-    hashed = users.get(username)
-    if not hashed:
-        return False
-    try:
-        return bcrypt.checkpw(password.encode("utf-8"), str(hashed).encode("utf-8"))
+        data = json.loads(p.read_text(encoding="utf-8"))
     except Exception:
+        return {}, 60
+
+    users = {str(k): str(v) for k, v in (data.get("users") or {}).items()}
+    timeout = int((data.get("auth") or {}).get("session_timeout_min", 60))
+    return users, timeout
+
+
+def _session_expired(last_seen_epoch, timeout_min: int) -> bool:
+    if not last_seen_epoch:
         return False
-
-def _session_expired(last_seen: float, timeout_min: int) -> bool:
-    if last_seen is None: 
+    try:
+        return (time.time() - float(last_seen_epoch)) > timeout_min * 60
+    except Exception:
         return True
-    return (time.time() - float(last_seen)) > (timeout_min * 60)
 
-def login_gate() -> bool:
+
+def _check_password(user: str, pwd: str, users: dict) -> bool:
+    if not user or not pwd or user not in users:
+        return False
+    stored = users[user]
+    try:
+        # hash bcrypt esperado no JSON
+        return bcrypt.checkpw(pwd.encode("utf-8"), stored.encode("utf-8"))
+    except Exception:
+        # fallback (APENAS se você decidir armazenar texto claro — não recomendado)
+        return pwd == stored
+
+
+# -------------------------------------------------------------------
+# Login Gate (sem UI de sessão / sem botão de sair)
+# -------------------------------------------------------------------
+def login_gate(
+    config_json_path: str = "teste.json",
+    form_key: str | None = None,
+) -> bool:
     """
-    Exibe login se necessário, controla sessão (timeout) e botão de logout.
+    Exibe login se necessário, controla sessão (timeout).
     Retorna True se o usuário estiver autenticado, senão False.
+
+    Não exibe nada no sidebar quando autenticado.
     """
-    # Config
-    timeout_min = int(st.secrets.get("auth", {}).get("session_timeout_min", 60))
+    users, timeout_min = _load_auth_json(config_json_path)
 
     # Sessão ativa?
     auth = st.session_state.get("_auth", {})
-    if auth.get("ok") is True and auth.get("user"):
-        # Verifica expiração
+    if auth.get("ok") and auth.get("user") in users:
+        # Expirou?
         if _session_expired(auth.get("last_seen"), timeout_min):
             st.session_state.pop("_auth", None)
             st.warning("🔒 Sessão expirada. Faça login novamente.")
             st.rerun()
 
-        # Atualiza last_seen
+        # Atualiza last_seen e segue em frente (sem renderizar nada)
         auth["last_seen"] = time.time()
         st.session_state["_auth"] = auth
-
-        # Cabeçalho da sessão + logout
-        with st.sidebar.expander("Sessão", expanded=True):
-            st.markdown(f"**Usuário:** `{auth['user']}`")
-            if st.button("Sair"):
-                st.session_state.pop("_auth", None)
-                st.rerun()
         return True
 
-    # Não autenticado → mostra formulário de login
-    users = _load_users_from_secrets()
+    # Não autenticado → precisa do arquivo de usuários
     if not users:
+        st.error(f"⚠️ Configure usuários em `{config_json_path}` (JSON).")
         return False
 
-    st.markdown("### 🔐 Login")
-    with st.form("login_form", clear_on_submit=False):
-        col1, col2 = st.columns([1,1])
-        username = col1.text_input("Usuário", value="", autocomplete="username")
-        password = col2.text_input("Senha", value="", type="password", autocomplete="current-password")
-        lembrar  = st.checkbox("Manter conectado nesta sessão", value=True)
-        submitted = st.form_submit_button("Entrar")
+    # Evita keys duplicadas (form)
+    if form_key is None:
+        cnt = st.session_state.get("_login_form_counter", 0) + 1
+        st.session_state["_login_form_counter"] = cnt
+        form_key = f"login_form_{cnt}"
 
-    if submitted:
-        if _check_password(username.strip(), password, users):
+    st.markdown("### 🔐 Login")
+    with st.form(key=form_key, clear_on_submit=False):
+        c1, c2 = st.columns(2)
+        username = c1.text_input("Usuário", key=f"{form_key}_user", autocomplete="username")
+        password = c2.text_input("Senha", key=f"{form_key}_pass", type="password", autocomplete="current-password")
+        lembrar = st.checkbox("Manter conectado nesta sessão", value=True, key=f"{form_key}_remember")
+        ok = st.form_submit_button("Entrar", use_container_width=True)
+
+    if ok:
+        u = (username or "").strip()
+        if _check_password(u, password, users):
             st.session_state["_auth"] = {
                 "ok": True,
-                "user": username.strip(),
+                "user": u,
                 "last_seen": time.time(),
-                # Se quiser implementar “lembrar” com query params/cookie, use este flag:
                 "remember": bool(lembrar),
             }
             st.success("✅ Login efetuado.")
@@ -8564,7 +8593,17 @@ def login_gate() -> bool:
     # Bloqueia app até logar
     return False
 
-    
+
+# -------------------------------------------------------------------
+# Exemplo de uso (uma ÚNICA chamada antes do resto do app)
+# -------------------------------------------------------------------
+# Id da página atual para ter uma key de form estável
+page_id = st.session_state.get("current_page", "main")
+
+CONFIG_PATH = "teste.json"  # ajuste se quiser
+
+
+
 
 # ==========================================================
 #   FUNÇÃO DA PÁGINA 1 (Dashboard Principal)
@@ -11299,9 +11338,11 @@ if "current_page" not in st.session_state:
     st.session_state["current_page"] = "main"
 
 if st.session_state["current_page"] == "main":
-
+    if not login_gate(CONFIG_PATH, form_key=f"login_{page_id}"):
+        st.stop()
     main_page()
 else:
-
+    if not login_gate(CONFIG_PATH, form_key=f"login_{page_id}"):
+        st.stop()
     main_page()
 # --------------------------------------------------------

@@ -6235,7 +6235,6 @@ def calc_contribs_for_date_cached(
         out["dv01_R$"] = dv01_R_d.to_dict()
 
     # ---------- CoVaR(d) ----------
-    # ---------- CoVaR(d) ----------
     if return_covar:
         # 1) Pesos re-normalizados para colunas válidas de df_hist
         w_eff = pesos_d.reindex(df_hist.columns).fillna(0.0)

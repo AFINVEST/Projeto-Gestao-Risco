@@ -6827,7 +6827,7 @@ def simulate_nav_cota() -> None:
     c6.metric("Máx. Drawdown",     f"{max_dd:,.2%}")
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### Horizonte para *attribution*")
+    st.sidebar.markdown("### Escolha o Horizonte de tempo")
     opcao = st.sidebar.selectbox(
         "Tipo de recorte",
         ("Dia", "Mês", "Período"),
@@ -7170,7 +7170,6 @@ def simulate_nav_cota() -> None:
             use_container_width=True
                 )
         # ===================== Rentabilidade histórica (sempre CDI; célula 2 linhas) =====================
-        st.write("## Rentabilidade histórica")
 
         import numpy as np, pandas as pd
         import plotly.graph_objects as go
@@ -7287,11 +7286,11 @@ def simulate_nav_cota() -> None:
             height=28 + 30*len(anos) + 15,
             paper_bgcolor="rgba(0,0,0,0)"
         )
-
-        st.plotly_chart(fig_hist, use_container_width=True)
-
-        st.subheader("Índices Históricos")
-        st.plotly_chart(fig_tbl, use_container_width=True)
+        #st.write("## Rentabilidade histórica")
+        #st.plotly_chart(fig_hist, use_container_width=True)
+#
+        #st.subheader("Índices Históricos")
+        #st.plotly_chart(fig_tbl, use_container_width=True)
 
     with aba_cart:
 
@@ -7473,37 +7472,43 @@ def simulate_nav_cota() -> None:
         ]
 
         # gráfico -------------------------------------------------------
-        fig = go.Figure()
+        df1 = df_wf.query("Componente != 'CDI'").copy()
 
+        # tudo que não for Performance é passo relativo
+        df1.loc[df1["Componente"] != "Performance", "measure"] = "relative"
+
+        # Performance como valor alvo (não soma): barra = y que você passou
+        df1.loc[df1["Componente"] == "Performance", "measure"] = "absolute"
+
+        fig = go.Figure()
         fig.add_trace(
             go.Waterfall(
-                x       = df_wf.query("Componente != 'CDI'")["Componente"],
-                y       = df_wf.query("Componente != 'CDI'")["ret_pl"],
-                measure = df_wf.query("Componente != 'CDI'")["measure"],
-                text    = df_wf.query("Componente != 'CDI'")["text"],
+                x=df1["Componente"],
+                y=df1["ret_pl"],
+                measure=df1["measure"],
+                text=df1["text"],
                 textposition="outside",
-                connector = dict(line=dict(color="grey")),
-                increasing = dict(marker=dict(color="#1a7519")),  # verde
-                decreasing = dict(marker=dict(color="#d62728")),  # vermelho
-                totals     = dict(marker=dict(color="#000080")),  # azul‑escuro
+                connector=dict(line=dict(color="grey")),
+                increasing=dict(marker=dict(color="#1a7519")),
+                decreasing=dict(marker=dict(color="#d62728")),
+                totals=dict(marker=dict(color="#000080")),
                 name="Atribuição"
             )
         )
 
-        # ───── segunda trace: CDI isolado ───────────────────────────────────
+        # CDI segue separado
         cdi_val = df_wf.loc[df_wf["Componente"]=="CDI","ret_pl"].values[0]
         fig.add_trace(
             go.Waterfall(
-                x       = ["CDI"],
-                y       = [cdi_val],
-                measure = ["absolute"],
-                text    = [f"{cdi_val:+.2%}"],
+                x=["CDI"],
+                y=[cdi_val],
+                measure=["absolute"],
+                text=[f"{cdi_val:+.2%}"],
                 textposition="outside",
-                increasing = dict(marker=dict(color="#7f7f7f")),  # cinza
+                increasing=dict(marker=dict(color="#7f7f7f")),
                 name="CDI"
             )
         )
-
         # ───── layout (o mesmo de antes) ────────────────────────────────────
         fig.update_layout(
             height = 460,
@@ -7523,6 +7528,12 @@ def simulate_nav_cota() -> None:
             st.dataframe(df_wf.set_index("Componente")[["ret_pl"]]
                         .rename(columns={"ret_pl": "pontos‑percentuais"})
                         .style.format({"pontos‑percentuais": "{:+.2%}"}))
+        
+        st.write("## Rentabilidade histórica")
+        st.plotly_chart(fig_hist, use_container_width=True)
+
+        st.subheader("Índices Históricos")
+        st.plotly_chart(fig_tbl, use_container_width=True)
         
         # 3) Botões de download
 
@@ -7853,8 +7864,8 @@ def simulate_nav_cota() -> None:
         #        help="Se não houver 252 dias, usa tudo que existir e anualiza.")
         #c10.metric("Drawdown corrente", f"{dd_atual:,.2%}", help=f"Dias no DD: {dias_em_dd}d")
         c7, c8 = st.columns(2)
-        c7.metric("Vol (ultimos 21 dias)", f"{vols_finais['1M']:,.2%}" if np.isfinite(vols_finais['1M']) else "—")
-        c8.metric("Drawdown corrente", f"{dd_atual:,.2%}", help=f"Dias no DD: {dias_em_dd}d")
+        c7.metric("Drawdown corrente", f"{dd_atual:,.2%}", help=f"Dias no DD: {dias_em_dd}d")
+        c8.metric("Vol (ultimos 21 dias)", f"{vols_finais['1M']:,.2%}" if np.isfinite(vols_finais['1M']) else "—")
 
         # ======================= GRÁFICOS LADO A LADO (AZUIS) ========================
         g1, g2 = st.columns(2)

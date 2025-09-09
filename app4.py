@@ -8072,7 +8072,7 @@ def simulate_nav_cota() -> None:
                 # fallback
                 st.progress(pct_clamped/100.0)
         with col11:
-            st.subheader("Consumo do orçamento (VaR e CVaR)")
+            st.subheader("Consumo do orçamento (VaR)")
             #colA, colB = st.columns(2)
             #with colA:
             st.caption(f"VaR — {fmt_pct(pct_consumo_var(var_bps/100))} do orçamento")

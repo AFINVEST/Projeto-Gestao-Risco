@@ -20,7 +20,7 @@ PARQUET_PATH = "Dados/pl_fundos_teste.parquet"
 
 # Fundo que deve zerar a partir de CUTOFF_DATE
 TARGET_FUND = "AF DEB INCENTIVADAS"
-CUTOFF_DATE = datetime(2025, 9, 1).date()  # 01/09/2025
+CUTOFF_DATE = datetime(2025, 9, 24).date()  # 01/09/2025
 ZERO_TXT = "R$ 0,00"
 
 # Janela para caçar “repetidos” (e re-scrapar)

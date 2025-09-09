@@ -7782,13 +7782,13 @@ def simulate_nav_cota() -> None:
                 )
 
 
-            with coll2:
-                orcamento_bps_cvar = st.sidebar.radio(
-                    "Orçamento de risco CVaR (%)",
-                    options=[1, 2, 3],
-                    index=2,
-                    horizontal=True
-                )
+            #with coll2:
+                #orcamento_bps_cvar = st.sidebar.radio(
+                #    "Orçamento de risco CVaR (%)",
+                #    options=[1, 2, 3],
+                #    index=2,
+                #    horizontal=True
+                #)
 
         with COLmeio:
             # Adicionar linha vertical
@@ -7810,9 +7810,9 @@ def simulate_nav_cota() -> None:
                         '''
             )
 
-        with col22:
-            st.subheader("Volatilidade histórica por ativo")
-            st.plotly_chart(fig_vol_assets, use_container_width=True)
+        #with col22:
+            #st.subheader("Volatilidade histórica por ativo")
+            #st.plotly_chart(fig_vol_assets, use_container_width=True)
 
     # ======================= DRAWNDOWN: série, atual e dias =======================
 
@@ -8073,13 +8073,13 @@ def simulate_nav_cota() -> None:
                 st.progress(pct_clamped/100.0)
         with col11:
             st.subheader("Consumo do orçamento (VaR e CVaR)")
-            colA, colB = st.columns(2)
-            with colA:
-                st.caption(f"VaR — {fmt_pct(pct_consumo_var(var_bps/100))} do orçamento")
-                donut_chart("VaR", pct_consumo_var(var_bps/100))
-            with colB:
-                st.caption(f"CVaR — {fmt_pct(pct_consumo_cvar(cvar_bps/100))} do orçamento")
-                donut_chart("CVaR", pct_consumo_cvar(cvar_bps/100))
+            #colA, colB = st.columns(2)
+            #with colA:
+            st.caption(f"VaR — {fmt_pct(pct_consumo_var(var_bps/100))} do orçamento")
+            donut_chart("VaR", pct_consumo_var(var_bps/100))
+            #with colB:
+            #    st.caption(f"CVaR — {fmt_pct(pct_consumo_cvar(cvar_bps/100))} do orçamento")
+            #    donut_chart("CVaR", pct_consumo_cvar(cvar_bps/100))
 
         # ========= Helpers NOVOS (podem ficar no topo do tab) =========
         import plotly.express as px
@@ -8478,7 +8478,8 @@ def simulate_nav_cota() -> None:
                 fig_area2.update_yaxes(range=[0, 1], tickformat=".0%", title="Proporção de CoVaR")
                 fig_area2.update_traces(hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>")
                 st.plotly_chart(fig_area2, use_container_width=True)
-        
+        st.subheader("Volatilidade histórica por ativo")
+        st.plotly_chart(fig_vol_assets, use_container_width=True)
                 
     #with tab_fundos:
     #    df_contratos_2 = read_atual_contratos()

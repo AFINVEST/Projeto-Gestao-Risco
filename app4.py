@@ -6415,7 +6415,88 @@ def get_risk_static_bundle(pl_signature: tuple, interpret_quantities: str = "del
 
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Utilidades
+# ──────────────────────────────────────────────────────────────────────────────
+from typing import Optional, Dict, Tuple, Sequence
+from pathlib import Path
 
+
+MONTH_CODE: Dict[str, int] = {"F":1,"G":2,"H":3,"J":4,"K":5,"M":6,"N":7,"Q":8,"U":9,"V":10,"X":11,"Z":12}
+
+def first_bday_of_month(year: int, month: int) -> pd.Timestamp:
+    return pd.date_range(pd.Timestamp(year, month, 1), periods=1, freq="BMS")[0]
+
+def di_maturity_from_ticker(ticker: str) -> Optional[pd.Timestamp]:
+    """
+    'ODF26 Comdty' (ou 'ODF26') -> 1º dia útil de jan/2026 (F=Jan...Z=Dez).
+    """
+    try:
+        base = str(ticker).strip().split()[0]
+        if not (base.startswith("OD") and len(base) >= 5):
+            return None
+        mcode = base[2]
+        yy = int(base[3:5])
+        month = MONTH_CODE.get(mcode.upper())
+        if month is None:
+            return None
+        year = 2000 + yy
+        return first_bday_of_month(year, month)
+    except Exception:
+        return None
+
+def bday_count(d0: pd.Timestamp, d1: pd.Timestamp) -> int:
+    """# de dias úteis (B3) em (d0, d1], exclusivo d0 e inclusivo d1."""
+    if pd.isna(d0) or pd.isna(d1) or d1 <= d0:
+        return 0
+    return len(pd.bdate_range(d0, d1, inclusive="right"))
+
+def aa_to_daily_scalar(r_aa: float) -> float:
+    """Taxa a.a. (fração) -> taxa diária efetiva, base 252."""
+    return (1.0 + r_aa)**(1.0/252.0) - 1.0
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Leitura e limpeza do Excel
+# ──────────────────────────────────────────────────────────────────────────────
+
+def read_dadosjuros_xlsx(path: str | Path) -> pd.DataFrame:
+    """
+    Lê 'DadosJuros.xlsx' no padrão:
+      • dropa a 2ª linha; • remove a 1ª coluna; • renomeia a nova 1ª para 'Datas';
+      • converte taxas (aceita vírgula e '%'); • ordena por 'Datas'.
+    """
+    path = Path(path)
+    df = pd.read_excel(path, dtype=str)
+
+    if df.shape[0] < 2 or df.shape[1] < 2:
+        raise ValueError("Arquivo sem linhas/colunas suficientes após leitura.")
+
+    # drop 2ª linha e 1ª coluna
+    df = df.drop(df.index[1], errors="ignore")
+    df = df.iloc[:, 1:].copy()
+    df = df.rename(columns={df.columns[0]: "Datas"})
+    df.columns = [str(c).strip() for c in df.columns]
+
+    df["Datas"] = pd.to_datetime(df["Datas"], errors="coerce")
+
+    for c in df.columns[1:]:
+        s = (
+            df[c].astype(str)
+            .str.replace("\u00a0", "", regex=False)
+            .str.strip()
+            .str.replace("%", "", regex=False)
+            .str.replace(",", ".", regex=False)
+        )
+        df[c] = pd.to_numeric(s, errors="coerce")
+
+    df = df.dropna(subset=["Datas"]).sort_values("Datas")
+    if df.empty:
+        raise ValueError("Sem datas válidas após limpeza.")
+    return df
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Curva: última linha válida -> nós (DU, DF)
+# ──────────────────────────────────────────────────────────────────────────────
 
 def fmt_rs_br(v, nd=0):
     try:
@@ -7722,11 +7803,11 @@ def simulate_nav_cota() -> None:
         except:
             return 0.0
 
-    def pct_consumo_cvar(bps):  # % do orçamento escolhido
-        try:
-            return max(0.0, (abs(float(bps)) / float(orcamento_bps_cvar)) * 100.0)
-        except:
-            return 0.0
+    #def pct_consumo_cvar(bps):  # % do orçamento escolhido
+    #    try:
+    #        return max(0.0, (abs(float(bps)) / float(orcamento_bps_cvar)) * 100.0)
+    #    except:
+    #        return 0.0
 
     # ==========================
     # Cards principais (sem delta/setinhas)
@@ -7813,9 +7894,120 @@ def simulate_nav_cota() -> None:
         #with col22:
             #st.subheader("Volatilidade histórica por ativo")
             #st.plotly_chart(fig_vol_assets, use_container_width=True)
-
+    with col22:
     # ======================= DRAWNDOWN: série, atual e dias =======================
+        from pathlib import Path
 
+        #COLOCAR CODIGO AQUI
+        # Caminho do arquivo (ajuste se necessário)
+        DADOS_JUROS_XLSX = Path("Dados/DadosJuros.xlsx")
+
+        # 1) Lê e limpa
+        #Tenho que mapear e deixar somente 
+        _df = read_dadosjuros_xlsx(DADOS_JUROS_XLSX)
+        b = st.session_state.get("_risk_bundle")
+        # cdi_series 
+        df_historico = b["df_precos_u"]
+        posicoes_atuais = b["positions_ts"]
+
+
+    # ==================== Carry do portfólio DI ao longo do tempo (PU, ODFYY, CDI) ====================
+
+        # -- helpers de taxa --
+        def _norm_aa_series(s: pd.Series) -> pd.Series:
+            s = pd.to_numeric(s, errors="coerce")
+            return np.where(s > 1.5, s/100.0, s)  # 12.3 -> 0.123 ; 0.123 -> 0.123
+
+        def _aa_to_daily_series(s_aa: pd.Series) -> pd.Series:
+            return (1.0 + s_aa)**(1.0/252.0) - 1.0
+
+        def _rate_col_for_di_F(cols, di_code: str) -> str | None:
+            yy = str(di_code).split("_")[-1]
+            col = f"ODF{yy} Comdty"
+            return col if col in cols else None
+
+        # -------------------- dados de entrada já existentes --------------------
+        # _df = read_dadosjuros_xlsx(DADOS_JUROS_XLSX)
+        # b = st.session_state.get("_risk_bundle")
+        # cdi_series = ...  # Series de CDI (a.a.)
+        # df_historico = b["df_precos_u"]       # PU (preços) por ativo
+        # posicoes_atuais = b["positions_ts"]   # posições ao longo do tempo
+
+        # -------------------- preparar colunas DI_* --------------------
+        di_cols = [c for c in posicoes_atuais.columns if str(c).upper().startswith("DI_")]
+        if not di_cols:
+            st.info("Nenhuma coluna DI_** encontrada em positions_ts.")
+        else:
+            # 1) CDI diário alinhado ao índice de posições
+            cdi_series = pd.Series(cdi_series.squeeze()) if isinstance(cdi_series, (pd.Series, pd.DataFrame)) else pd.Series([cdi_series], index=[posicoes_atuais.index[-1]])
+            cdi_series.index = pd.to_datetime(cdi_series.index)
+            cdi_aa = pd.to_numeric(cdi_series, errors="coerce").sort_index()
+            cdi_aa = cdi_aa.rename("CDI_aa")
+
+            # normaliza e vira diária
+            cdi_daily = cdi_aa
+            # reindex no calendário de posições com ffill
+            cdi_daily = cdi_daily.reindex(pd.to_datetime(posicoes_atuais.index)).ffill()
+
+            # 2) PU (df_historico) e Qtd (posicoes_atuais), reindex e ffill/zeros
+            idx = pd.to_datetime(posicoes_atuais.index)
+            pu_df  = df_historico.reindex(idx)[di_cols].apply(pd.to_numeric, errors="coerce").ffill()
+            qty_df = posicoes_atuais.reindex(idx)[di_cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
+
+            # 3) Taxas a.a. dos próprios contratos ODFYY, por data, a partir de _df
+            df_rates = _df.copy()
+            df_rates["Datas"] = pd.to_datetime(df_rates["Datas"])
+            df_rates = df_rates.set_index("Datas").sort_index()
+
+            # montar DataFrame só com as colunas ODFYY existentes que mapeiam para os DI_**
+            df_cols = list(df_rates.columns)
+            map_di_to_odf = {di: _rate_col_for_di_F(df_cols, di) for di in di_cols}
+            # filtra apenas mapeamentos válidos
+            map_di_to_odf = {di: odf for di, odf in map_di_to_odf.items() if odf is not None and odf in df_rates.columns}
+
+            if not map_di_to_odf:
+                st.warning("Não encontrei colunas ODFYY correspondentes aos DI_* em `DadosJuros.xlsx`.")
+            else:
+                taxas_aa_df = df_rates[list(map_di_to_odf.values())].rename(columns={v:k for k,v in map_di_to_odf.items()})
+                # normaliza 12.3 -> 0.123; mantém 0.123
+                taxas_aa_df = taxas_aa_df.apply(lambda s: pd.to_numeric(s, errors="coerce"))
+                taxas_aa_df = taxas_aa_df.apply(_norm_aa_series)
+                # diária
+                r_d_contr_df = taxas_aa_df.apply(_aa_to_daily_series)
+                # reindex para o calendário de posições e ffill
+                r_d_contr_df = r_d_contr_df.reindex(idx).ffill()
+
+                # 4) Carry por ativo ao longo do tempo: PU * (r_d_contr - r_d_cdi) * qty
+                # broadcast do CDI diário por linha
+                spread_df = r_d_contr_df.sub(cdi_daily, axis=0)
+                carry_assets_ts = pu_df[spread_df.columns] * spread_df * qty_df[spread_df.columns]
+
+                # 5) Carry total do portfólio (soma dos DIs)
+                carry_portfolio_ts = carry_assets_ts.sum(axis=1).rename("Carry_DI_portfolio_R$")
+
+                # --- visualizações ---
+                st.markdown("### Carry do portfólio DI ao longo do tempo (R$)")
+
+                # métrica do carry atual
+                if len(carry_portfolio_ts) >= 2:
+                    curr = float(carry_portfolio_ts.iloc[-1])
+                    prev = float(carry_portfolio_ts.iloc[-2])
+                    st.metric(label="Carry DI do portfólio (1d) — atual", value=f"R$ {curr:,.2f}", delta=f"{(curr-prev):,.2f}")
+                elif len(carry_portfolio_ts) == 1:
+                    curr = float(carry_portfolio_ts.iloc[-1])
+                    st.metric(label="Carry DI do portfólio (1d) — atual", value=f"R$ {curr:,.2f}", delta=None)
+                
+                st.line_chart(carry_portfolio_ts)
+                
+                # (opcional) contribuições por ativo na última data — dentro de "Exibir mais"
+                if "carry_assets_ts" in locals() and not carry_assets_ts.empty:
+                    last_contrib = carry_assets_ts.iloc[-1].sort_values(ascending=False)
+                    with st.expander("Exibir mais — Contribuição por DI (última data)", expanded=False):
+                        st.dataframe(
+                            last_contrib.to_frame("Carry_R$"),
+                            use_container_width=True
+                        )
+                        # ================================================================================================
 
     rolling_max = cota.cummax()
     is_peak = (cota == rolling_max)
@@ -8042,10 +8234,12 @@ def simulate_nav_cota() -> None:
     #else:
     #    st.info("Stress por classe indisponível.")
 
-
     # ==========================
     # Donuts de consumo do orçamento (VaR e CVaR)
     # ==========================
+
+
+
     with tab_orcamento:
         import pandas as pd
 
@@ -8077,9 +8271,13 @@ def simulate_nav_cota() -> None:
             #with colA:
             st.caption(f"VaR — {fmt_pct(pct_consumo_var(var_bps/100))} do orçamento")
             donut_chart("VaR", pct_consumo_var(var_bps/100))
+
             #with colB:
             #    st.caption(f"CVaR — {fmt_pct(pct_consumo_cvar(cvar_bps/100))} do orçamento")
             #    donut_chart("CVaR", pct_consumo_cvar(cvar_bps/100))
+
+
+        from typing import Optional, Dict, Tuple, Sequence
 
         # ========= Helpers NOVOS (podem ficar no topo do tab) =========
         import plotly.express as px

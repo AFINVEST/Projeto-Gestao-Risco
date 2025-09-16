@@ -98,7 +98,7 @@ last_common_dt = min(dates_p[-1], dates_v[-1])
 
 # ────────── calendário B3 ────────────
 cal = mcal.get_calendar("B3")
-today = date.today() - timedelta(days=1)
+today = date.today()
 # Adiciona 1 dia para evitar erro de scraping no último dia útil
 today = today
 

@@ -6076,6 +6076,7 @@ def _normalize_topN_from_dict(d: dict, top_n=8, use_abs=True, only_positive=Fals
     else:
         return (s / float(s.sum()))
     #return (s)
+
 # ============================================================
 # HISTÓRICO NORMALIZADO (Top-N + Outros) PARA ÁREA EMPILHADA
 # ============================================================
@@ -6151,6 +6152,7 @@ def build_history_normalized(
             norm = _normalize_topN_from_dict(
                 series_map, top_n=top_n, use_abs=False, only_positive=False, covar_tot_rs=covar_tot_rs
             )
+
         if norm.empty:
             continue
         rows.append(norm)
@@ -6239,13 +6241,16 @@ def calc_contribs_for_date_cached(
         # 1) Pesos re-normalizados para colunas válidas de df_hist
         w_eff = pesos_d.reindex(df_hist.columns).fillna(0.0)
         sw = float(w_eff.sum())
-        if sw > 0:
+        if sw != 0:
             w_eff = w_eff / sw
+        else:
+            # fallback estável se long = short (soma ~ 0): normaliza por L1
+            sw_abs = float(w_eff.abs().sum())
+            w_eff = (w_eff / sw_abs) if sw_abs != 0 else w_eff
 
-        # 2) Retorno do portfólio com pesos efetivos
         port_ret = (df_hist * w_eff.values).sum(axis=1)
 
-        # 3) Covariância com o portfólio (robusta)
+        # 3) Covariância
         df_tmp = df_hist.copy()
         df_tmp["PORT"] = port_ret.values
         covm = df_tmp.cov()
@@ -6255,14 +6260,15 @@ def calc_contribs_for_date_cached(
         else:
             beta = covm["PORT"].drop("PORT") / var_p
 
-            # 4) VaR (consistência com seu método "bom")
-            var_port = abs(np.quantile(port_ret.values, alpha))
+            # 4) VaR (sem abs)
+            var_port = -np.quantile(port_ret.values, alpha)
 
-            # 5) MV só do subconjunto com retornos (consistência do dinheiro)
+            # 5) MV assinado da mesma base de cols
             precos_eff = b["df_precos_u"][df_hist.columns].loc[:d].ffill().tail(1).squeeze()
-            pos_eff    = b["positions_ts"][df_hist.columns].loc[:d].tail(1).squeeze().abs()
-            mv_total_eff = float((pd.to_numeric(precos_eff, errors="coerce").fillna(0.0) *
-                                pd.to_numeric(pos_eff,    errors="coerce").fillna(0.0)).sum())
+            pos_eff    = b["positions_ts"][df_hist.columns].loc[:d].tail(1).squeeze()  # <— sem .abs()
+            mv_signed  = (pd.to_numeric(precos_eff, errors="coerce").fillna(0.0) *
+                        pd.to_numeric(pos_eff,    errors="coerce").fillna(0.0))
+            mv_total_eff = float(mv_signed.sum())
 
             mvar = beta * var_port
             covar_R = (mvar.reindex(df_hist.columns).fillna(0.0) * w_eff * mv_total_eff).astype(float)

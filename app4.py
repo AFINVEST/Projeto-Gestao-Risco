@@ -122,7 +122,7 @@ def load_and_process_divone2(file_bbg, df_excel):
     di = pd.read_excel('Dados/AF_Trading.xlsm', sheet_name='Base CDI', skiprows=1, usecols='G:M')
     di = di.iloc[:14, :].iloc[4:, :]         # mantém 14 linhas, depois dropa as 4 primeiras
     di = di.drop(di.index[1])                # dropa a segunda linha
-    di['Nome'] = ['DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30', 'DI_32', 'DI_33', 'DI_35', 'DI_37']
+    di['Nome'] = ['DI_26','DI_27', 'DI_28', 'DI_29', 'DI_30','DI_31', 'DI_33', 'DI_35', 'DI_37']
     di = di[['Nome', 'DV01']]
 
     # DAP
@@ -5761,6 +5761,7 @@ def calcular_metricas_por_pl(
     quantidades = quantidades.reindex(assets_universe).fillna(0.0)
     mv = (precos_ult * quantidades).fillna(0.0)     # MV por ativo (R$)
     mv_total = float(mv.sum())
+    mv_total = abs(mv_total)  # força positivo
 
     if mv_total > 0:
         cols = [c for c in assets_universe if c in df_retorno_hist.columns]

@@ -5759,7 +5759,7 @@ def calcular_metricas_por_pl(
         precos_ult = df_completo_u[assets_universe].ffill().loc[:data_eff].iloc[-1]
 
     quantidades = quantidades.reindex(assets_universe).fillna(0.0)
-    mv = (precos_ult * quantidades.abs()).fillna(0.0)     # MV por ativo (R$)
+    mv = (precos_ult * quantidades).fillna(0.0)     # MV por ativo (R$)
     mv_total = float(mv.sum())
 
     if mv_total > 0:
@@ -6149,8 +6149,9 @@ def build_history_normalized(
             series_map = res["covar_R$"]
             # CoVaR: mantém só positivos e normaliza por soma (0..1)
             norm = _normalize_topN_from_dict(
-                series_map, top_n=top_n, use_abs=False, only_positive=True, covar_tot_rs=covar_tot_rs
+                series_map, top_n=top_n, use_abs=False, only_positive=False, covar_tot_rs=covar_tot_rs
             )
+
         if norm.empty:
             continue
         rows.append(norm)
@@ -6259,8 +6260,9 @@ def calc_contribs_for_date_cached(
             var_port = abs(np.quantile(port_ret.values, alpha))
 
             # 5) MV só do subconjunto com retornos (consistência do dinheiro)
+            
             precos_eff = b["df_precos_u"][df_hist.columns].loc[:d].ffill().tail(1).squeeze()
-            pos_eff    = b["positions_ts"][df_hist.columns].loc[:d].tail(1).squeeze().abs()
+            pos_eff    = b["positions_ts"][df_hist.columns].loc[:d].tail(1).squeeze()
             mv_total_eff = float((pd.to_numeric(precos_eff, errors="coerce").fillna(0.0) *
                                 pd.to_numeric(pos_eff,    errors="coerce").fillna(0.0)).sum())
 
@@ -8534,7 +8536,7 @@ def simulate_nav_cota() -> None:
                         with col_right:
                             df_norm = normalize_topN(
                                 dict(zip(df_cv["Ativo"], df_cv["CoVaR_bps"])),
-                                top_n=8, use_abs=False, only_positive=True
+                                top_n=8, use_abs=True, only_positive=False
                             )
                             if df_norm.empty:
                                 st.info("Sem CoVaR positivo para normalizar.")

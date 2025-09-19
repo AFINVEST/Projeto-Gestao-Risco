@@ -5759,7 +5759,7 @@ def calcular_metricas_por_pl(
         precos_ult = df_completo_u[assets_universe].ffill().loc[:data_eff].iloc[-1]
 
     quantidades = quantidades.reindex(assets_universe).fillna(0.0)
-    mv = (precos_ult * quantidades).fillna(0.0)     # MV por ativo (R$)
+    mv = (precos_ult * quantidades.abs()).fillna(0.0)     # MV por ativo (R$)
     mv_total = float(mv.sum())
 
     if mv_total > 0:
@@ -6076,7 +6076,6 @@ def _normalize_topN_from_dict(d: dict, top_n=8, use_abs=True, only_positive=Fals
     else:
         return (s / float(s.sum()))
     #return (s)
-
 # ============================================================
 # HISTÓRICO NORMALIZADO (Top-N + Outros) PARA ÁREA EMPILHADA
 # ============================================================
@@ -6150,9 +6149,8 @@ def build_history_normalized(
             series_map = res["covar_R$"]
             # CoVaR: mantém só positivos e normaliza por soma (0..1)
             norm = _normalize_topN_from_dict(
-                series_map, top_n=top_n, use_abs=False, only_positive=False, covar_tot_rs=covar_tot_rs
+                series_map, top_n=top_n, use_abs=False, only_positive=True, covar_tot_rs=covar_tot_rs
             )
-
         if norm.empty:
             continue
         rows.append(norm)
@@ -6241,16 +6239,13 @@ def calc_contribs_for_date_cached(
         # 1) Pesos re-normalizados para colunas válidas de df_hist
         w_eff = pesos_d.reindex(df_hist.columns).fillna(0.0)
         sw = float(w_eff.sum())
-        if sw != 0:
+        if sw > 0:
             w_eff = w_eff / sw
-        else:
-            # fallback estável se long = short (soma ~ 0): normaliza por L1
-            sw_abs = float(w_eff.abs().sum())
-            w_eff = (w_eff / sw_abs) if sw_abs != 0 else w_eff
 
+        # 2) Retorno do portfólio com pesos efetivos
         port_ret = (df_hist * w_eff.values).sum(axis=1)
 
-        # 3) Covariância
+        # 3) Covariância com o portfólio (robusta)
         df_tmp = df_hist.copy()
         df_tmp["PORT"] = port_ret.values
         covm = df_tmp.cov()
@@ -6260,15 +6255,14 @@ def calc_contribs_for_date_cached(
         else:
             beta = covm["PORT"].drop("PORT") / var_p
 
-            # 4) VaR (sem abs)
-            var_port = -np.quantile(port_ret.values, alpha)
+            # 4) VaR (consistência com seu método "bom")
+            var_port = abs(np.quantile(port_ret.values, alpha))
 
-            # 5) MV assinado da mesma base de cols
+            # 5) MV só do subconjunto com retornos (consistência do dinheiro)
             precos_eff = b["df_precos_u"][df_hist.columns].loc[:d].ffill().tail(1).squeeze()
-            pos_eff    = b["positions_ts"][df_hist.columns].loc[:d].tail(1).squeeze()  # <— sem .abs()
-            mv_signed  = (pd.to_numeric(precos_eff, errors="coerce").fillna(0.0) *
-                        pd.to_numeric(pos_eff,    errors="coerce").fillna(0.0))
-            mv_total_eff = float(mv_signed.sum())
+            pos_eff    = b["positions_ts"][df_hist.columns].loc[:d].tail(1).squeeze().abs()
+            mv_total_eff = float((pd.to_numeric(precos_eff, errors="coerce").fillna(0.0) *
+                                pd.to_numeric(pos_eff,    errors="coerce").fillna(0.0)).sum())
 
             mvar = beta * var_port
             covar_R = (mvar.reindex(df_hist.columns).fillna(0.0) * w_eff * mv_total_eff).astype(float)
@@ -8540,7 +8534,7 @@ def simulate_nav_cota() -> None:
                         with col_right:
                             df_norm = normalize_topN(
                                 dict(zip(df_cv["Ativo"], df_cv["CoVaR_bps"])),
-                                top_n=8, use_abs=True, only_positive=False
+                                top_n=8, use_abs=False, only_positive=True
                             )
                             if df_norm.empty:
                                 st.info("Sem CoVaR positivo para normalizar.")

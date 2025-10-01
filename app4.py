@@ -5543,7 +5543,7 @@ def plot_ret_diario(ret: pd.Series) -> alt.Chart:
 import requests
 from datetime import date
 
-#@st.cache_data(ttl=24*3600)         # consulta ao SGS no máx. 1 vez/dia
+#@st.cache_data(ttl=24*3600)         # consulta ao SGDS no máx. 1 vez/dia
 def load_cdi_series(cache_csv: str = "Dados/cdi_cached.csv") -> pd.Series:
     """
     Retorna Series diária do CDI (decimal) indexada por datetime.
@@ -8609,7 +8609,6 @@ def simulate_nav_cota() -> None:
         #with colH1:
         import plotly.express as px
       
-
         # Mapeamento de ativos para estratégias
         estrategias = {
             "Juros nominais": ['DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30', 'DI_31', 'DI_32', 'DI_33', 'DI_35'],

@@ -16,7 +16,6 @@ for file in files:
     print(f'{file} convertido para parquet')
 
 print('Conversão finalizada')
-
 # Preciso ler todos os arquivos dentro de BaseFundos e se for um arquivo csv transformar em parquet
 
 # Pegar todos os arquivos csv

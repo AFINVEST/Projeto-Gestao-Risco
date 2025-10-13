@@ -6072,6 +6072,7 @@ def _normalize_topN_from_dict(d: dict, top_n=8, use_abs=True, only_positive=Fals
         top = s.head(top_n)
         outros = pd.Series({"Outros": s.iloc[top_n:].sum()})
         s = pd.concat([top, outros])
+
     if covar_tot_rs != 0:
         return (s / covar_tot_rs)
     else:
@@ -6629,6 +6630,13 @@ def simulate_nav_cota() -> None:
     #Printar a parte de positions_ts
     #st.write(bundle["positions_ts"])
     st.session_state["_risk_bundle"] = bundle
+    st.write(bundle["positions_ts"])
+    st.write(bundle["cols_returns"])
+    st.write(bundle["dv01_pc"])
+    st.write(bundle["signature"])
+    st.write(bundle["df_retorno_u"])
+    st.write(bundle["df_precos_u"])
+    st.write(bundle["trading_index"])
     #Escrever a position
 
 
@@ -8431,7 +8439,7 @@ def simulate_nav_cota() -> None:
 
             # usa o mesmo normalizador da área (Top-N + "Outros" e divide pelo budget)
             df_norm = _normalize_topN_from_dict(
-                s_rs.to_dict(), top_n=8, use_abs=False, only_positive=True, covar_tot_rs=covar_tot_rs
+                s_rs.to_dict(), top_n=8, use_abs=False, only_positive=False, covar_tot_rs=covar_tot_rs
             )
             # df_norm agora são frações do orçamento; use isso para o donut
             labels = df_norm.index.tolist()
@@ -8680,6 +8688,7 @@ def simulate_nav_cota() -> None:
                 st.plotly_chart(fig_area2, use_container_width=True)
         st.subheader("Volatilidade histórica por ativo")
         st.plotly_chart(fig_vol_assets, use_container_width=True)
+        st.write(df_hist_cv_estrategia,df_hist_cv,df_hist_dv)
                 
     #with tab_fundos:
     #    df_contratos_2 = read_atual_contratos()

@@ -6630,7 +6630,7 @@ def simulate_nav_cota() -> None:
 
     #Printar a parte de positions_ts
     #st.write(bundle["positions_ts"])
-    #st.session_state["_risk_bundle"] = bundle
+    st.session_state["_risk_bundle"] = bundle
     #st.write(bundle["positions_ts"])
     #st.write(bundle["cols_returns"])
     #st.write(bundle["dv01_pc"])
@@ -6638,7 +6638,7 @@ def simulate_nav_cota() -> None:
     #st.write(bundle["df_retorno_u"])
     #st.write(bundle["df_precos_u"])
     #st.write(bundle["trading_index"])
-    #Escrever a position
+    ##Escrever a position
 
 
     #st.write(pl_series)

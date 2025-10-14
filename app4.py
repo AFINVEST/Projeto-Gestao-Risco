@@ -6275,6 +6275,7 @@ def calc_contribs_for_date_cached(
 
     return out
 
+
 def normalize_topN(series_map: dict, top_n=8, use_abs=True, only_positive=False):
     """Converte dict{name->value} em df normalizado (share)."""
     s = pd.Series(series_map, dtype=float).replace({np.inf: np.nan, -np.inf: np.nan}).dropna()
@@ -6629,14 +6630,14 @@ def simulate_nav_cota() -> None:
 
     #Printar a parte de positions_ts
     #st.write(bundle["positions_ts"])
-    st.session_state["_risk_bundle"] = bundle
-    st.write(bundle["positions_ts"])
-    st.write(bundle["cols_returns"])
-    st.write(bundle["dv01_pc"])
-    st.write(bundle["signature"])
-    st.write(bundle["df_retorno_u"])
-    st.write(bundle["df_precos_u"])
-    st.write(bundle["trading_index"])
+    #st.session_state["_risk_bundle"] = bundle
+    #st.write(bundle["positions_ts"])
+    #st.write(bundle["cols_returns"])
+    #st.write(bundle["dv01_pc"])
+    #st.write(bundle["signature"])
+    #st.write(bundle["df_retorno_u"])
+    #st.write(bundle["df_precos_u"])
+    #st.write(bundle["trading_index"])
     #Escrever a position
 
 
@@ -8688,7 +8689,7 @@ def simulate_nav_cota() -> None:
                 st.plotly_chart(fig_area2, use_container_width=True)
         st.subheader("Volatilidade histórica por ativo")
         st.plotly_chart(fig_vol_assets, use_container_width=True)
-        st.write(df_hist_cv_estrategia,df_hist_cv,df_hist_dv)
+        #st.write(df_hist_cv_estrategia,df_hist_cv,df_hist_dv)
                 
     #with tab_fundos:
     #    df_contratos_2 = read_atual_contratos()

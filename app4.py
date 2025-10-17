@@ -6008,15 +6008,20 @@ def _nearest_left(idx: pd.DatetimeIndex, alvo: pd.Timestamp) -> pd.Timestamp:
         return idx[0]
     return idx[pos]
 
+
 @st.cache_data(show_spinner=False)
 def build_positions_timeseries(
-    _trading_index,                       # <- ignorado no hash (começa com _)
+    _trading_index,
     interpret_quantities: str = "delta",
-    trading_sig: tuple | None = None      # <- entra no hash (first,last,len)
+    trading_sig: tuple | None = None
 ) -> pd.DataFrame:
     """Retorna DataFrame (datas x ativos) com quantidade vigente por dia."""
-    # Reconstroi o índice a partir do argumento “ignorado no hash”
+
+    # --- Índice de negociação: normalizado, único e ordenado ---
     trading_index = pd.DatetimeIndex(pd.to_datetime(list(_trading_index)))
+    if trading_index.tz is not None:
+        trading_index = trading_index.tz_localize(None)
+    trading_index = trading_index.normalize().drop_duplicates().sort_values()
 
     df = hist_posicoes_supabase()
     if df is None or df.empty:
@@ -6026,24 +6031,57 @@ def build_positions_timeseries(
     df["Dia de Compra"] = pd.to_datetime(df["Dia de Compra"]).dt.normalize()
     df["Quantidade"] = pd.to_numeric(df["Quantidade"], errors="coerce").fillna(0.0)
 
-    if interpret_quantities.lower() == "delta":
-        delta = (
-            df.pivot_table(index="Dia de Compra", columns="Ativo",
-                           values="Quantidade", aggfunc="sum")
-              .sort_index()
-              .reindex(trading_index, fill_value=0.0)
+    mode = interpret_quantities.lower().strip()
+
+    if mode == "delta":
+        # 1) Agrega os deltas do dia por ativo
+        trades = (
+            df.groupby(["Dia de Compra", "Ativo"], as_index=False)["Quantidade"]
+              .sum()
+              .sort_values("Dia de Compra")
         )
-        pos = delta.cumsum().reindex(trading_index).fillna(0.0)
-    else:  # "level"
+        # 2) Acumula por ativo APENAS nas datas de trade
+        trades["pos"] = trades.groupby("Ativo")["Quantidade"].cumsum()
+
+        # 3) Pivot (posições somente nas datas de trade)
+        pos_at_trades = (
+            trades.pivot(index="Dia de Compra", columns="Ativo", values="pos")
+                  .sort_index()
+        )
+
+        # 4) Espalha para todas as datas do trading_index com FFill
+        pos = pos_at_trades.reindex(trading_index).ffill().fillna(0.0)
+
+    else:  # "level" — se o input já é nível no dia, só propagar
         last = (
             df.pivot_table(index="Dia de Compra", columns="Ativo",
                            values="Quantidade", aggfunc="last")
               .sort_index()
         )
         pos = last.reindex(trading_index).ffill().fillna(0.0)
-    
 
-    return pos.where(np.isfinite(pos), 0.0)
+    # Sanitiza
+    pos = pos.apply(pd.to_numeric, errors="coerce").fillna(0.0)
+    pos = pos.where(np.isfinite(pos), 0.0)
+
+    # ---- (Opcional, mas recomendado) Tampar buracos de 1 e 2 dias ----
+    prev1 = pos.shift(1)
+    next1 = pos.shift(-1)
+    next2 = pos.shift(-2)
+
+    # v → 0 → v
+    m1 = pos.eq(0) & prev1.eq(next1) & prev1.ne(0)
+
+    # v → 0 → 0 → v  (marca o 1º zero e o 2º zero)
+    m2_start  = pos.eq(0) & pos.shift(-1).eq(0) & prev1.eq(next2) & prev1.ne(0)
+    m2_second = m2_start.shift(1).fillna(False)
+
+    mask = m1 | m2_start | m2_second
+    fill_vals = prev1.where(~m2_second, pos.shift(2))
+    pos = pos.where(~mask, fill_vals)
+
+    return pos
+
 
 # ============================================================
 # CÁLCULO LEVE POR DATA: DV01(d) e CoVaR(d)
@@ -6210,6 +6248,8 @@ def calc_contribs_for_date_cached(
     # Converta precos_d para formato numérico
     precos_d = pd.to_numeric(precos_d, errors="coerce").fillna(0.0)
 
+    st.write(b["cols_returns"])
+
     # Quantidades na data (<= d) - Ajuste de índice
     q_d = b["positions_ts"].reindex(columns=cols)
 
@@ -6241,12 +6281,15 @@ def calc_contribs_for_date_cached(
     if return_covar:
         # 1) Pesos re-normalizados para colunas válidas de df_hist
         w_eff = pesos_d.reindex(df_hist.columns).fillna(0.0)
+        st.write(w_eff)
         sw = float(w_eff.sum())
+        st.write(sw)
         if sw > 0:
             w_eff = w_eff / sw
 
         # 2) Retorno do portfólio com pesos efetivos
         port_ret = (df_hist * w_eff.values).sum(axis=1)
+        st.write(port_ret)
 
         # 3) Covariância com o portfólio (robusta)
         df_tmp = df_hist.copy()
@@ -6257,20 +6300,72 @@ def calc_contribs_for_date_cached(
             out["covar_R$"] = {c: 0.0 for c in cols}
         else:
             beta = covm["PORT"].drop("PORT") / var_p
+            st.write(beta)
 
             # 4) VaR (consistência com seu método "bom")
             var_port = abs(np.quantile(port_ret.values, alpha))
+            st.write(var_port)
 
             # 5) MV só do subconjunto com retornos (consistência do dinheiro)
             
             precos_eff = b["df_precos_u"][df_hist.columns].loc[:d].ffill().tail(1).squeeze()
+            st.write(precos_eff)
             pos_eff    = b["positions_ts"][df_hist.columns].loc[:d].tail(1).squeeze()
+            st.write(pos_eff)
             mv_total_eff = float((pd.to_numeric(precos_eff, errors="coerce").fillna(0.0) *
                                 pd.to_numeric(pos_eff,    errors="coerce").fillna(0.0)).sum())
-
+            st.write(mv_total_eff)
             mvar = beta * var_port
+            st.write(mvar)
             covar_R = (mvar.reindex(df_hist.columns).fillna(0.0) * w_eff * mv_total_eff).astype(float)
+            st.write(covar_R)
             out["covar_R$"] = covar_R.reindex(cols).fillna(0.0).to_dict()
+
+    if return_covar:
+        # 1) Market values assinados (net) e pesos assinados
+        mv_signed = (precos_d.reindex(df_hist.columns).fillna(0.0) *
+                    q_d.reindex(df_hist.columns).fillna(0.0))              # pode ser ±
+        st.write(mv_signed)
+        mv_gross_total = float((precos_d * q_d.abs()).reindex(df_hist.columns)
+                            .fillna(0.0).sum())                           # > 0
+        st.write(mv_gross_total)
+
+        if mv_gross_total > 0:
+            w_signed = (mv_signed / mv_gross_total).astype(float)            # somas ≠ 1, mas ok
+        else:
+            w_signed = pd.Series(0.0, index=df_hist.columns)
+        st.write(w_signed)
+        # 2) Retorno do portfólio com pesos assinados (consistente com o livro)
+        port_ret = (df_hist * w_signed.values).sum(axis=1)
+        st.write(port_ret)
+        # 3) Covariância e beta vs. PORT assinado
+        df_tmp = df_hist.copy()
+        df_tmp["PORT"] = port_ret.values
+        covm = df_tmp.cov()
+        var_p = float(covm.loc["PORT", "PORT"])
+        if var_p == 0 or np.isnan(var_p):
+            out["covar_R$"] = {c: 0.0 for c in cols}
+        else:
+            beta = (covm["PORT"].drop("PORT") / var_p).reindex(df_hist.columns).fillna(0.0)
+            st.write(beta)
+
+
+            # 4) VaR do portfólio (método simples; mantenha igual ao seu "bom")
+            var_port = abs(np.quantile(port_ret.values, alpha))
+            st.write(var_port)
+
+
+            # 5) CoVaR em R$ por ativo (sem misturar gross com net)
+            #    CoVaR_i^R$ = beta_i * VaR_port * MV_i_signed
+            covar_R = (beta * var_port * mv_signed).astype(float)
+            st.write(covar_R)
+
+            # garantir colunas no mesmo "cols" final e limpar -0.0
+            covar_R = covar_R.reindex(cols).fillna(0.0)
+            covar_R = covar_R.mask(covar_R.abs() < 1e-15, 0.0)
+
+            out["covar_R$"] = covar_R.to_dict()
+
 
 
     return out
@@ -6639,7 +6734,41 @@ def simulate_nav_cota() -> None:
     #st.write(bundle["df_precos_u"])
     #st.write(bundle["trading_index"])
     ##Escrever a position
+     # 1) Copia e ordena
+    pos = bundle["positions_ts"].copy().sort_index()
 
+    # (Opcional) força numérico
+    pos = pos.apply(pd.to_numeric, errors="coerce").fillna(0)
+
+    # 2) Vizinhos
+    prev1 = pos.shift(1)
+    next1 = pos.shift(-1)
+    next2 = pos.shift(-2)
+
+    # 3) Buraco de 1 dia: v → 0 → v
+    m1 = pos.eq(0) & prev1.eq(next1) & prev1.ne(0)
+
+    # 4) Buraco de 2 dias: v → 0 → 0 → v
+    #    marca o 1º zero...
+    m2_start = pos.eq(0) & pos.shift(-1).eq(0) & prev1.eq(next2) & prev1.ne(0)
+    #    ...e o 2º zero (dia seguinte ao start)
+    m2_second = m2_start.shift(1).fillna(False)
+
+    # 5) Máscara total a preencher
+    mask = m1 | m2_start | m2_second
+
+    # 6) Valores de preenchimento:
+    #    - para m1 e m2_start: usar prev1 (valor de v do dia anterior)
+    #    - para m2_second: usar pos.shift(2) (v de dois dias antes)
+    fill_vals = prev1.where(~m2_second, pos.shift(2))
+
+    # 7) Aplica preenchimento
+    pos_filled = pos.where(~mask, fill_vals)
+
+    # 9) Armazena
+    bundle["positions_ts"] = pos_filled
+
+    #st.write(bundle["positions_ts"])
 
     #st.write(pl_series)
     # o retorno de calcular_metricas_por_pl é     return {    "PL_ref (R$)"       : float(pl_ref),    "VaR (bps)"         : float(var_bps),    "CVaR (bps)"        : float(cvar_bps),    "VaR (R$)"          : float(var_R),    "CVaR (R$)"         : float(cvar_R),    "Stress DV01 (R$)"  : float(stress_R),    "Stress DV01 (bps)" : float(stress_bps),}
@@ -7920,7 +8049,9 @@ def simulate_nav_cota() -> None:
         b = st.session_state.get("_risk_bundle")
         # cdi_series 
         df_historico = b["df_precos_u"]
+
         posicoes_atuais = b["positions_ts"]
+       
 
 
     # ==================== Carry do portfólio DI ao longo do tempo (PU, ODFYY, CDI) ====================
@@ -8610,9 +8741,10 @@ def simulate_nav_cota() -> None:
 
         # CoVaR normalizado (apenas positivos) — histórico
         df_hist_cv = build_history_normalized(
-            dates_hist, kind="covar", top_n=8, weekly=True, only_positive=False, window=126, alpha=0.05, covar_tot_rs=covar_tot_rs
+            dates_hist, kind=
+            "covar", top_n=8, weekly=True, only_positive=False, window=126, alpha=0.05, covar_tot_rs=covar_tot_rs
         )
-
+        #st.write(covar_tot_rs)
         #colH1, colH2 = st.columns(2)
 
         #with colH1:
@@ -8669,7 +8801,7 @@ def simulate_nav_cota() -> None:
             with colll2:
                 st.caption("CoVaR por estratégia — área empilhada")
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
-                #st.write(df_hist_cv)
+                st.write(df_hist_cv)
                 df_hist_cv_positive = df_hist_cv.clip(lower=0)
                 existing_cols = [col for col in df_hist_cv_positive.columns if col in ativos_para_estrategia]
                 df_hist_cv_filtrado = df_hist_cv_positive[existing_cols]
@@ -8689,8 +8821,12 @@ def simulate_nav_cota() -> None:
                 st.plotly_chart(fig_area2, use_container_width=True)
         st.subheader("Volatilidade histórica por ativo")
         st.plotly_chart(fig_vol_assets, use_container_width=True)
+        #Dado que preciso pegar os dados de cotações -> Traga o valor a presente
         #st.write(df_hist_cv_estrategia,df_hist_cv,df_hist_dv)
-                
+        #Printar o histórico de posições do bundle
+        #st.write(bundle['positions_ts'])
+
+
     #with tab_fundos:
     #    df_contratos_2 = read_atual_contratos()
     #    for col in df_contratos_2.columns:

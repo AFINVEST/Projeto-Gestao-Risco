@@ -6281,15 +6281,15 @@ def calc_contribs_for_date_cached(
     if return_covar:
         # 1) Pesos re-normalizados para colunas válidas de df_hist
         w_eff = pesos_d.reindex(df_hist.columns).fillna(0.0)
-        st.write(w_eff)
+        #st.write(w_eff)
         sw = float(w_eff.sum())
-        st.write(sw)
+        #st.write(sw)
         if sw > 0:
             w_eff = w_eff / sw
 
         # 2) Retorno do portfólio com pesos efetivos
         port_ret = (df_hist * w_eff.values).sum(axis=1)
-        st.write(port_ret)
+        #st.write(port_ret)
 
         # 3) Covariância com o portfólio (robusta)
         df_tmp = df_hist.copy()
@@ -6300,44 +6300,44 @@ def calc_contribs_for_date_cached(
             out["covar_R$"] = {c: 0.0 for c in cols}
         else:
             beta = covm["PORT"].drop("PORT") / var_p
-            st.write(beta)
+            #st.write(beta)
 
             # 4) VaR (consistência com seu método "bom")
             var_port = abs(np.quantile(port_ret.values, alpha))
-            st.write(var_port)
+            #st.write(var_port)
 
             # 5) MV só do subconjunto com retornos (consistência do dinheiro)
             
             precos_eff = b["df_precos_u"][df_hist.columns].loc[:d].ffill().tail(1).squeeze()
-            st.write(precos_eff)
+            #st.write(precos_eff)
             pos_eff    = b["positions_ts"][df_hist.columns].loc[:d].tail(1).squeeze()
-            st.write(pos_eff)
+            #st.write(pos_eff)
             mv_total_eff = float((pd.to_numeric(precos_eff, errors="coerce").fillna(0.0) *
                                 pd.to_numeric(pos_eff,    errors="coerce").fillna(0.0)).sum())
-            st.write(mv_total_eff)
+            #st.write(mv_total_eff)
             mvar = beta * var_port
-            st.write(mvar)
+            #st.write(mvar)
             covar_R = (mvar.reindex(df_hist.columns).fillna(0.0) * w_eff * mv_total_eff).astype(float)
-            st.write(covar_R)
+            #st.write(covar_R)
             out["covar_R$"] = covar_R.reindex(cols).fillna(0.0).to_dict()
 
     if return_covar:
         # 1) Market values assinados (net) e pesos assinados
         mv_signed = (precos_d.reindex(df_hist.columns).fillna(0.0) *
                     q_d.reindex(df_hist.columns).fillna(0.0))              # pode ser ±
-        st.write(mv_signed)
+        #st.write(mv_signed)
         mv_gross_total = float((precos_d * q_d.abs()).reindex(df_hist.columns)
                             .fillna(0.0).sum())                           # > 0
-        st.write(mv_gross_total)
+        #st.write(mv_gross_total)
 
         if mv_gross_total > 0:
             w_signed = (mv_signed / mv_gross_total).astype(float)            # somas ≠ 1, mas ok
         else:
             w_signed = pd.Series(0.0, index=df_hist.columns)
-        st.write(w_signed)
+        #st.write(w_signed)
         # 2) Retorno do portfólio com pesos assinados (consistente com o livro)
         port_ret = (df_hist * w_signed.values).sum(axis=1)
-        st.write(port_ret)
+        #st.write(port_ret)
         # 3) Covariância e beta vs. PORT assinado
         df_tmp = df_hist.copy()
         df_tmp["PORT"] = port_ret.values
@@ -6347,18 +6347,16 @@ def calc_contribs_for_date_cached(
             out["covar_R$"] = {c: 0.0 for c in cols}
         else:
             beta = (covm["PORT"].drop("PORT") / var_p).reindex(df_hist.columns).fillna(0.0)
-            st.write(beta)
-
+            #st.write(beta)
 
             # 4) VaR do portfólio (método simples; mantenha igual ao seu "bom")
             var_port = abs(np.quantile(port_ret.values, alpha))
-            st.write(var_port)
-
+            #st.write(var_port)
 
             # 5) CoVaR em R$ por ativo (sem misturar gross com net)
             #    CoVaR_i^R$ = beta_i * VaR_port * MV_i_signed
             covar_R = (beta * var_port * mv_signed).astype(float)
-            st.write(covar_R)
+            #st.write(covar_R)
 
             # garantir colunas no mesmo "cols" final e limpar -0.0
             covar_R = covar_R.reindex(cols).fillna(0.0)

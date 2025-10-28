@@ -100,7 +100,7 @@ last_common_dt = min(dates_p[-1], dates_v[-1])
 cal = mcal.get_calendar("B3")
 today = date.today()
 # Adiciona 1 dia para evitar erro de scraping no último dia útil
-today = today - timedelta(1)
+today = today
 
 ultimo_util = cal.valid_days(today - timedelta(days=10), today)[-1].date()
 dias_scrap = [d.date() for d in cal.valid_days(last_common_dt, ultimo_util)]

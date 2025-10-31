@@ -8788,7 +8788,6 @@ def simulate_nav_cota() -> None:
                         # Limitar o eixo y a 6% (0.06)
                 fig_area.update_yaxes(range=[0, 0.06], tickformat=".0%", title="Proporção de DV01")
                 fig_area.update_traces(hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>")
-
                 # Exibir o gráfico
                 st.plotly_chart(fig_area, use_container_width=True)
 

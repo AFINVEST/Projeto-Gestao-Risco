@@ -33,7 +33,6 @@ for file in files:
 
 print('Conversão finalizada')
 
-
 file_pl = "Dados/pl_fundos.parquet"
 df2 = pd.read_parquet(file_pl)
 

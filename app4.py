@@ -6248,7 +6248,7 @@ def calc_contribs_for_date_cached(
     # Converta precos_d para formato numérico
     precos_d = pd.to_numeric(precos_d, errors="coerce").fillna(0.0)
 
-    st.write(b["cols_returns"])
+    #st.write(b["cols_returns"])
 
     # Quantidades na data (<= d) - Ajuste de índice
     q_d = b["positions_ts"].reindex(columns=cols)
@@ -8162,8 +8162,6 @@ def simulate_nav_cota() -> None:
             c5.metric("DV01 Stress (R$ / bps)",  dv01_strss_display)
             #c6.metric("CoVaR Total (R$ / bps)",  covar_tot_display)
 
-
-
     # ======================= VOL CURTA (1M, 6M, 1Y) ==============================
     def vol_annualized(ser: pd.Series) -> float:
         ser = ser.dropna()
@@ -8173,7 +8171,6 @@ def simulate_nav_cota() -> None:
 
     ret_clean = ret_total.dropna()
     n_obs = len(ret_clean)
-
     # janelas alvo
     janelas = {"1M": 21, "6M": 126, "1Y": 252}
 
@@ -8185,7 +8182,8 @@ def simulate_nav_cota() -> None:
             vols_finais[nome] = vol_annualized(ret_clean.iloc[-janela_real:])
         else:
             vols_finais[nome] = np.nan
-
+    
+    #vol = ret_clean.std() * np.sqrt(252)
 
     with aba_cart:
    
@@ -8798,7 +8796,6 @@ def simulate_nav_cota() -> None:
             with colll2:
                 st.caption("CoVaR por estratégia — área empilhada")
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
-                st.write(df_hist_cv)
                 df_hist_cv_positive = df_hist_cv.clip(lower=0)
                 existing_cols = [col for col in df_hist_cv_positive.columns if col in ativos_para_estrategia]
                 df_hist_cv_filtrado = df_hist_cv_positive[existing_cols]

@@ -5918,6 +5918,7 @@ def calcular_metricas_por_pl(
     covar_perc = (covar_R / covar_total_R) if covar_total_R != 0 else covar_R.copy()
 
     # CoVaR em bps do PL_ref e % de 1 bp
+    #st.write(covar_R, df_mvar, mv_total, pesos_series)
     covar_bps       = ((covar_R / pl_ref) * 1e4).replace([np.inf, -np.inf], 0.0).fillna(0.0) if pl_ref else covar_R*0.0
     covar_pct_1bp   = ((covar_R / one_bp_R) * 100.0).replace([np.inf, -np.inf], 0.0).fillna(0.0) if one_bp_R else covar_R*0.0
     covar_total_bps = float((covar_total_R / pl_ref) * 1e4) if pl_ref else 0.0
@@ -6188,8 +6189,8 @@ def build_history_normalized(
         else:
             series_map = res["covar_R$"]
             # CoVaR: mantém só positivos e normaliza por soma (0..1)
-            norm = _normalize_topN_from_dict(
-                series_map, top_n=top_n, use_abs=False, only_positive=False, covar_tot_rs=covar_tot_rs
+            norm = _normalize_topN_signed(
+                series_map, top_n=top_n, covar_tot_rs=covar_tot_rs
             )
 
         if norm.empty:
@@ -6202,7 +6203,7 @@ def build_history_normalized(
 
     return pd.DataFrame(rows, index=idxs).sort_index().fillna(0.0)
 
-@st.cache_data(show_spinner=False)
+#st.cache_data(show_spinner=False)
 def calc_contribs_for_date_cached(
     date_val: int,
     window: int,
@@ -6211,60 +6212,34 @@ def calc_contribs_for_date_cached(
     return_dv01: bool = True,
     return_covar: bool = True,
 ) -> dict:
-    """
-    Retorna dicionário: {'dv01_R$': Series-like, 'covar_R$': Series-like, 'pesos': Series}
-    A função busca os dados no bundle via st.session_state (que você define quando cria o bundle).
-    O cache depende só de: data, janela, alpha e assinatura do bundle (não há widgets aqui).
-    """
     b = st.session_state.get("_risk_bundle")
     if b is None:
         raise RuntimeError("Bundle não encontrado em session_state['_risk_bundle'].")
     
-    # Garantir que date_val seja convertido para Timestamp
     d = pd.to_datetime(date_val, unit='ns')  # Convertendo 'date_val' para Timestamp
-
-    # ---- Fatias na data ----
     rets = b["df_retorno_u"]
     cols = b["cols_returns"]
-
-    # Garantir que o primeiro índice de rets seja do tipo Timestamp
-    rets_index_first = pd.to_datetime(rets.index[0])  # Convertendo o primeiro índice de rets para Timestamp
-
-    # Verifique se 'd' é menor que o primeiro índice de retorno e retorne dicionário vazio
+    rets_index_first = pd.to_datetime(rets.index[0])
     if d < rets_index_first:
         return {"dv01_R$": {}, "covar_R$": {}, "pesos": {}}
 
-    # Ajuste para usar o índice correto no pandas (DataFrame com Timestamps)
     df_hist = rets.loc[:d, cols]
     if df_hist.empty:
         return {"dv01_R$": {}, "covar_R$": {}, "pesos": {}}
 
-    # Garantir que os índices estejam como Timestamps
     b["df_precos_u"].index = pd.to_datetime(b["df_precos_u"].index)
-
-    # Agora a linha de fatiamento funcionará corretamente
     precos_d = b["df_precos_u"][cols].loc[:d].ffill().tail(1).squeeze()
-
-    # Converta precos_d para formato numérico
     precos_d = pd.to_numeric(precos_d, errors="coerce").fillna(0.0)
 
-    #st.write(b["cols_returns"])
-
-    # Quantidades na data (<= d) - Ajuste de índice
     q_d = b["positions_ts"].reindex(columns=cols)
-
-    # Caso as posições estejam vazias, retorne um dicionário vazio
     if q_d.empty:
         return {"dv01_R$": {}, "covar_R$": {}, "pesos": {}}
-
-    # Ajuste no cálculo das quantidades
-    # Ao invés de get_loc() com method='pad', vamos usar a fatiagem direta
+    
     q_d = q_d.loc[q_d.index <= d].iloc[-1].fillna(0.0)
 
     # MV e pesos
     mv_d = (precos_d * q_d.abs()).fillna(0.0)
     mv_total_d = float(mv_d.sum())
-
     if mv_total_d <= 0:
         pesos_d = pd.Series(0.0, index=cols)
     else:
@@ -6272,24 +6247,20 @@ def calc_contribs_for_date_cached(
 
     out = {"dv01_R$": {}, "covar_R$": {}, "pesos": pesos_d.to_dict()}
 
-    # ---------- DV01(d) ---------- 
     if return_dv01:
         dv01_R_d = (b["dv01_pc"].reindex(cols).fillna(0.0) * q_d).astype(float)
         out["dv01_R$"] = dv01_R_d.to_dict()
 
-    # ---------- CoVaR(d) ----------
     if return_covar:
         # 1) Pesos re-normalizados para colunas válidas de df_hist
         w_eff = pesos_d.reindex(df_hist.columns).fillna(0.0)
-        #st.write(w_eff)
+        #st.write("w_eff:", w_eff)
         sw = float(w_eff.sum())
-        #st.write(sw)
         if sw > 0:
             w_eff = w_eff / sw
 
         # 2) Retorno do portfólio com pesos efetivos
         port_ret = (df_hist * w_eff.values).sum(axis=1)
-        #st.write(port_ret)
 
         # 3) Covariância com o portfólio (robusta)
         df_tmp = df_hist.copy()
@@ -6300,71 +6271,20 @@ def calc_contribs_for_date_cached(
             out["covar_R$"] = {c: 0.0 for c in cols}
         else:
             beta = covm["PORT"].drop("PORT") / var_p
-            #st.write(beta)
+
 
             # 4) VaR (consistência com seu método "bom")
             var_port = abs(np.quantile(port_ret.values, alpha))
-            #st.write(var_port)
+            #st.write("beta:", beta, "mv_d:", mv_d, "var_port:", var_port)
 
-            # 5) MV só do subconjunto com retornos (consistência do dinheiro)
-            
-            precos_eff = b["df_precos_u"][df_hist.columns].loc[:d].ffill().tail(1).squeeze()
-            #st.write(precos_eff)
-            pos_eff    = b["positions_ts"][df_hist.columns].loc[:d].tail(1).squeeze()
-            #st.write(pos_eff)
-            mv_total_eff = float((pd.to_numeric(precos_eff, errors="coerce").fillna(0.0) *
-                                pd.to_numeric(pos_eff,    errors="coerce").fillna(0.0)).sum())
-            #st.write(mv_total_eff)
-            mvar = beta * var_port
-            #st.write(mvar)
-            covar_R = (mvar.reindex(df_hist.columns).fillna(0.0) * w_eff * mv_total_eff).astype(float)
-            #st.write(covar_R)
-            out["covar_R$"] = covar_R.reindex(cols).fillna(0.0).to_dict()
+            # 5) CoVaR em R$ por ativo
+            covar_R = (beta * var_port * mv_d).astype(float)
 
-    if return_covar:
-        # 1) Market values assinados (net) e pesos assinados
-        mv_signed = (precos_d.reindex(df_hist.columns).fillna(0.0) *
-                    q_d.reindex(df_hist.columns).fillna(0.0))              # pode ser ±
-        #st.write(mv_signed)
-        mv_gross_total = float((precos_d * q_d.abs()).reindex(df_hist.columns)
-                            .fillna(0.0).sum())                           # > 0
-        #st.write(mv_gross_total)
-
-        if mv_gross_total > 0:
-            w_signed = (mv_signed / mv_gross_total).astype(float)            # somas ≠ 1, mas ok
-        else:
-            w_signed = pd.Series(0.0, index=df_hist.columns)
-        #st.write(w_signed)
-        # 2) Retorno do portfólio com pesos assinados (consistente com o livro)
-        port_ret = (df_hist * w_signed.values).sum(axis=1)
-        #st.write(port_ret)
-        # 3) Covariância e beta vs. PORT assinado
-        df_tmp = df_hist.copy()
-        df_tmp["PORT"] = port_ret.values
-        covm = df_tmp.cov()
-        var_p = float(covm.loc["PORT", "PORT"])
-        if var_p == 0 or np.isnan(var_p):
-            out["covar_R$"] = {c: 0.0 for c in cols}
-        else:
-            beta = (covm["PORT"].drop("PORT") / var_p).reindex(df_hist.columns).fillna(0.0)
-            #st.write(beta)
-
-            # 4) VaR do portfólio (método simples; mantenha igual ao seu "bom")
-            var_port = abs(np.quantile(port_ret.values, alpha))
-            #st.write(var_port)
-
-            # 5) CoVaR em R$ por ativo (sem misturar gross com net)
-            #    CoVaR_i^R$ = beta_i * VaR_port * MV_i_signed
-            covar_R = (beta * var_port * mv_signed).astype(float)
-            #st.write(covar_R)
-
-            # garantir colunas no mesmo "cols" final e limpar -0.0
+            # Garantir que as colunas correspondam ao final e limpar valores próximos de zero
             covar_R = covar_R.reindex(cols).fillna(0.0)
             covar_R = covar_R.mask(covar_R.abs() < 1e-15, 0.0)
 
             out["covar_R$"] = covar_R.to_dict()
-
-
 
     return out
 

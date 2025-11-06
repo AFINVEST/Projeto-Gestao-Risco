@@ -7679,7 +7679,6 @@ def simulate_nav_cota() -> None:
 
     # ------------- gráfico Waterfall plot ------------------------
     # ===================== VOL HISTÓRICA POR ATIVO (usando df_retorno) =====================
-
         
     default_assets, quantidade_inicial, portifolio_default = processar_dados_port()
 
@@ -7965,12 +7964,11 @@ def simulate_nav_cota() -> None:
         #Tenho que mapear e deixar somente 
         _df = read_dadosjuros_xlsx(DADOS_JUROS_XLSX)
         b = st.session_state.get("_risk_bundle")
+        
         # cdi_series 
         df_historico = b["df_precos_u"]
 
         posicoes_atuais = b["positions_ts"]
-       
-
 
     # ==================== Carry do portfólio DI ao longo do tempo (PU, ODFYY, CDI) ====================
 
@@ -8069,7 +8067,130 @@ def simulate_nav_cota() -> None:
                             use_container_width=True
                         )
                         # ================================================================================================
+        
+    import re as _re
 
+    def _rate_col_for_dap(df_cols: list[str], dap_ticker: str) -> str | None:
+        """
+        Mapeia tickers DAP_* para a coluna de taxa no DadosJuros.xlsx.
+        Ajuste os padrões conforme sua planilha:
+        - Exemplos comuns: 'DAP26', 'PRE26', 'ODP26' etc.
+        - A regex abaixo tenta anos '(\d{2})' e aceita prefixos DAP|PRE|ODP|OPR.
+        Retorna o nome da coluna encontrada ou None.
+        """
+        # extrai o sufixo ano do ticker (ex: DAP_26 -> '26' ou DAP26 -> '26')
+        m = _re.search(r'(\d{2})', dap_ticker)
+        if not m:
+            return None
+        yy = m.group(1)
+
+        # candidatos por padrão (ajuste a ordem/prioridade ao seu arquivo):
+        candidates = [
+            f"DAP{yy}", f"PRE{yy}", f"ODP{yy}", f"OPR{yy}",
+            f"DAP {yy}", f"PRE {yy}", f"ODP {yy}", f"OPR {yy}",
+        ]
+        for c in candidates:
+            if c in df_cols:
+                return c
+
+        # fallback com busca por regex “qualquer prefixo conhecido + yy”
+        pat = _re.compile(rf'^(?:DAP|PRE|ODP|OPR)\s*{yy}$', _re.IGNORECASE)
+        for c in df_cols:
+            if pat.match(str(c)):
+                return c
+        return None
+
+    def _build_rate_df_for_universe(df_rates: pd.DataFrame, tickers: list[str],
+                                    mapper_func) -> pd.DataFrame:
+        """
+        Dado um df_rates (Datas index) e uma lista de tickers (ex.: DI_* ou DAP_*),
+        usa 'mapper_func' para mapear cada ticker → coluna de taxa do arquivo,
+        e retorna um DataFrame de taxas a.a. (normalizadas) com colunas = tickers encontrados.
+        """
+        df_cols = list(df_rates.columns)
+        mapping = {t: mapper_func(df_cols, t) for t in tickers}
+        mapping = {t: col for t, col in mapping.items() if col is not None and col in df_rates.columns}
+        if not mapping:
+            return pd.DataFrame(index=df_rates.index)
+
+        out = df_rates[list(mapping.values())].rename(columns={v: k for k, v in mapping.items()})
+        out = out.apply(lambda s: pd.to_numeric(s, errors="coerce"))
+        out = out.apply(_norm_aa_series)  # 12.34 -> 0.1234
+        return out
+
+    # -----------------------------
+    # ENTRADAS já disponíveis:
+    # - cdi_series (pode vir escalar/Series/DF) → iremos torná-la série diária 'cdi_daily'
+    # - df_historico: PUs ao longo do tempo (index datas), colunas com DI_* e DAP_* (quando houver)
+    # - posicoes_atuais: quantidades por data (index datas), colunas DI_* e DAP_* (quando houver)
+    # - _df: DataFrame com colunas de taxas (ODFyy para DI e PRE/DAP/ODP/OPR para DAP), e coluna 'Datas'
+    # - di_cols: lista de colunas DI_* presentes no portfólio
+    # - dap_cols: lista de colunas DAP_* presentes no portfólio (adicione no seu carregamento)
+    # -----------------------------
+    dap_cols = [c for c in posicoes_atuais.columns if str(c).upper().startswith("DAP")]
+    if not dap_cols:
+        st.info("Nenhuma coluna DAP_** encontrada em positions_ts.")
+    else:
+        # 1) CDI a.a. → diário → alinhado ao calendário das posições
+        cdi_series = pd.Series(cdi_series.squeeze()) if isinstance(cdi_series, (pd.Series, pd.DataFrame)) else pd.Series([cdi_series], index=[posicoes_atuais.index[-1]])
+        cdi_series.index = pd.to_datetime(cdi_series.index)
+        cdi_aa = pd.to_numeric(cdi_series, errors="coerce").sort_index().rename("CDI_aa")
+
+        idx = pd.to_datetime(posicoes_atuais.index).sort_values()
+        cdi_daily = cdi_aa.reindex(idx).ffill()  # funding diário
+
+        # 2) PU e Quantidade reindexados/limpos
+        pu_df  = df_historico.reindex(idx)[[c for c in df_historico.columns if c in (di_cols + dap_cols)]].apply(pd.to_numeric, errors="coerce").ffill()
+        qty_df = posicoes_atuais.reindex(idx)[[c for c in posicoes_atuais.columns if c in (di_cols + dap_cols)]].apply(pd.to_numeric, errors="coerce").fillna(0.0)
+
+        # 3) Taxas a.a. (arquivo de juros) → diárias por contrato
+        df_rates = _df.copy()
+        df_rates["Datas"] = pd.to_datetime(df_rates["Datas"])
+        df_rates = df_rates.set_index("Datas").sort_index()
+
+        # 3a) DI
+        taxas_di_aa_df = _build_rate_df_for_universe(df_rates, di_cols, _rate_col_for_di_F)
+        r_d_di_df = taxas_di_aa_df.apply(_aa_to_daily_series).reindex(idx).ffill()
+
+        # 3b) DAP (prefixado)
+        taxas_dap_aa_df = _build_rate_df_for_universe(df_rates, dap_cols, _rate_col_for_dap)
+        r_d_dap_df = taxas_dap_aa_df.apply(_aa_to_daily_series).reindex(idx).ffill()
+
+        # 4) Carry = PU * (taxa_contrato_diária - CDI_diária) * qty
+        # DI
+        carry_di_ts = pd.DataFrame()
+        if not r_d_di_df.empty:
+            spread_di = r_d_di_df.sub(cdi_daily, axis=0)
+            carry_assets_di_ts = pu_df[spread_di.columns] * spread_di * qty_df[spread_di.columns]
+            carry_di_ts = carry_assets_di_ts.sum(axis=1).rename("Carry_DI_portfolio_R$")
+
+        # DAP
+        carry_dap_ts = pd.DataFrame()
+        if not r_d_dap_df.empty:
+            spread_dap = r_d_dap_df.sub(cdi_daily, axis=0)  # funding ao CDI
+            carry_assets_dap_ts = pu_df[spread_dap.columns] * spread_dap * qty_df[spread_dap.columns]
+            carry_dap_ts = carry_assets_dap_ts.sum(axis=1).rename("Carry_DAP_portfolio_R$")
+
+        # 5) Carry total (DI + DAP)
+        pieces = []
+        if isinstance(carry_di_ts, pd.Series) and not carry_di_ts.empty:  pieces.append(carry_di_ts)
+        if isinstance(carry_dap_ts, pd.Series) and not carry_dap_ts.empty: pieces.append(carry_dap_ts)
+        carry_total_ts = None if not pieces else pd.concat(pieces, axis=1).sum(axis=1).rename("Carry_total_portfolio_R$")
+
+        # --- Exemplo de exposição (Streamlit) ---
+        if isinstance(carry_total_ts, pd.Series) and not carry_total_ts.empty:
+            st.markdown("### Carry do portfólio — DI + DAP (R$)")
+            cur = float(carry_total_ts.iloc[-1])
+            prev = float(carry_total_ts.iloc[-2]) if len(carry_total_ts) >= 2 else 0.0
+            st.metric("Carry total (1d) — atual", value=f"R$ {cur:,.2f}", delta=f"{(cur-prev):,.2f}")
+            st.line_chart(carry_total_ts)
+
+            with st.expander("Quebra por bloco", expanded=False):
+                cols = []
+                if isinstance(carry_di_ts, pd.Series) and not carry_di_ts.empty: cols.append(carry_di_ts.rename("DI"))
+                if isinstance(carry_dap_ts, pd.Series) and not carry_dap_ts.empty: cols.append(carry_dap_ts.rename("DAP"))
+                if cols:
+                    st.dataframe(pd.concat(cols, axis=1).tail(10))
     rolling_max = cota.cummax()
     is_peak = (cota == rolling_max)
     ultima_data_pico = is_peak[is_peak].index[-1] if is_peak.any() else cota.index[0]

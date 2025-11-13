@@ -11705,7 +11705,7 @@ def main_page():
         # Função para apagar os dias de dados que o usuário não quer mais
         st.write("## Apagar Dados")
         st.write(
-            "Escolha o Ativo e nsira uma data para que os dados registrados dessa data sejam apagados")
+            "Escolha o Ativo e insira uma data para que os dados registrados dessa data sejam apagados")
 
         editar_ou_remover()
 

@@ -8808,6 +8808,7 @@ def simulate_nav_cota() -> None:
         else:
             with COL2:
                 st.caption("DV01 por estratégia (área empilhada)")
+                st.write(df_hist_dv)
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
                 existing_cols = [col for col in df_hist_dv.columns if col in ativos_para_estrategia]
                 df_hist_dv_filtrado = df_hist_dv[existing_cols]

@@ -38,7 +38,7 @@ def process_portfolio(df_pl, Weights):
         .replace('--', np.nan)
         .astype(float)
     )
-    df_pl = df_pl.iloc[[4, 8, 9, 10, 16, 17, 18, 19, 21]]
+    df_pl = df_pl.iloc[[2,5,6,7,10,11,12,13,15]]
     weights_zero = []
     for weight in Weights:
         if weight == 0:
@@ -59,7 +59,7 @@ def process_portfolio(df_pl, Weights):
 
 
 def process_portfolio_especifico(df_pl, Weights, fundo):
-    df_pl = df_pl.iloc[[4, 8, 9, 10, 16, 17, 18, 19, 21]]
+    df_pl = df_pl.iloc[[2,5,6,7,10,11,12,13,15]]
     weights_zero = []
     for weight in Weights:
         if weight == 0:

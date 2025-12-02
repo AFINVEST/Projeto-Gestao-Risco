@@ -30,7 +30,7 @@ LOOKBACK_DAYS = 120  # ajuste se quiser
 INDICES_TOTAL = [0, 7, 10, 14, 15, 16, 17, 20, 25]
 
 # <<< IGNORAR FUNDOS EM DUP-CHECK >>>
-IGNORE_FUND_DUPES = {"BORDEAUX FIM"}
+IGNORE_FUND_DUPES = {"BORDEAUX FIM", TARGET_FUND}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Feriados BR (nacionais): fixos + móveis (Carnaval, Sexta Santa, Corpus Christi)
@@ -151,6 +151,10 @@ def _find_repeated_dates_for_rescrape(df: pd.DataFrame,
     # Itera linhas exceto TOTAL
     mask_not_total = df["Fundos/Carteiras Adm"].astype(str) != "TOTAL"
     df_fundos = df.loc[mask_not_total, ["Fundos/Carteiras Adm"] + recent_biz_cols].copy()
+    mask_valid = ~df["Fundos/Carteiras Adm"].astype(str).isin(
+    ["TOTAL", *IGNORE_FUND_DUPES]
+    )
+    df_fundos = df.loc[mask_valid, ["Fundos/Carteiras Adm"] + recent_biz_cols].copy()
 
     # Para cada fundo, compara com a coluna do dia ÚTIL anterior (ignora fds/feriado)
     for _, row in df_fundos.iterrows():

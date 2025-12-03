@@ -18,7 +18,6 @@ from plotnine import (
 # ── depois dos imports pandas/streamlit ────────────────────
 import functools, os, datetime as dt
 
-
 # ==========================================================
 #               FUNÇÕES AUXILIARES (MESMAS)
 # ==========================================================
@@ -28,12 +27,11 @@ SUPABASE_URL = 'https://obgwfekirteetqzjydry.supabase.co'
 SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9iZ3dmZWtpcnRlZXRxemp5ZHJ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODk2MDc1MCwiZXhwIjoyMDU0NTM2NzUwfQ.k7-Haw1txbCEwb_MzkynOeEuRJpfgt3msePdvQavWAc'
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-
 def process_portfolio(df_pl, Weights):
     df_pl['PL'] = (
         df_pl['PL']
         .str.replace('R$', '', regex=False)
-        .str.replace('.', '', regex=False)
+        .str.replace('.', '', regex=False)a
         .str.replace(',', '.', regex=False)
         .replace('--', np.nan)
         .astype(float)

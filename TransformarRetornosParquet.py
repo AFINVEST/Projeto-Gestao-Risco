@@ -64,6 +64,7 @@ df.to_parquet('Dados/df_inicial.parquet')
 df_divone = pd.read_excel(file_bbg, sheet_name='DIV01',
                           skiprows=1, usecols='E:F', nrows=31)
 df_divone = df_divone.T
+
 columns = [
     'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
     'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP26', 'DAP27',

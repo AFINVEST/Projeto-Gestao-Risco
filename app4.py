@@ -120,9 +120,8 @@ def load_and_process_divone2(file_bbg, df_excel):
     # --- 2) Seu pré-processamento (como você já fez) ---
     # DI
     di = pd.read_excel('Dados/AF_Trading.xlsm', sheet_name='Base CDI', skiprows=1, usecols='G:M')
-    di = di.iloc[:14, :].iloc[4:, :]         # mantém 14 linhas, depois dropa as 4 primeiras
-    di = di.drop(di.index[1])                # dropa a segunda linha
-    di['Nome'] = ['DI_26','DI_27', 'DI_28', 'DI_29', 'DI_30','DI_31', 'DI_33', 'DI_35', 'DI_37']
+    di = di.iloc[:18, :].iloc[4:, :]         # mantém 14 linhas, depois dropa as 4 primeiras
+    di['Nome'] = ['DI_26','DIN_26','DI_27','DIN_27', 'DI_28','DIN_28', 'DI_29','DIN_29', 'DI_30','DIN_30','DI_31', 'DI_33', 'DI_35', 'DI_37']
     di = di[['Nome', 'DV01']]
 
     # DAP
@@ -8808,7 +8807,7 @@ def simulate_nav_cota() -> None:
         else:
             with COL2:
                 st.caption("DV01 por estratégia (área empilhada)")
-                st.write(df_hist_dv)
+                #st.write(df_hist_dv)
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
                 existing_cols = [col for col in df_hist_dv.columns if col in ativos_para_estrategia]
                 df_hist_dv_filtrado = df_hist_dv[existing_cols]
@@ -8826,7 +8825,7 @@ def simulate_nav_cota() -> None:
                 fig_area.update_layout( 
                     margin=dict(l=16, r=16, t=16, b=16))
                         # Limitar o eixo y a 6% (0.06)
-                fig_area.update_yaxes(range=[0, 0.06], tickformat=".0%", title="Proporção de DV01")
+                fig_area.update_yaxes(range=[-0.06, 0.06], tickformat=".0%", title="Proporção de DV01")
                 fig_area.update_traces(hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>")
                 # Exibir o gráfico
                 st.plotly_chart(fig_area, use_container_width=True)

@@ -24,13 +24,13 @@ CUTOFF_DATE = datetime(2025, 9, 22).date()  # 01/09/2025
 ZERO_TXT = "R$ 0,00"
 
 # Janela para caçar “repetidos” (e re-scrapar)
-LOOKBACK_DAYS = 120  # ajuste se quiser
+LOOKBACK_DAYS = 10  # ajuste se quiser
 
 # Índices dos fundos que compõem o TOTAL (mesma regra original)
 INDICES_TOTAL = [0, 7, 10, 14, 15, 16, 17, 20, 25]
 
 # <<< IGNORAR FUNDOS EM DUP-CHECK >>>
-IGNORE_FUND_DUPES = {"BORDEAUX FIM", TARGET_FUND}
+IGNORE_FUND_DUPES = {"BORDEAUX FIM", TARGET_FUND, "SANKALPA FIM", "SANTANA", "REAL FIM", "TOPAZIO FIM","AYA NMK FIM", "BH FIM"}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Feriados BR (nacionais): fixos + móveis (Carnaval, Sexta Santa, Corpus Christi)
@@ -160,18 +160,30 @@ def _find_repeated_dates_for_rescrape(df: pd.DataFrame,
     for _, row in df_fundos.iterrows():
         fund_name = str(row["Fundos/Carteiras Adm"]).strip()
         vals = row[recent_biz_cols].tolist()
-        for j in range(1, len(recent_biz_cols)):
-            v_prev = vals[j - 1]
+
+        # anda do fim para o começo
+        for j in range(len(recent_biz_cols) - 1, 0, -1):
             v_curr = vals[j]
+            v_prev = vals[j - 1]
+
+            # se bater em valor nulo ou ignorado, para de olhar para trás
             if pd.isna(v_curr) or pd.isna(v_prev):
-                continue
-            if (str(v_curr) == str(v_prev)) and (str(v_curr).strip() not in ignore_set):
-                # <<< IGNORA BORDEAUX FIM NA DETECÇÃO DE DUPLICADOS (sem PL) >>>
+                break
+            if str(v_curr).strip() in ignore_set or str(v_prev).strip() in ignore_set:
+                break
+
+            # se PL repetiu em dias úteis consecutivos → marca essa data
+            if str(v_curr) == str(v_prev):
+                # ignora fundos que não queremos considerar na regra
                 if fund_name in IGNORE_FUND_DUPES:
                     continue
                 d = _to_date(recent_biz_cols[j])
                 if d:
                     dates_to_refresh.add(d)
+            else:
+                # primeira diferença encontrada andando pra trás:
+                # acabou a "pontinha" de PL repetido, não precisa ver datas mais antigas
+                break
 
     return dates_to_refresh
 

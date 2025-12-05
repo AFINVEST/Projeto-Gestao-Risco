@@ -5669,6 +5669,55 @@ def ui_radio(label, options, *, index=0, horizontal=False, key=None, ui=True):
 def ui_selectbox(label, options, *, index=0, key=None, ui=True):
     return st.selectbox(label, options, index=index, key=key) if ui else options[index]
 
+def debug_comparar_covars(
+    date_val: int,
+    pl_series: pd.Series,
+    alpha: float,
+    window: int,
+    bundle_signature: tuple,
+):
+    """
+    Roda as duas funções e monta um df comparando:
+    - peso incremental vs peso da função grande
+    - CoVaR_R$ incremental vs CoVaR_R$ da função grande
+    Não estou forçando a mesma data na função grande, ela vai usar o comportamento atual.
+    """
+    b = st.session_state.get("_risk_bundle")
+    if b is None:
+        st.error("Bundle não encontrado em session_state['_risk_bundle'].")
+        return
+
+    # 1) Resultado da função incremental (para date_val)
+    contribs = calc_contribs_for_date_cached(
+        date_val=date_val,
+        window=window,
+        alpha=alpha,
+        bundle_signature=bundle_signature,
+        return_dv01=True,
+        return_covar=True,
+        debug=True,  # liga debug interno
+    )
+
+    covar_small = pd.Series(contribs.get("covar_R$", {}), name="CoVaR_R$_calc_contribs")
+    pesos_small = pd.Series(contribs.get("pesos", {}), name="peso_calc_contribs")
+
+    # 2) Resultado da função grande (na data padrão dela, hoje é última data de pl_series)
+    out_big, default_assets, quantidades = calcular_metricas_por_pl(
+        pl_series=pl_series,
+        alpha=alpha,
+        debug=True,   # liga debug interno
+        ui=False,
+    )
+
+    covar_big = pd.Series(out_big.get("CoVaR por ativo (R$)", {}), name="CoVaR_R$_funcao_grande")
+    pesos_big = pd.Series(out_big.get("Peso MV por ativo", {}), name="peso_funcao_grande")
+
+    # 3) Junta tudo num DataFrame
+    df_cmp = pd.concat([pesos_small, pesos_big, covar_small, covar_big], axis=1)
+    st.subheader("Comparação CoVaR e pesos — função incremental vs função grande")
+    st.dataframe(df_cmp.sort_index())
+
+
 def calcular_metricas_por_pl(
     pl_series: pd.Series,
     data: pd.Timestamp | str | None = None,
@@ -5679,7 +5728,7 @@ def calcular_metricas_por_pl(
 ):
     """
     Métricas do portfólio (VaR, CVaR, CoVaR, DV01 e DV01-stress) normalizadas pelo PL_ref (1% do PL do dia).
-    Retorna (dict, default_assets).
+    Retorna (dict, default_assets, quantidades).
     """
 
     # ---------------- 1) Base/retornos ----------------
@@ -5696,7 +5745,7 @@ def calcular_metricas_por_pl(
     common_idx = df_retorno.index.intersection(pl_series.index)
     data_eff = _choose_effective_date(data, common_idx)
 
-    #Mudar para a ultima data disponivel em pl_series
+    # Mudar para a última data disponível em pl_series
     data_eff = pl_series.index[-1]
 
     # ---------------- 3) Ajustes e retornos até a data ----------------
@@ -5721,8 +5770,14 @@ def calcular_metricas_por_pl(
     assets_from_contracts = [c.replace("Contratos ", "") for c in s_quant.index]
     quantidades = pd.Series(s_quant.values, index=assets_from_contracts).astype(float)
 
-    # Universo final (para não perder histórico)
+    # --- NOVO: filtrar sempre ativos com quantidade != 0 ---
+    quantidades = quantidades[quantidades != 0.0]
+
+    # Universo final (para não perder histórico, mas risco só usa quem tem qty)
     assets_universe = sorted(set(default_assets).union(set(quantidades.index)))
+    #st.write(f"Ativos no universo final (antes de risco): {assets_universe}")
+
+    # NÃO tem mais filtro manual tipo ['DAP30', 'DI_28', ...]
     df_precos_u, df_completo_u = load_and_process_excel(df_base, assets_universe)
     df_retorno_u = process_returns2(df_completo_u, assets_universe)
     df_retorno_u = _ensure_dt_index_df(df_retorno_u)
@@ -5749,7 +5804,7 @@ def calcular_metricas_por_pl(
             "CoVaR por ativo (R$)"      : {},
             "CoVaR por ativo (bps)"     : {},
             "CoVaR por ativo (% de 1bp)": {},
-        }, default_assets)
+        }, default_assets, quantidades)
 
     # ---------------- 5) Pesos por MV e MV_total ----------------
     if "Valor Fechamento" in df_precos_ajustados.columns:
@@ -5757,17 +5812,32 @@ def calcular_metricas_por_pl(
     else:
         precos_ult = df_completo_u[assets_universe].ffill().loc[:data_eff].iloc[-1]
 
+    # reindexa quantidades no universo e zera NaN, depois filtra de novo qty != 0 por segurança
     quantidades = quantidades.reindex(assets_universe).fillna(0.0)
-    mv = (precos_ult * quantidades).fillna(0.0)     # MV por ativo (R$)
-    mv_total = float(mv.sum())
-    mv_total = abs(mv_total)  # força positivo
+    ativos_com_pos = quantidades[quantidades != 0.0].index.tolist()
 
-    if mv_total > 0:
-        cols = [c for c in assets_universe if c in df_retorno_hist.columns]
+    if ativos_com_pos:
+        precos_ult_eff = precos_ult.reindex(ativos_com_pos).fillna(0.0)
+        quant_eff = quantidades.reindex(ativos_com_pos).fillna(0.0)
+
+        mv = (precos_ult_eff * quant_eff).fillna(0.0)     # MV por ativo (R$)
+        mv_total = float(abs(mv.sum()))
+
+        # cols = ativos com posição que também existem em df_retorno_hist
+        cols = [c for c in ativos_com_pos if c in df_retorno_hist.columns]
+
         mv = mv.reindex(cols).fillna(0.0)
-        pesos = (mv / float(mv.sum())).values              # pesos de MV
+
+        if float(mv.sum()) != 0.0:
+            pesos = (mv / float(mv.sum())).values          # pesos de MV
+        else:
+            pesos = np.ones(len(cols)) / len(cols) if cols else np.array([])
+
         df_retorno_hist = df_retorno_hist[cols]
     else:
+        # Sem nenhuma posição → tudo vira "sem risco"
+        mv = pd.Series(dtype=float)
+        mv_total = 0.0
         cols = list(df_retorno_hist.columns)
         pesos = np.ones(len(cols)) / len(cols) if cols else np.array([])
 
@@ -5789,7 +5859,7 @@ def calcular_metricas_por_pl(
     # ---------------- 7) DV01 do portfólio (df_divone) ----------------
     file_bbg = "Dados/BBG - ECO DASH.xlsx"
     df_divone, _, _ = load_and_process_divone2(file_bbg, df_completo_u)
-    #Colocar uma opção para aparecer os div01 -> um check na sidebar
+
     show_dv01 = ui_checkbox("Mostrar DV01", value=False, key="mostrar_dv01", ui=ui)
     if show_dv01:
         st.write(df_divone)
@@ -5804,14 +5874,12 @@ def calcular_metricas_por_pl(
     intersec = [a for a in cols if a in dv01_per_contract.index]
     q_signed = quantidades.reindex(intersec).fillna(0.0)
     dv01_pc  = dv01_per_contract.reindex(intersec).fillna(0.0)
-    dv01_asset_R = (dv01_pc * q_signed).astype(float)   # R$/bp por ativo (já agregado por quantidade)
+    dv01_asset_R = (dv01_pc * q_signed).astype(float)   # R$/bp por ativo
     dv01_asset_bps = ((dv01_asset_R / pl_ref) * 1e4).replace([np.inf, -np.inf], 0.0).fillna(0.0) if pl_ref else dv01_asset_R*0.0
     dv01_port_R  = float(dv01_asset_R.sum())            # DV01 do portfólio (R$/bp)
     dv01_port_bps_of_PLref = float((dv01_port_R / pl_ref) * 1e4) if pl_ref else 0.0
 
     # ---------------- 8) DV01 "stress" por drawdown ----------------
-    # ---------------- 8) Stress por ativo / por classe / portfólio ----------------
-    # Helpers de classificação
     is_nominal = lambda a: a.startswith("DI_")
     is_real    = lambda a: a.startswith(("DAP", "NTNB"))
     is_us      = lambda a: "TREASURY" in a
@@ -5822,34 +5890,22 @@ def calcular_metricas_por_pl(
     us_rates = [a for a in intersec if is_us(a)]
     moeda    = [a for a in intersec if is_fx(a)]
 
-    # Drawdown por ativo (retorno mínimo histórico até data_eff)
     dd_min_series = df_retorno_hist[intersec].min(axis=0).astype(float)
     mv_intersec   = mv.reindex(intersec).fillna(0.0).astype(float)
 
-    # Stress POR ATIVO em R$ conforme regra
     stress_asset_R = {}
     for a in intersec:
         if is_nominal(a):
-            # 100 bps sobre DV01
-            #st.write(f"Ativo nominal: {a}, DV01: {dv01_asset_R.get(a, 0.0)}")
-            #st.write(f"Drawdown: {dd_min_series.get(a, 0.0)}")
-            #st.write(f"MV: {mv_intersec.get(a, 0.0)}")
             stress_asset_R[a] = abs(float(dv01_asset_R.get(a, 0.0))) * 100.0
-            #st.write(f"Stress nominal R$: {stress_asset_R[a]}")
         elif is_real(a):
-            # 50 bps sobre DV01
             stress_asset_R[a] = abs(float(dv01_asset_R.get(a, 0.0))) * 50.0
         elif is_us(a) or is_fx(a):
-            # drawdown × MV
             stress_asset_R[a] = abs(float(dd_min_series.get(a, 0.0))) * float(mv_intersec.get(a, 0.0))
         else:
-            # fallback: drawdown × MV
             stress_asset_R[a] = abs(float(dd_min_series.get(a, 0.0))) * float(mv_intersec.get(a, 0.0))
 
-    # Versão em bps do PL_ref
     stress_asset_bps = {a: ((v / pl_ref) * 1e4 if pl_ref else 0.0) for a, v in stress_asset_R.items()}
 
-    # Totais POR CLASSE (R$)
     stress_nom_R  = sum(stress_asset_R.get(a, 0.0) for a in nominais)
     stress_real_R = sum(stress_asset_R.get(a, 0.0) for a in reais)
     stress_us_R   = sum(stress_asset_R.get(a, 0.0) for a in us_rates)
@@ -5863,33 +5919,25 @@ def calcular_metricas_por_pl(
     }
     stress_cat_bps = {k: ((v / pl_ref) * 1e4 if pl_ref else 0.0) for k, v in stress_cat_R.items()}
 
-    # Stress COMBINADO das classes (aplica todos os choques simultaneamente)
     stress_combined_R   = stress_nom_R + stress_real_R + stress_us_R + stress_fx_R
     stress_combined_bps = (stress_combined_R / pl_ref) * 1e4 if pl_ref else 0.0
 
-    # Stress agregado por ativo (que você já fazia): soma |dd_i| × MV_i
     dv01_stress_R   = float((dd_min_series.abs() * mv_intersec).sum())
     dv01_stress_bps = (dv01_stress_R / pl_ref) * 1e4 if pl_ref else 0.0
 
-    # Drawdown do PORTFÓLIO (retorno mínimo do portfólio × MV_total)
     dd_port              = abs(float(port_ret.min())) if len(port_ret) else 0.0
     stress_port_dd_R     = dd_port * mv_total
     stress_port_dd_bps   = (stress_port_dd_R / pl_ref) * 1e4 if pl_ref else 0.0
 
-    # ---------------- 9) CoVaR (procedimentos do seu trecho) ----------------
-    # VaR do portfólio em retorno:
+    # ---------------- 9) CoVaR ----------------
     var_port = abs(var_ret)
-
-    # Volatilidade do portfólio (retorno)
     vol_port_retornos = float(port_ret.std())
 
-    # Preço base para mVaR_em_dinheiro (como no seu código): usa "Valor Fechamento" se existir
     if "Valor Fechamento" in df_precos_ajustados.columns:
         precos_base = df_precos_ajustados["Valor Fechamento"].reindex(cols).fillna(0.0)
     else:
         precos_base = precos_ult.reindex(cols).fillna(0.0)
 
-    # Monta DF temporário com a coluna 'Portifolio' para a covariância
     df_tmp = df_retorno_hist.copy()
     df_tmp["Portifolio"] = port_ret
 
@@ -5902,25 +5950,46 @@ def calcular_metricas_por_pl(
     denom = (vol_port_retornos ** 2) if vol_port_retornos != 0 else np.nan
     df_beta = cov_port / denom
 
-    # mVaR no espaço de retorno
     df_mvar = df_beta * var_port
-
-    # mVaR em R$ (seguindo seu código original: multiplicando por preço base)
     df_mvar_dinheiro = (df_mvar * precos_base.reindex(df_mvar.index).fillna(0.0)).astype(float)
 
-    # CoVaR por ativo (R$): mVaR_i * peso_i * MV_total
     pesos_series = pd.Series(pesos, index=cols)
     covar_R = (df_mvar.reindex(cols).fillna(0.0) * pesos_series * mv_total).astype(float)
 
-    # Distribuição percentual dentro do total de CoVaR (como no seu código)
     covar_total_R = float(covar_R.sum())
     covar_perc = (covar_R / covar_total_R) if covar_total_R != 0 else covar_R.copy()
 
-    # CoVaR em bps do PL_ref e % de 1 bp
-    #st.write(covar_R, df_mvar, mv_total, pesos_series)
     covar_bps       = ((covar_R / pl_ref) * 1e4).replace([np.inf, -np.inf], 0.0).fillna(0.0) if pl_ref else covar_R*0.0
     covar_pct_1bp   = ((covar_R / one_bp_R) * 100.0).replace([np.inf, -np.inf], 0.0).fillna(0.0) if one_bp_R else covar_R*0.0
     covar_total_bps = float((covar_total_R / pl_ref) * 1e4) if pl_ref else 0.0
+
+    #st.write("=== DEBUG calcular_metricas_por_pl ===")
+    #st.write("data_eff:", data_eff)
+    #st.write("cols (universo com posição):", cols)
+#
+    #st.write("---- Bloco MV/pesos (funcão grande) ----")
+    #st.write("quantidades (reindexadas em cols):", quantidades.reindex(cols))
+    #st.write("precos_ult (reindexados em cols):", precos_ult.reindex(cols))
+    #st.write("mv (cols):", mv.reindex(cols))
+    #st.write("mv_total (abs(net)):", mv_total)
+    #st.write("pesos (MV / sum(MV)):", pd.Series(pesos, index=cols))
+#
+    #st.write("---- Bloco port_ret/VaR ----")
+    #st.write("df_retorno_hist.index (min/max):", df_retorno_hist.index.min(), "->", df_retorno_hist.index.max())
+    #st.write("port_ret.describe():", port_ret.describe())
+    #st.write("var_ret (retorno):", var_ret)
+    #st.write("cvar_ret (retorno):", cvar_ret)
+    #st.write("var_R (R$):", var_R)
+    #st.write("cvar_R (R$):", cvar_R)
+#
+    #st.write("---- Bloco CoVaR (funcão grande) ----")
+    #st.write("df_beta (beta por ativo):", df_beta)
+    #st.write("df_mvar (retorno):", df_mvar)
+    #st.write("df_mvar_dinheiro:", df_mvar_dinheiro)
+    #st.write("covar_R (funcão grande):", covar_R)
+    #st.write("covar_total_R:", covar_total_R)
+    #st.write("covar_bps:", covar_bps)
+    #st.write("=== Fim DEBUG calcular_metricas_por_pl ===")
 
     # ---------------- 10) Saída ----------------
     out = {
@@ -5944,14 +6013,14 @@ def calcular_metricas_por_pl(
         "DV01 por ativo (R$/bp)"    : dv01_asset_R.to_dict(),
         "DV01 por ativo (bps)"      : dv01_asset_bps.to_dict(),
 
-        # CoVaR (novo)
+        # CoVaR
         "CoVaR total (R$)"          : covar_total_R,
         "CoVaR total (bps)"         : covar_total_bps,
         "CoVaR por ativo (R$)"      : covar_R.to_dict(),
         "CoVaR por ativo (bps)"     : covar_bps.to_dict(),
         "CoVaR por ativo (% de 1bp)": covar_pct_1bp.to_dict(),
 
-        # Diagnósticos úteis
+        # Diagnósticos
         "Beta por ativo"            : df_beta.replace([np.inf, -np.inf], np.nan).fillna(0.0).to_dict(),
         "mVaR por ativo (ret)"      : df_mvar.replace([np.inf, -np.inf], np.nan).fillna(0.0).to_dict(),
         "mVaR por ativo (R$)"       : df_mvar_dinheiro.to_dict(),
@@ -5959,19 +6028,12 @@ def calcular_metricas_por_pl(
     }
 
     out.update({
-        # Stress por ativo
         "Stress por ativo (R$)" : stress_asset_R,
         "Stress por ativo (bps)": stress_asset_bps,
-
-        # Stress por classe
         "Stress por classe (R$)" : stress_cat_R,
         "Stress por classe (bps)": stress_cat_bps,
-
-        # Stress combinado (todas as classes)
         "Stress combinado classes (R$)" : stress_combined_R,
         "Stress combinado classes (bps)": stress_combined_bps,
-
-        # Portfólio: 2 óticas de drawdown
         "Stress Portfólio (agregado por ativo) (R$)"  : dv01_stress_R,
         "Stress Portfólio (agregado por ativo) (bps)" : dv01_stress_bps,
         "Stress Portfólio (retorno min do port) (R$)" : stress_port_dd_R,
@@ -5996,8 +6058,8 @@ def calcular_metricas_por_pl(
         st.write("CoVaR (bps do PL_ref):", covar_bps)
         st.write("CoVaR (% de 1bp):", covar_pct_1bp)
 
-
     return out, default_assets, quantidades
+
 
 # ============================================================
 # POSIÇÕES HISTÓRICAS (delta ou nível) a partir do Supabase
@@ -6150,6 +6212,7 @@ def _normalize_topN_signed(d: dict, top_n=8, covar_tot_rs: float | None = None) 
         return pd.Series(dtype=float)
     return top / denom  # shares assinadas (somatório dos |shares| = 1)
 
+
 def build_history_normalized(
     dates: pd.DatetimeIndex,
     kind: str = "dv01",         # "dv01" | "covar"
@@ -6210,6 +6273,7 @@ def calc_contribs_for_date_cached(
     bundle_signature: tuple,
     return_dv01: bool = True,
     return_covar: bool = True,
+    debug: bool = False,
 ) -> dict:
     b = st.session_state.get("_risk_bundle")
     if b is None:
@@ -6217,43 +6281,98 @@ def calc_contribs_for_date_cached(
     
     d = pd.to_datetime(date_val, unit='ns')  # Convertendo 'date_val' para Timestamp
     rets = b["df_retorno_u"]
-    cols = b["cols_returns"]
+    cols_all = list(b["cols_returns"])
+
+    if debug:
+        st.write("=== DEBUG calc_contribs_for_date_cached ===")
+        st.write("Data pedida (d):", d)
+        st.write("Cols (returns - universo):", cols_all)
+
     rets_index_first = pd.to_datetime(rets.index[0])
     if d < rets_index_first:
+        if debug:
+            st.write("Sem histórico de retornos até a data (d < primeira data de rets).")
         return {"dv01_R$": {}, "covar_R$": {}, "pesos": {}}
 
-    df_hist = rets.loc[:d, cols]
+    # Histórico de retornos até a data (ainda com universo completo)
+    df_hist = rets.loc[:d, cols_all]
     if df_hist.empty:
+        if debug:
+            st.write("df_hist vazio até a data.")
         return {"dv01_R$": {}, "covar_R$": {}, "pesos": {}}
 
+    # Preços até a data
     b["df_precos_u"].index = pd.to_datetime(b["df_precos_u"].index)
-    precos_d = b["df_precos_u"][cols].loc[:d].ffill().tail(1).squeeze()
+    precos_d = b["df_precos_u"][cols_all].loc[:d].ffill().tail(1).squeeze()
     precos_d = pd.to_numeric(precos_d, errors="coerce").fillna(0.0)
 
-    q_d = b["positions_ts"].reindex(columns=cols)
-    if q_d.empty:
+    # Posições ao longo do tempo
+    q_ts = b["positions_ts"].reindex(columns=cols_all)
+    if q_ts.empty:
+        if debug:
+            st.write("positions_ts reindexado em cols_all ficou vazio.")
         return {"dv01_R$": {}, "covar_R$": {}, "pesos": {}}
-    
-    q_d = q_d.loc[q_d.index <= d].iloc[-1].fillna(0.0)
+
+    # Posição na data: última linha <= d
+    q_ts = q_ts.loc[q_ts.index <= d]
+    if q_ts.empty:
+        if debug:
+            st.write("Sem posição até a data (nenhuma linha em positions_ts <= d).")
+        return {"dv01_R$": {}, "covar_R$": {}, "pesos": {}}
+
+    q_row = q_ts.iloc[-1].fillna(0.0)
+
+    # --- FILTRAR APENAS ATIVOS COM QUANTIDADE != 0 ---
+    mask_pos = q_row != 0.0
+    cols = q_row.index[mask_pos].tolist()
+
+    if debug:
+        st.write("Ativos com posição != 0 na data:", cols)
+
+    if not cols:
+        if debug:
+            st.write("Nenhum ativo com posição diferente de zero na data.")
+        return {"dv01_R$": {}, "covar_R$": {}, "pesos": {}}
+
+    # Restringir tudo ao subconjunto com posição
+    q_d = q_row[cols]
+    precos_d = precos_d.reindex(cols).fillna(0.0)
+    df_hist = df_hist[cols]
 
     # MV e pesos
-    mv_d = (precos_d * q_d.abs()).fillna(0.0)
+    mv_d = (precos_d * q_d).fillna(0.0)
     mv_total_d = float(mv_d.sum())
-    if mv_total_d <= 0:
+    gross_mv = float(mv_d.abs().sum())
+
+    if gross_mv == 0:
         pesos_d = pd.Series(0.0, index=cols)
     else:
-        pesos_d = (mv_d / mv_total_d).astype(float)
+        # aqui você está usando gross (exposição bruta), igual na versão anterior
+        pesos_d = (mv_d / gross_mv).astype(float)
+
+    if debug:
+        st.write("---- Bloco MV/pesos (calc_contribs) ----")
+        st.write("precos_d (ativos com posição):", precos_d)
+        st.write("q_d (quantidades, ativos com posição):", q_d)
+        st.write("mv_d:", mv_d)
+        st.write("mv_total_d (net):", mv_total_d)
+        st.write("gross_mv:", gross_mv)
+        st.write("pesos_d (MV/gross):", pesos_d)
 
     out = {"dv01_R$": {}, "covar_R$": {}, "pesos": pesos_d.to_dict()}
 
+    # ---------------- DV01 ----------------
     if return_dv01:
-        dv01_R_d = (b["dv01_pc"].reindex(cols).fillna(0.0) * q_d).astype(float)
+        dv01_pc = b["dv01_pc"].reindex(cols).fillna(0.0)
+        dv01_R_d = (dv01_pc * q_d).astype(float)
         out["dv01_R$"] = dv01_R_d.to_dict()
+        if debug:
+            st.write("DV01_R$ (calc_contribs, apenas ativos com posição):", dv01_R_d)
 
+    # ---------------- CoVaR ----------------
     if return_covar:
         # 1) Pesos re-normalizados para colunas válidas de df_hist
         w_eff = pesos_d.reindex(df_hist.columns).fillna(0.0)
-        #st.write("w_eff:", w_eff)
         sw = float(w_eff.sum())
         if sw > 0:
             w_eff = w_eff / sw
@@ -6261,22 +6380,22 @@ def calc_contribs_for_date_cached(
         # 2) Retorno do portfólio com pesos efetivos
         port_ret = (df_hist * w_eff.values).sum(axis=1)
 
-        # 3) Covariância com o portfólio (robusta)
+        # 3) Covariância com o portfólio
         df_tmp = df_hist.copy()
         df_tmp["PORT"] = port_ret.values
         covm = df_tmp.cov()
         var_p = float(covm.loc["PORT", "PORT"])
         if var_p == 0 or np.isnan(var_p):
             out["covar_R$"] = {c: 0.0 for c in cols}
+            if debug:
+                st.write("var_p == 0 ou NaN, CoVaR zerado.")
         else:
             beta = covm["PORT"].drop("PORT") / var_p
 
-
-            # 4) VaR (consistência com seu método "bom")
+            # 4) VaR (não-paramétrico) do portfólio
             var_port = abs(np.quantile(port_ret.values, alpha))
-            #st.write("beta:", beta, "mv_d:", mv_d, "var_port:", var_port)
 
-            # 5) CoVaR em R$ por ativo
+            # 5) CoVaR em R$ por ativo (apenas ativos com posição)
             covar_R = (beta * var_port * mv_d).astype(float)
 
             # Garantir que as colunas correspondam ao final e limpar valores próximos de zero
@@ -6284,6 +6403,17 @@ def calc_contribs_for_date_cached(
             covar_R = covar_R.mask(covar_R.abs() < 1e-15, 0.0)
 
             out["covar_R$"] = covar_R.to_dict()
+
+            if debug:
+                st.write("---- Bloco CoVaR (calc_contribs) ----")
+                st.write("df_hist.index (min/max):", df_hist.index.min(), "->", df_hist.index.max())
+                st.write("port_ret.describe():", port_ret.describe())
+                st.write("var_port (quantile):", var_port)
+                st.write("beta (calc_contribs, apenas ativos com posição):", beta)
+                st.write("covar_R (calc_contribs, apenas ativos com posição):", covar_R)
+
+    if debug:
+        st.write("=== Fim DEBUG calc_contribs_for_date_cached ===")
 
     return out
 
@@ -7760,6 +7890,7 @@ def simulate_nav_cota() -> None:
 
     # série de retorno da carteira (histórico ponderado pelos pesos financeiros atuais)
     ret_port = (df_ret * weights).sum(axis=1)
+    #st.write(ret_port,df_ret,weights,posicoes_atuais)
 
     # vols da carteira por janela
     vol_port = {}
@@ -8467,7 +8598,7 @@ def simulate_nav_cota() -> None:
         # ===================== DV01 por CLASSE com CATEGORIAS empilhadas =====================
             st.subheader("DV01 por classe")
 
-            dv01_asset_rs_dict  = risco.get("DV01 por ativo (R$/bp)", {}) or {}
+            dv01_asset_rs_dict  = risco.get("DV01 por ativo (bps)", {}) or {}
             if not dv01_asset_rs_dict:
                 st.info("DV01 por ativo indisponível para este portfólio.")
             else:
@@ -8541,9 +8672,9 @@ def simulate_nav_cota() -> None:
                                     name=_short(ativo, 22),                  # legenda curta
                                     customdata=np.array([ativo]*len(x)),     # hover com nome completo
                                     hovertemplate="<b>%{y}</b><br>Ativo: %{customdata}"
-                                                "<br>DV01: %{x:,.0f} R$/bp<extra></extra>",
+                                                "<br>DV01: %{x:,.2f} R$/bp<extra></extra>",
                                     # rótulo só em barras “maiores” (evita poluição visual)
-                                    text=[f"{v:,.0f}" if abs(v) >= np.nanpercentile(np.abs(wide.values), 75) else "" for v in x],
+                                    text=[f"{v:,.2f}" if abs(v) >= np.nanpercentile(np.abs(wide.values), 75) else "" for v in x],
                                     textposition="outside",
                                     cliponaxis=False,
                                 ))
@@ -8552,7 +8683,7 @@ def simulate_nav_cota() -> None:
                                 barmode="relative",   # empilha positivos/negativos
                                 #height=max(260, 64 * len(wide.index)),
                                 margin=dict(l=20, r=20, t=10, b=10),
-                                xaxis=dict(title="DV01 (R$/bp)", tickformat=",.0f",
+                                xaxis=dict(title="DV01 (bps)", tickformat=",.2f",
                                         showgrid=True, gridcolor="#F3F4F6"),
                                 yaxis=dict(title=""),
                                 legend=dict(orientation="h", y=-0.25, x=0.5, xanchor="center", title="Ativos"),
@@ -8825,7 +8956,7 @@ def simulate_nav_cota() -> None:
                 fig_area.update_layout( 
                     margin=dict(l=16, r=16, t=16, b=16))
                         # Limitar o eixo y a 6% (0.06)
-                fig_area.update_yaxes(range=[-0.06, 0.06], tickformat=".0%", title="Proporção de DV01")
+                fig_area.update_yaxes(range=[-0.02, 0.06], tickformat=".0%", title="Proporção de DV01")
                 fig_area.update_traces(hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>")
                 # Exibir o gráfico
                 st.plotly_chart(fig_area, use_container_width=True)
@@ -8837,25 +8968,50 @@ def simulate_nav_cota() -> None:
             with colll2:
                 st.caption("CoVaR por estratégia — área empilhada")
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
-                df_hist_cv_positive = df_hist_cv.clip(lower=0)
+                df_hist_cv_positive = df_hist_cv
                 existing_cols = [col for col in df_hist_cv_positive.columns if col in ativos_para_estrategia]
                 df_hist_cv_filtrado = df_hist_cv_positive[existing_cols]
                 mapper = {col: ativos_para_estrategia[col] for col in existing_cols}
                 df_hist_cv_estrategia = df_hist_cv_filtrado.groupby(by=mapper, axis=1).sum()
                 
-                # 2. Normalizar os dados agrupados
-                #df_hist_cv_normalized = df_hist_cv_estrategia.divide(df_hist_cv_estrategia.sum(axis=1), axis=0)
-                df_hist_cv_normalized = df_hist_cv_estrategia
+                # >>> CÓPIA COM -10% <<<
+                df_hist_cv_estrategia_menos10 = df_hist_cv_estrategia.copy() * 0.9
+
+                # Se quiser usar a versão com -10% no gráfico, use essa:
+                df_hist_cv_normalized = df_hist_cv_estrategia_menos10
+                # Se quiser manter o original, deixe assim:
+                #df_hist_cv_normalized = df_hist_cv_estrategia
+
                 # 3. Plotar o gráfico de área empilhada
-                fig_area2 = px.area(df_hist_cv_normalized, x=df_hist_cv_normalized.index, y=df_hist_cv_normalized.columns,
-                                    labels={'value': 'Proporção', 'variable': 'Estratégia'},
-                                    title=" ")
+                fig_area2 = px.area(
+                    df_hist_cv_normalized,
+                    x=df_hist_cv_normalized.index,
+                    y=df_hist_cv_normalized.columns,
+                    labels={'value': 'Proporção', 'variable': 'Estratégia'},
+                    title=" "
+                )
                 fig_area2.update_layout(margin=dict(l=10, r=10, t=10, b=10), legend_title_text="")
-                fig_area2.update_yaxes(range=[0, 1], tickformat=".0%", title="Proporção de CoVaR")
-                fig_area2.update_traces(hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>")
+                fig_area2.update_yaxes(range=[0,0.8], tickformat=".0%", title="Proporção de CoVaR")
+                fig_area2.update_traces(
+                    hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>"
+                )
                 st.plotly_chart(fig_area2, use_container_width=True)
+
         st.subheader("Volatilidade histórica por ativo")
         st.plotly_chart(fig_vol_assets, use_container_width=True)
+        if st.button("Debug CoVaR para data selecionada"):
+            # Exemplo: usa o último índice de df_retorno_u do bundle como data_val
+            b = st.session_state["_risk_bundle"]
+            d_last = pd.to_datetime(b["df_retorno_u"].index[-1])
+            date_val = int(d_last.value)
+
+            debug_comparar_covars(
+                date_val=date_val,
+                pl_series=pl_series,       # mesma série que você já passa à função grande
+                alpha=0.05,
+                window=252,
+                bundle_signature=("dummy",),
+            )
         #Dado que preciso pegar os dados de cotações -> Traga o valor a presente
         #st.write(df_hist_cv_estrategia,df_hist_cv,df_hist_dv)
         #Printar o histórico de posições do bundle

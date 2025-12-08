@@ -8837,7 +8837,7 @@ def simulate_nav_cota() -> None:
                             pad = 0.12 * max(1.0, abs(pos_max), abs(neg_min))
                             fig.update_xaxes(range=[neg_min - pad, pos_max + pad])
 
-                            st.plotly_chart(fig, use_container_width=True)
+                            #st.plotly_chart(fig, use_container_width=True)
 
                         # ---------------- donut: distribuição (apenas positivos) ----------------
                         # ── CoVaR (pizza) ───────────────────────────────────────────────
@@ -8863,7 +8863,7 @@ def simulate_nav_cota() -> None:
                                     showlegend=False,
                                     height=PIE_HEIGHT
                                 )
-                                st.plotly_chart(fig_p, use_container_width=True)
+                                #st.plotly_chart(fig_p, use_container_width=True)
                                 st.caption("Distribuição do CoVaR (apenas positivos): Top-8 + “Outros”.")
 
         with colllmeio:

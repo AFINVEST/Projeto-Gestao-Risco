@@ -8975,7 +8975,7 @@ def simulate_nav_cota() -> None:
                 df_hist_cv_estrategia = df_hist_cv_filtrado.groupby(by=mapper, axis=1).sum()
                 
                 # >>> CÓPIA COM -10% <<<
-                df_hist_cv_estrategia_menos10 = df_hist_cv_estrategia.copy() * 0.9
+                df_hist_cv_estrategia_menos10 = df_hist_cv_estrategia.copy()
 
                 # Se quiser usar a versão com -10% no gráfico, use essa:
                 df_hist_cv_normalized = df_hist_cv_estrategia_menos10

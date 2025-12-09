@@ -5669,55 +5669,6 @@ def ui_radio(label, options, *, index=0, horizontal=False, key=None, ui=True):
 def ui_selectbox(label, options, *, index=0, key=None, ui=True):
     return st.selectbox(label, options, index=index, key=key) if ui else options[index]
 
-def debug_comparar_covars(
-    date_val: int,
-    pl_series: pd.Series,
-    alpha: float,
-    window: int,
-    bundle_signature: tuple,
-):
-    """
-    Roda as duas funções e monta um df comparando:
-    - peso incremental vs peso da função grande
-    - CoVaR_R$ incremental vs CoVaR_R$ da função grande
-    Não estou forçando a mesma data na função grande, ela vai usar o comportamento atual.
-    """
-    b = st.session_state.get("_risk_bundle")
-    if b is None:
-        st.error("Bundle não encontrado em session_state['_risk_bundle'].")
-        return
-
-    # 1) Resultado da função incremental (para date_val)
-    contribs = calc_contribs_for_date_cached(
-        date_val=date_val,
-        window=window,
-        alpha=alpha,
-        bundle_signature=bundle_signature,
-        return_dv01=True,
-        return_covar=True,
-        debug=True,  # liga debug interno
-    )
-
-    covar_small = pd.Series(contribs.get("covar_R$", {}), name="CoVaR_R$_calc_contribs")
-    pesos_small = pd.Series(contribs.get("pesos", {}), name="peso_calc_contribs")
-
-    # 2) Resultado da função grande (na data padrão dela, hoje é última data de pl_series)
-    out_big, default_assets, quantidades = calcular_metricas_por_pl(
-        pl_series=pl_series,
-        alpha=alpha,
-        debug=True,   # liga debug interno
-        ui=False,
-    )
-
-    covar_big = pd.Series(out_big.get("CoVaR por ativo (R$)", {}), name="CoVaR_R$_funcao_grande")
-    pesos_big = pd.Series(out_big.get("Peso MV por ativo", {}), name="peso_funcao_grande")
-
-    # 3) Junta tudo num DataFrame
-    df_cmp = pd.concat([pesos_small, pesos_big, covar_small, covar_big], axis=1)
-    st.subheader("Comparação CoVaR e pesos — função incremental vs função grande")
-    st.dataframe(df_cmp.sort_index())
-
-
 def calcular_metricas_por_pl(
     pl_series: pd.Series,
     data: pd.Timestamp | str | None = None,
@@ -5821,7 +5772,7 @@ def calcular_metricas_por_pl(
         quant_eff = quantidades.reindex(ativos_com_pos).fillna(0.0)
 
         mv = (precos_ult_eff * quant_eff).fillna(0.0)     # MV por ativo (R$)
-        mv_total = float(abs(mv.sum()))
+        mv_total = float(mv.sum())
 
         # cols = ativos com posição que também existem em df_retorno_hist
         cols = [c for c in ativos_com_pos if c in df_retorno_hist.columns]
@@ -5896,9 +5847,9 @@ def calcular_metricas_por_pl(
     stress_asset_R = {}
     for a in intersec:
         if is_nominal(a):
-            stress_asset_R[a] = abs(float(dv01_asset_R.get(a, 0.0))) * 100.0
+            stress_asset_R[a] = abs(float(dv01_asset_R.get(a, 0.0))) + 100.0
         elif is_real(a):
-            stress_asset_R[a] = abs(float(dv01_asset_R.get(a, 0.0))) * 50.0
+            stress_asset_R[a] = abs(float(dv01_asset_R.get(a, 0.0))) + 50.0
         elif is_us(a) or is_fx(a):
             stress_asset_R[a] = abs(float(dd_min_series.get(a, 0.0))) * float(mv_intersec.get(a, 0.0))
         else:
@@ -5931,7 +5882,6 @@ def calcular_metricas_por_pl(
 
     # ---------------- 9) CoVaR ----------------
     var_port = abs(var_ret)
-    vol_port_retornos = float(port_ret.std())
 
     if "Valor Fechamento" in df_precos_ajustados.columns:
         precos_base = df_precos_ajustados["Valor Fechamento"].reindex(cols).fillna(0.0)
@@ -5940,6 +5890,10 @@ def calcular_metricas_por_pl(
 
     df_tmp = df_retorno_hist.copy()
     df_tmp["Portifolio"] = port_ret
+    #Dropar primeira linha
+    df_tmp = df_tmp.dropna(how='any')
+
+    vol_port_retornos = float(df_tmp['Portifolio'].std())
 
     cov = df_tmp.cov()
     if "Portifolio" in cov.columns:
@@ -5947,15 +5901,15 @@ def calcular_metricas_por_pl(
     else:
         cov_port = pd.Series(0.0, index=cols)
 
+
     denom = (vol_port_retornos ** 2) if vol_port_retornos != 0 else np.nan
     df_beta = cov_port / denom
 
     df_mvar = df_beta * var_port
-    df_mvar_dinheiro = (df_mvar * precos_base.reindex(df_mvar.index).fillna(0.0)).astype(float)
 
+    df_mvar_dinheiro = (df_mvar * precos_base.reindex(df_mvar.index).fillna(0.0)).astype(float)
     pesos_series = pd.Series(pesos, index=cols)
     covar_R = (df_mvar.reindex(cols).fillna(0.0) * pesos_series * mv_total).astype(float)
-
     covar_total_R = float(covar_R.sum())
     covar_perc = (covar_R / covar_total_R) if covar_total_R != 0 else covar_R.copy()
 
@@ -6217,7 +6171,7 @@ def build_history_normalized(
     dates: pd.DatetimeIndex,
     kind: str = "dv01",         # "dv01" | "covar"
     top_n: int = 8,
-    weekly: bool = True,
+    weekly: bool = False,
     only_positive: bool = False,
     window: int = 126,
     alpha: float = 0.05,
@@ -6228,8 +6182,15 @@ def build_history_normalized(
     if b is None:
         raise RuntimeError("Bundle não encontrado em session_state['_risk_bundle'].")
 
-    if weekly:
-        dates = pd.DatetimeIndex(dates).to_series().groupby(pd.Grouper(freq="W-FRI")).last().dropna().index
+    #if weekly:
+    #    dates = (
+    #        pd.DatetimeIndex(dates)
+    #        .to_series()
+    #        .groupby(pd.Grouper(freq="W-FRI"))
+    #        .last()
+    #        .dropna()
+    #        .index
+    #    )
 
     rows, idxs = [], []
     for d in dates:
@@ -6239,31 +6200,43 @@ def build_history_normalized(
             window=window,
             alpha=alpha,
             bundle_signature=b["signature"],
-            return_dv01=(kind=="dv01"),
-            return_covar=(kind=="covar"),
+            return_dv01=(kind == "dv01"),
+            return_covar=(kind == "covar"),
         )
 
         if kind == "dv01":
-            series_map = res["dv01_R$"]                         # ← COM sinal
+            series_map = res["dv01_R$"]  # dict
             norm = _normalize_topN_signed(
                 series_map, top_n=top_n, covar_tot_rs=covar_tot_rs
             )
         else:
-            series_map = res["covar_R$"]
-            # CoVaR: mantém só positivos e normaliza por soma (0..1)
-            norm = _normalize_topN_signed(
-                series_map, top_n=top_n, covar_tot_rs=covar_tot_rs
-            )
+            series_map = res["covar_R$"]  # dict {ativo: covar_R$}
 
-        if norm.empty:
+            # se não vier total, calcula pela soma (opcional, mas evita erro com None)
+            cov_total = covar_tot_rs if covar_tot_rs is not None else sum(series_map.values())
+
+            # Covar porcentagem (com sinal)
+            if cov_total == 0:
+                cov_percent = {k: 0.0 for k in series_map.keys()}
+            else:
+                cov_percent = {k: (v / cov_total) for k, v in series_map.items()}
+
+            # Transformar o dict em uma Series (uma "linha" que depois vira DataFrame)
+            norm = pd.Series(cov_percent, dtype=float)
+
+        # pode acontecer de norm ser Series vazia
+        if norm is None or (hasattr(norm, "empty") and norm.empty):
             continue
+
         rows.append(norm)
         idxs.append(pd.to_datetime(d))
 
     if not rows:
         return pd.DataFrame()
 
+    # cada Series em rows vira uma linha; índice = datas
     return pd.DataFrame(rows, index=idxs).sort_index().fillna(0.0)
+
 
 #st.cache_data(show_spinner=False)
 def calc_contribs_for_date_cached(
@@ -6373,6 +6346,7 @@ def calc_contribs_for_date_cached(
     if return_covar:
         # 1) Pesos re-normalizados para colunas válidas de df_hist
         w_eff = pesos_d.reindex(df_hist.columns).fillna(0.0)
+        
         sw = float(w_eff.sum())
         if sw > 0:
             w_eff = w_eff / sw
@@ -6383,8 +6357,9 @@ def calc_contribs_for_date_cached(
         # 3) Covariância com o portfólio
         df_tmp = df_hist.copy()
         df_tmp["PORT"] = port_ret.values
+        df_tmp = df_tmp.dropna(how='any')
         covm = df_tmp.cov()
-        var_p = float(covm.loc["PORT", "PORT"])
+        var_p = float(df_tmp["PORT"].std() ** 2)
         if var_p == 0 or np.isnan(var_p):
             out["covar_R$"] = {c: 0.0 for c in cols}
             if debug:
@@ -6397,7 +6372,9 @@ def calc_contribs_for_date_cached(
 
             # 5) CoVaR em R$ por ativo (apenas ativos com posição)
             covar_R = (beta * var_port * mv_d).astype(float)
-
+            # Multiplicar pelo peso MV do ativo no portfólio
+            covar_R = covar_R.reindex(cols).fillna(0.0)
+            covar_R = (covar_R * pesos_d).astype(float)
             # Garantir que as colunas correspondam ao final e limpar valores próximos de zero
             covar_R = covar_R.reindex(cols).fillna(0.0)
             covar_R = covar_R.mask(covar_R.abs() < 1e-15, 0.0)
@@ -8308,19 +8285,19 @@ def simulate_nav_cota() -> None:
         carry_total_ts = None if not pieces else pd.concat(pieces, axis=1).sum(axis=1).rename("Carry_total_portfolio_R$")
 
         # --- Exemplo de exposição (Streamlit) ---
-        if isinstance(carry_total_ts, pd.Series) and not carry_total_ts.empty:
-            st.markdown("### Carry do portfólio — DI + DAP (R$)")
-            cur = float(carry_total_ts.iloc[-1])
-            prev = float(carry_total_ts.iloc[-2]) if len(carry_total_ts) >= 2 else 0.0
-            st.metric("Carry total (1d) — atual", value=f"R$ {cur:,.2f}", delta=f"{(cur-prev):,.2f}")
-            st.line_chart(carry_total_ts)
-
-            with st.expander("Quebra por bloco", expanded=False):
-                cols = []
-                if isinstance(carry_di_ts, pd.Series) and not carry_di_ts.empty: cols.append(carry_di_ts.rename("DI"))
-                if isinstance(carry_dap_ts, pd.Series) and not carry_dap_ts.empty: cols.append(carry_dap_ts.rename("DAP"))
-                if cols:
-                    st.dataframe(pd.concat(cols, axis=1).tail(10))
+        #if isinstance(carry_total_ts, pd.Series) and not carry_total_ts.empty:
+        #    st.markdown("### Carry do portfólio — DI + DAP (R$)")
+        #    cur = float(carry_total_ts.iloc[-1])
+        #    prev = float(carry_total_ts.iloc[-2]) if len(carry_total_ts) >= 2 else 0.0
+        #    st.metric("Carry total (1d) — atual", value=f"R$ {cur:,.2f}", delta=f"{(cur-prev):,.2f}")
+        #    st.line_chart(carry_total_ts)
+#
+        #    with st.expander("Quebra por bloco", expanded=False):
+        #        cols = []
+        #        if isinstance(carry_di_ts, pd.Series) and not carry_di_ts.empty: cols.append(carry_di_ts.rename("DI"))
+        #        if isinstance(carry_dap_ts, pd.Series) and not carry_dap_ts.empty: cols.append(carry_dap_ts.rename("DAP"))
+        #        if cols:
+        #            st.dataframe(pd.concat(cols, axis=1).tail(10))
     rolling_max = cota.cummax()
     is_peak = (cota == rolling_max)
     ultima_data_pico = is_peak[is_peak].index[-1] if is_peak.any() else cota.index[0]
@@ -8719,7 +8696,7 @@ def simulate_nav_cota() -> None:
                                     height=PIE_HEIGHT
                                 )
                                 st.plotly_chart(fig_p, use_container_width=True)
-                                st.caption("Distribuição do DV01 (|R$|): Top-8 + “Outros”.")
+                                st.caption("Distribuição do DV01.")
 
 
         # ========================== CoVaR por ativo (AJUSTES + PIZZA) ==========================
@@ -8837,7 +8814,7 @@ def simulate_nav_cota() -> None:
                             pad = 0.12 * max(1.0, abs(pos_max), abs(neg_min))
                             fig.update_xaxes(range=[neg_min - pad, pos_max + pad])
 
-                            #st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, use_container_width=True)
 
                         # ---------------- donut: distribuição (apenas positivos) ----------------
                         # ── CoVaR (pizza) ───────────────────────────────────────────────
@@ -8863,8 +8840,12 @@ def simulate_nav_cota() -> None:
                                     showlegend=False,
                                     height=PIE_HEIGHT
                                 )
-                                #st.plotly_chart(fig_p, use_container_width=True)
-                                st.caption("Distribuição do CoVaR (apenas positivos): Top-8 + “Outros”.")
+                                st.plotly_chart(
+                                    fig_p,
+                                    use_container_width=True,
+                                    key="plot_nav_cota"
+                                )          
+                                st.caption("Distribuição do CoVaR")
 
         with colllmeio:
             # Adicionar linha vertical
@@ -8968,6 +8949,9 @@ def simulate_nav_cota() -> None:
             with colll2:
                 st.caption("CoVaR por estratégia — área empilhada")
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
+                #st.write(df_hist_cv)
+                #b = st.session_state.get("_risk_bundle")
+                #st.write(b['positions_ts'])
                 df_hist_cv_positive = df_hist_cv
                 existing_cols = [col for col in df_hist_cv_positive.columns if col in ativos_para_estrategia]
                 df_hist_cv_filtrado = df_hist_cv_positive[existing_cols]
@@ -8991,7 +8975,7 @@ def simulate_nav_cota() -> None:
                     title=" "
                 )
                 fig_area2.update_layout(margin=dict(l=10, r=10, t=10, b=10), legend_title_text="")
-                fig_area2.update_yaxes(range=[0,0.8], tickformat=".0%", title="Proporção de CoVaR")
+                fig_area2.update_yaxes(range=[-0.8,0.8], tickformat=".0%", title="Proporção de CoVaR")
                 fig_area2.update_traces(
                     hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>"
                 )
@@ -8999,19 +8983,6 @@ def simulate_nav_cota() -> None:
 
         st.subheader("Volatilidade histórica por ativo")
         st.plotly_chart(fig_vol_assets, use_container_width=True)
-        if st.button("Debug CoVaR para data selecionada"):
-            # Exemplo: usa o último índice de df_retorno_u do bundle como data_val
-            b = st.session_state["_risk_bundle"]
-            d_last = pd.to_datetime(b["df_retorno_u"].index[-1])
-            date_val = int(d_last.value)
-
-            debug_comparar_covars(
-                date_val=date_val,
-                pl_series=pl_series,       # mesma série que você já passa à função grande
-                alpha=0.05,
-                window=252,
-                bundle_signature=("dummy",),
-            )
         #Dado que preciso pegar os dados de cotações -> Traga o valor a presente
         #st.write(df_hist_cv_estrategia,df_hist_cv,df_hist_dv)
         #Printar o histórico de posições do bundle
@@ -9033,6 +9004,8 @@ def simulate_nav_cota() -> None:
 #
 #
     #    #d6.metric("Stress DV01 (R$)", f"{risco['Stress DV01 (R$)']:,.2f}")
+
+
 import json
 import time
 from pathlib import Path

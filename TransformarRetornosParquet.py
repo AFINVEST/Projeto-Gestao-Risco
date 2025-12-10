@@ -100,7 +100,7 @@ colunas = df_ntnb.columns
 for col in colunas:
     df_ntnb[col] = df_ntnb[col].apply(lambda x: str(x).replace('.', ','))
 
-df_b3 = pd.read_parquet('Dados/df_preco_de_ajuste_atual.parquet')
+df_b3 = pd.read_parquet('Dados/df_preco_de_ajuste_atual_completo.parquet')
 
 # Fazer o merge dos dataframes
 df_precos = pd.concat([df_b3, df_ntnb], axis=0)

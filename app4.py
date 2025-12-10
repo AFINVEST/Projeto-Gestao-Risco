@@ -5084,9 +5084,19 @@ def switch_to_main():
 @st.cache_data(show_spinner=False, ttl=3600)        # 1 h de cache
 def load_b3_prices() -> pd.DataFrame:
     df = pd.read_parquet("Dados/df_preco_de_ajuste_atual_completo.parquet")
-    df = (df.replace(r'\.', '', regex=True)
-            .replace(',', '.', regex=True))
-    df.iloc[:, 1:] = df.iloc[:, 1:].astype(float)
+    df.iloc[:, 1:] = (
+    df.iloc[:, 1:]
+      .replace(r"^\s*$", np.nan, regex=True)
+      .apply(
+          lambda col: pd.to_numeric(
+              col.astype(str)
+                 .str.strip()
+                 .str.replace(".", "", regex=False)
+                 .str.replace(",", ".", regex=False),
+              errors="coerce"
+          )
+      )
+)
     df.loc[df['Assets'] == 'TREASURY', df.columns != 'Assets'] *= 1000
     df.loc[df['Assets'] == 'WDO1',     df.columns != 'Assets'] *= 10
     return df
@@ -5100,15 +5110,29 @@ def read_atual_contratos_cached():
 @st.cache_data(show_spinner=False)
 def load_ajustes() -> pd.DataFrame:
     df = pd.read_parquet("Dados/df_valor_ajuste_contrato.parquet")
-    if df.iloc[:, -1].equals(df.iloc[:, -2]):       # tira duplicata de “última coluna”
-        df = df.iloc[:, :-1]
-    qtd_cols = df.columns[1:]
-    df[qtd_cols] = (df[qtd_cols]
-                    .replace(r'\.', '', regex=True)
-                    .replace(',', '.', regex=True)
-                    .astype(float))
-    return df
 
+    # Se a última coluna for cópia exata da penúltima, remove a última
+    # (isso trata o caso em que você duplicou o último dia útil)
+    if df.shape[1] >= 3 and df.iloc[:, -1].equals(df.iloc[:, -2]):
+        df = df.iloc[:, :-1].copy()
+
+    # Converte todas as colunas de data (tudo menos 'Assets') de pt-BR -> float
+    # e transforma strings vazias em NaN (que depois viram null no JSON)
+    df.iloc[:, 1:] = (
+        df.iloc[:, 1:]
+        .replace(r"^\s*$", np.nan, regex=True)   # "" ou só espaços -> NaN
+        .apply(
+            lambda col: pd.to_numeric(
+                col.astype(str)
+                   .str.strip()
+                   .str.replace(".", "", regex=False)  # tira separador de milhar
+                   .str.replace(",", ".", regex=False),# vírgula -> ponto
+                errors="coerce"                        # lixo -> NaN
+            )
+        )
+    )
+
+    return df
 
 @st.cache_data(show_spinner=False)
 def load_basefundos() -> dict[str, pd.DataFrame]:

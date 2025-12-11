@@ -190,7 +190,7 @@ def process_returns(df, assets):
     df_retorno = df_retorno[assets]
     df_retorno.dropna(inplace=True)
     df_retorno = df_retorno.astype(float)
-    df_retorno = df_retorno.tail(756).reset_index(drop=True)
+    df_retorno = df_retorno.tail(1260).reset_index(drop=True)
     df_retorno = np.log(df_retorno / df_retorno.shift(1))
     return df_retorno
 
@@ -203,7 +203,7 @@ def process_returns2(df, assets):
     df_retorno = df_retorno[assets]
     df_retorno.dropna(inplace=True)
     df_retorno = df_retorno.astype(float)
-    df_retorno = df_retorno.tail(756)
+    df_retorno = df_retorno.tail(1260)
     df_retorno = np.log(df_retorno / df_retorno.shift(1))
     return df_retorno
 
@@ -6469,7 +6469,7 @@ def process_returns_with_b3(df_b3_fechamento, assets):
         raise KeyError(f"Nenhum dos ativos solicitados está presente em df_b3_fechamento: {assets}")
 
     # Seleciona os ativos presentes e usa os últimos 756 dias de dados (aproximadamente 3 anos)
-    df_b3_fechamento = df_b3_fechamento[assets_to_use].tail(756) 
+    df_b3_fechamento = df_b3_fechamento[assets_to_use].tail(1260) 
     
     # Calculando os retornos logarítmicos
     df_returns = np.log(df_b3_fechamento / df_b3_fechamento.shift(1))
@@ -8976,7 +8976,8 @@ def simulate_nav_cota() -> None:
                 #st.write(df_hist_cv)
                 #b = st.session_state.get("_risk_bundle")
                 #st.write(b['positions_ts'])
-                df_hist_cv_positive = df_hist_cv
+                #Colocar o df_hist_cv absoluto
+                df_hist_cv_positive = df_hist_cv.abs()
                 existing_cols = [col for col in df_hist_cv_positive.columns if col in ativos_para_estrategia]
                 df_hist_cv_filtrado = df_hist_cv_positive[existing_cols]
                 mapper = {col: ativos_para_estrategia[col] for col in existing_cols}
@@ -9004,6 +9005,7 @@ def simulate_nav_cota() -> None:
                     hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>"
                 )
                 st.plotly_chart(fig_area2, use_container_width=True)
+                st.caption("Distribuição do CoVaR por estratégia ao longo do tempo ( Em valores absolutos**).")
 
         st.subheader("Volatilidade histórica por ativo")
         st.plotly_chart(fig_vol_assets, use_container_width=True)

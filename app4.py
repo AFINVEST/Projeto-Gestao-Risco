@@ -262,66 +262,36 @@ def calculate_portfolio_values(df_precos, df_pl_processado, var_bps):
 
 def processar_b3_portifolio():
     """
-    Carrega o df de preços de ajuste da B3 a partir do parquet
-    'Dados/df_preco_de_ajuste_atual_completo.parquet', converte
-    as colunas de datas para float e ajusta TREASURY e WDO1.
+    Exemplo de função que carrega dois dataframes de parquet:
+     - Dados/df_preco_de_ajuste_atual_completo.parquet : preços de fechamento (colunas de datas)
+     - df_variacao.parquet : variação diária dos ativos (colunas de datas)
     """
+    df_b3_fechamento = pd.read_parquet(
+        "Dados/df_preco_de_ajuste_atual_completo.parquet")
+    # df_b3_fechamento possui colunas: ['Ativo', '17/01/2025', '18/01/2025', ...]
 
-    path = Path("Dados/df_preco_de_ajuste_atual_completo.parquet")
-    df_b3_fechamento = pd.read_parquet(path)
+    # df_b3_variacao possui colunas: ['Ativo', '17/01/2025', '18/01/2025', ...]
+    # Tirar o pontos das casas de milhar
+    #Percorrer as linhas e o que for ''' ou "" ou " " ou ' ' substituir por NaN
+    df_b3_fechamento = df_b3_fechamento.replace(r"^\s*$", float("NaN"), regex=True)
+    #Fazer um foward fill para preencher os NaN
+    df_b3_fechamento = df_b3_fechamento.fillna(method='ffill', axis=1)
+    #Dropar a linha que estiver asset = "DAP25"
+    df_b3_fechamento = df_b3_fechamento[df_b3_fechamento['Assets'] != 'DAP25'] 
 
-    # ------------------------------------------------------------------
-    # Garantir que exista uma coluna "Assets" (ou equivalente)
-    # ------------------------------------------------------------------
-    # Se o índice é "Assets" e não há coluna "Assets", traz pro corpo:
-    if df_b3_fechamento.index.name == "Assets" and "Assets" not in df_b3_fechamento.columns:
-        df_b3_fechamento = df_b3_fechamento.reset_index()
+    df_b3_fechamento = df_b3_fechamento.replace('\.', '', regex=True)
 
-    # Se veio com nome "Ativo", renomeia pra "Assets" (ajusta se o seu nome for outro)
-    if "Ativo" in df_b3_fechamento.columns and "Assets" not in df_b3_fechamento.columns:
-        df_b3_fechamento = df_b3_fechamento.rename(columns={"Ativo": "Assets"})
+    # Trocar Virgula por Ponto
+    df_b3_fechamento = df_b3_fechamento.replace(',', '.', regex=True)
 
-    # Se ainda assim não tiver "Assets", assume que a primeira coluna é o identificador
-    if "Assets" not in df_b3_fechamento.columns:
-        first_col = df_b3_fechamento.columns[0]
-        df_b3_fechamento = df_b3_fechamento.rename(columns={first_col: "Assets"})
-
-    # ------------------------------------------------------------------
-    # Limpeza e conversão numérica das colunas de datas
-    # ------------------------------------------------------------------
-    # Todas as colunas exceto "Assets" são consideradas numéricas
-    numeric_cols = [c for c in df_b3_fechamento.columns if c != "Assets"]
-
-    # 1) Converte tudo pra string nessas colunas
-    df_b3_fechamento[numeric_cols] = df_b3_fechamento[numeric_cols].astype(str)
-
-    # 2) Remove pontos de milhar e troca vírgula por ponto
-    df_b3_fechamento[numeric_cols] = (
-        df_b3_fechamento[numeric_cols]
-        .replace(r"\.", "", regex=True)   # tira . das casas de milhar
-        .replace(",", ".", regex=True)    # vírgula -> ponto decimal
-    )
-
-    # 3) Converte para numérico, forçando erros para NaN (ao invés de ValueError)
-    df_b3_fechamento[numeric_cols] = df_b3_fechamento[numeric_cols].apply(
-        pd.to_numeric, errors="coerce"
-    )
-
-    # ------------------------------------------------------------------
-    # Ajustes especiais de escala
-    # ------------------------------------------------------------------
-    mask_treasury = df_b3_fechamento["Assets"] == "TREASURY"
-    mask_wdo1 = df_b3_fechamento["Assets"] == "WDO1"
+    # Converter para Float menos a primeira coluna
+    df_b3_fechamento.iloc[:, 1:] = df_b3_fechamento.iloc[:, 1:].astype(float)
 
     # Multiplicar a linha da treasury por 1000
-    df_b3_fechamento.loc[mask_treasury, numeric_cols] = (
-        df_b3_fechamento.loc[mask_treasury, numeric_cols] * 1000
-    )
-
-    # Multiplicar a linha do WDO1 por 10
-    df_b3_fechamento.loc[mask_wdo1, numeric_cols] = (
-        df_b3_fechamento.loc[mask_wdo1, numeric_cols] * 10
-    )
+    df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns !=
+                         'Assets'] = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns != 'Assets'] * 1000
+    df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', df_b3_fechamento.columns !=
+                         'Assets'] = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', df_b3_fechamento.columns != 'Assets'] * 10
 
     return df_b3_fechamento
 
@@ -634,6 +604,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
 
             if qtd_total != 0:
                 # Média ponderada de Preço de Compra:
+                # (soma de [Quantidade_i * PreçoCompra_i]) / soma(Quantidade_i)
                 preco_medio_compra = (
                     (subdf['Quantidade'] * subdf['Preço de Compra']).sum()
                     / qtd_total
@@ -644,34 +615,27 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
             # Preço de Ajuste Atual mais recente (a linha final depois de sort)
             preco_ajuste_atual = subdf.iloc[-1]['Preço de Ajuste Atual']
 
-            # ------------------------------------------------------------------
-            # Caso 1: DAP
-            # ------------------------------------------------------------------
+            # Rendimento recalculado:
+            # (Preço Ajuste Atual - Preço Compra Médio) * Quantidade total
+            # Rendimento por ativo DAP
             if 'DAP' in subdf['Ativo'].iloc[0]:
-                df_ajuste = pd.read_parquet('Dados/df_valor_ajuste_contrato.parquet')
-
-                # Se a última coluna é igual à penúltima, remove a última (cópia)
-                if df_ajuste.shape[1] > 2 and df_ajuste.iloc[:, -1].equals(df_ajuste.iloc[:, -2]):
+                df_ajuste = pd.read_parquet(
+                    'Dados/df_valor_ajuste_contrato.parquet')
+                # Ver se a ultima coluna é igual a penultima
+                if df_ajuste.iloc[:, -1].equals(df_ajuste.iloc[:, -2]):
                     df_ajuste = df_ajuste.iloc[:, :-1]
-
-                # Corrigir formatação das colunas de datas
+                # Corrigir formatação
                 colunas_datas = df_ajuste.columns[1:]
-                df_ajuste[colunas_datas] = (
-                    df_ajuste[colunas_datas]
-                    .astype(str)                         # garante string
-                    .replace(r'\.', '', regex=True)      # tira ponto de milhar
-                    .replace(',', '.', regex=True)       # vírgula -> ponto decimal
-                )
-                df_ajuste[colunas_datas] = df_ajuste[colunas_datas].apply(
-                    pd.to_numeric, errors='coerce'       # '' e lixo -> NaN
-                )
+                df_ajuste[colunas_datas] = df_ajuste[colunas_datas].replace(
+                    '\.', '', regex=True).replace(',', '.', regex=True)
+                df_ajuste[colunas_datas] = df_ajuste[colunas_datas].astype(
+                    float)
 
                 # Converter nomes de colunas (datas) para datetime
-                datas_convertidas = pd.to_datetime(colunas_datas, errors='coerce')
-                colunas_datas_validas = [
-                    col for col, data in zip(df_ajuste.columns[1:], datas_convertidas)
-                    if pd.notnull(data)
-                ]
+                datas_convertidas = pd.to_datetime(
+                    colunas_datas, errors='coerce')
+                colunas_datas_validas = [col for col, data in zip(
+                    df_ajuste.columns[1:], datas_convertidas) if pd.notnull(data)]
 
                 # Garantir que vamos usar apenas datas válidas
                 df_ajuste = df_ajuste[['Assets'] + colunas_datas_validas]
@@ -680,53 +644,50 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                 ativo = subdf['Ativo'].iloc[0]
 
                 # DataFrame de ajustes do ativo
-                linha_ajuste = df_ajuste[df_ajuste['Assets'] == ativo].drop(columns='Assets')
+                linha_ajuste = df_ajuste[df_ajuste['Assets'] == ativo].drop(
+                    columns='Assets')
 
                 # Converter colunas novamente para datetime para indexar
-                datas_ajuste = pd.to_datetime(linha_ajuste.columns) if not linha_ajuste.empty else pd.to_datetime([])
+                datas_ajuste = pd.to_datetime(linha_ajuste.columns)
 
+                # Agora iterar sobre cada linha de compra do subdf
                 rendimentos = []
                 for _, row in subdf.iterrows():
                     dia_compra = pd.to_datetime(row['Dia de Compra'])
                     quantidade = row['Quantidade']
 
-                    # Filtrar colunas de datas > data de compra
+                    # Filtrar colunas de datas iguais ou posteriores à data de compra
                     colunas_uteis = linha_ajuste.columns[datas_ajuste > dia_compra]
-                    if len(colunas_uteis):
-                        rendimento = linha_ajuste[colunas_uteis].sum(axis=1).values[0] * quantidade
-                    else:
-                        rendimento = 0.0
+
+                    # Soma dos valores de ajuste após a data de compra
+                    rendimento = linha_ajuste[colunas_uteis].sum(
+                        axis=1).values[0] * quantidade
                     rendimentos.append(rendimento)
 
+                # Atribuir os rendimentos ao subdf
                 subdf['Rendimento'] = rendimentos
                 rendimento_final = sum(rendimentos)
 
-            # ------------------------------------------------------------------
-            # Caso 2: DI
-            # ------------------------------------------------------------------
             elif 'DI' in subdf['Ativo'].iloc[0]:
                 df_ajuste = pd.read_parquet('Dados/df_valor_ajuste_contrato.parquet')
 
                 # Se a última coluna é igual à penúltima, remove a última (cópia)
-                if df_ajuste.shape[1] > 2 and df_ajuste.iloc[:, -1].equals(df_ajuste.iloc[:, -2]):
+                if df_ajuste.iloc[:, -1].equals(df_ajuste.iloc[:, -2]):
                     df_ajuste = df_ajuste.iloc[:, :-1]
 
+                # Corrigir formatação
                 colunas_datas = df_ajuste.columns[1:]
                 df_ajuste[colunas_datas] = (
                     df_ajuste[colunas_datas]
-                    .astype(str)
-                    .replace(r'\.', '', regex=True)
+                    .replace('\.', '', regex=True)
                     .replace(',', '.', regex=True)
-                )
-                df_ajuste[colunas_datas] = df_ajuste[colunas_datas].apply(
-                    pd.to_numeric, errors='coerce'
+                    .astype(float)
                 )
 
                 # Converter nomes de colunas (datas) para datetime e manter apenas válidas
                 datas_convertidas = pd.to_datetime(colunas_datas, errors='coerce')
                 colunas_datas_validas = [
-                    col for col, data in zip(df_ajuste.columns[1:], datas_convertidas)
-                    if pd.notnull(data)
+                    col for col, data in zip(df_ajuste.columns[1:], datas_convertidas) if pd.notnull(data)
                 ]
                 df_ajuste = df_ajuste[['Assets'] + colunas_datas_validas]
 
@@ -735,6 +696,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                 linha_ajuste = df_ajuste[df_ajuste['Assets'] == ativo].drop(columns='Assets')
                 datas_ajuste = pd.to_datetime(linha_ajuste.columns) if not linha_ajuste.empty else pd.to_datetime([])
 
+                # Itera cada compra
                 rendimentos = []
                 for _, row in subdf.iterrows():
                     dia_compra  = pd.to_datetime(row['Dia de Compra'])
@@ -748,22 +710,16 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                         soma_ajustes_unit = 0.0
                     else:
                         colunas_uteis = linha_ajuste.columns[datas_ajuste > dia_compra]  # estritamente > D0
-                        soma_ajustes_unit = (
-                            linha_ajuste[colunas_uteis].sum(axis=1).values[0]
-                            if len(colunas_uteis) else 0.0
-                        )
+                        soma_ajustes_unit = linha_ajuste[colunas_uteis].sum(axis=1).values[0] if len(colunas_uteis) else 0.0
 
                     rendimento = (pnl_d0_unit + soma_ajustes_unit) * quantidade
                     rendimentos.append(rendimento)
 
                 subdf['Rendimento'] = rendimentos
                 rendimento_final = sum(rendimentos)
-
-            # ------------------------------------------------------------------
-            # Caso geral (não DAP/DI)
-            # ------------------------------------------------------------------
             else:
-                rendimento_final = (preco_ajuste_atual - preco_medio_compra) * qtd_total
+                rendimento_final = (preco_ajuste_atual -
+                                    preco_medio_compra) * qtd_total
 
             return pd.Series({
                 'Quantidade': qtd_total,

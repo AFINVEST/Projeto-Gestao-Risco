@@ -9292,7 +9292,12 @@ def main_page():
                 dict_pesos["GLOBAL BONDS"] = 0.0
                 fundos_zero_auto.append("GLOBAL BONDS")
             #st.sidebar.info("Detectado CSV apenas com DAP → zerado: GLOBAL BONDS.")
-
+    
+    for f in ("AF DEB INCENTIVADAS", "GLOBAL BONDS"):
+        if f in dict_pesos:
+            dict_pesos[f] = 0.0
+            fundos_zero_auto.append(f)
+            
     # ===========================================
     # 3) Ajuste manual de pesos (mostra zeros)
     #    Os fundos zerados automaticamente já aparecem pré-selecionados

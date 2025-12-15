@@ -6226,6 +6226,17 @@ def build_history_normalized(
     rows, idxs = [], []
     for d in dates:
         date_val = int(pd.Timestamp(d).value)
+        #if d >= pd.Timestamp("2025-12-01"):
+        #    res = calc_contribs_for_date_cached(
+        #    date_val=date_val,
+        #    window=window,
+        #    alpha=alpha,
+        #    bundle_signature=b["signature"],
+        #    return_dv01=(kind == "dv01"),
+        #    return_covar=(kind == "covar"),
+        #    debug=True
+        #)
+        #else:
         res = calc_contribs_for_date_cached(
             date_val=date_val,
             window=window,
@@ -6240,6 +6251,7 @@ def build_history_normalized(
             norm = _normalize_topN_signed(
                 series_map, top_n=top_n, covar_tot_rs=covar_tot_rs
             )
+
         else:
             series_map = res["covar_R$"]  # dict {ativo: covar_R$}
 
@@ -6352,7 +6364,7 @@ def calc_contribs_for_date_cached(
         pesos_d = pd.Series(0.0, index=cols)
     else:
         # aqui você está usando gross (exposição bruta), igual na versão anterior
-        pesos_d = (mv_d / gross_mv).astype(float)
+        pesos_d = (mv_d / mv_total_d).astype(float)
 
     if debug:
         st.write("---- Bloco MV/pesos (calc_contribs) ----")
@@ -6402,7 +6414,8 @@ def calc_contribs_for_date_cached(
             var_port = abs(np.quantile(port_ret.values, alpha))
 
             # 5) CoVaR em R$ por ativo (apenas ativos com posição)
-            covar_R = (beta * var_port * mv_d).astype(float)
+            covar_R = (beta * var_port * mv_total_d).astype(float)
+
             # Multiplicar pelo peso MV do ativo no portfólio
             covar_R = covar_R.reindex(cols).fillna(0.0)
             covar_R = (covar_R * pesos_d).astype(float)
@@ -6419,6 +6432,7 @@ def calc_contribs_for_date_cached(
                 st.write("var_port (quantile):", var_port)
                 st.write("beta (calc_contribs, apenas ativos com posição):", beta)
                 st.write("covar_R (calc_contribs, apenas ativos com posição):", covar_R)
+                
 
     if debug:
         st.write("=== Fim DEBUG calc_contribs_for_date_cached ===")
@@ -8984,11 +8998,12 @@ def simulate_nav_cota() -> None:
                 #b = st.session_state.get("_risk_bundle")
                 #st.write(b['positions_ts'])
                 #Colocar o df_hist_cv absoluto
-                df_hist_cv_positive = df_hist_cv.abs()
+                df_hist_cv_positive = df_hist_cv
                 existing_cols = [col for col in df_hist_cv_positive.columns if col in ativos_para_estrategia]
                 df_hist_cv_filtrado = df_hist_cv_positive[existing_cols]
                 mapper = {col: ativos_para_estrategia[col] for col in existing_cols}
                 df_hist_cv_estrategia = df_hist_cv_filtrado.groupby(by=mapper, axis=1).sum()
+                df_hist_cv_estrategia = df_hist_cv_estrategia.abs()
                 
                 # >>> CÓPIA COM -10% <<<
                 df_hist_cv_estrategia_menos10 = df_hist_cv_estrategia.copy()
@@ -9007,7 +9022,7 @@ def simulate_nav_cota() -> None:
                     title=" "
                 )
                 fig_area2.update_layout(margin=dict(l=10, r=10, t=10, b=10), legend_title_text="")
-                fig_area2.update_yaxes(range=[-0.8,0.8], tickformat=".0%", title="Proporção de CoVaR")
+                fig_area2.update_yaxes(range=[0.0,1], tickformat=".0%", title="Proporção de CoVaR")
                 fig_area2.update_traces(
                     hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>"
                 )

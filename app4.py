@@ -8995,15 +8995,16 @@ def simulate_nav_cota() -> None:
                 st.caption("CoVaR por estratégia — área empilhada")
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
                 #st.write(df_hist_cv)
-                #b = st.session_state.get("_risk_bundle")
-                #st.write(b['positions_ts'])
+                b = st.session_state.get("_risk_bundle")
+                st.write(b['positions_ts'])
+                st.write(df_hist_cv)
                 #Colocar o df_hist_cv absoluto
                 df_hist_cv_positive = df_hist_cv
                 existing_cols = [col for col in df_hist_cv_positive.columns if col in ativos_para_estrategia]
                 df_hist_cv_filtrado = df_hist_cv_positive[existing_cols]
                 mapper = {col: ativos_para_estrategia[col] for col in existing_cols}
                 df_hist_cv_estrategia = df_hist_cv_filtrado.groupby(by=mapper, axis=1).sum()
-                df_hist_cv_estrategia = df_hist_cv_estrategia.abs()
+                df_hist_cv_estrategia = df_hist_cv_estrategia
                 
                 # >>> CÓPIA COM -10% <<<
                 df_hist_cv_estrategia_menos10 = df_hist_cv_estrategia.copy()
@@ -9022,7 +9023,7 @@ def simulate_nav_cota() -> None:
                     title=" "
                 )
                 fig_area2.update_layout(margin=dict(l=10, r=10, t=10, b=10), legend_title_text="")
-                fig_area2.update_yaxes(range=[0.0,1], tickformat=".0%", title="Proporção de CoVaR")
+                fig_area2.update_yaxes(range=[-1,1], tickformat=".0%", title="Proporção de CoVaR")
                 fig_area2.update_traces(
                     hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>"
                 )

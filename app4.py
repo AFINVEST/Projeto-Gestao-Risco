@@ -8996,21 +8996,19 @@ def simulate_nav_cota() -> None:
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
                 #st.write(df_hist_cv)
                 b = st.session_state.get("_risk_bundle")
-                st.write(b['positions_ts'])
-                st.write(df_hist_cv)
+                #st.write(b['positions_ts'])
+                #st.write(df_hist_cv)
                 #Colocar o df_hist_cv absoluto
                 df_hist_cv_positive = df_hist_cv
+                #Tirar as datas 2025-11-11 00:00:00 e 2025-11-12 00:00:00
+                df_hist_cv_positive = df_hist_cv_positive.drop(pd.to_datetime(['2025-11-11', '2025-11-12']), axis=0)
+                
                 existing_cols = [col for col in df_hist_cv_positive.columns if col in ativos_para_estrategia]
                 df_hist_cv_filtrado = df_hist_cv_positive[existing_cols]
                 mapper = {col: ativos_para_estrategia[col] for col in existing_cols}
                 df_hist_cv_estrategia = df_hist_cv_filtrado.groupby(by=mapper, axis=1).sum()
-                df_hist_cv_estrategia = df_hist_cv_estrategia
-                
-                # >>> CÓPIA COM -10% <<<
-                df_hist_cv_estrategia_menos10 = df_hist_cv_estrategia.copy()
 
-                # Se quiser usar a versão com -10% no gráfico, use essa:
-                df_hist_cv_normalized = df_hist_cv_estrategia_menos10
+                df_hist_cv_normalized = df_hist_cv_estrategia.copy()
                 # Se quiser manter o original, deixe assim:
                 #df_hist_cv_normalized = df_hist_cv_estrategia
 
@@ -9028,7 +9026,7 @@ def simulate_nav_cota() -> None:
                     hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>"
                 )
                 st.plotly_chart(fig_area2, use_container_width=True)
-                st.caption("Distribuição do CoVaR por estratégia ao longo do tempo ( Em valores absolutos**).")
+                st.caption("Distribuição do CoVaR por estratégia ao longo do tempo.")
 
         st.subheader("Volatilidade histórica por ativo")
         st.plotly_chart(fig_vol_assets, use_container_width=True)

@@ -18,7 +18,6 @@ from plotnine import (
 # ── depois dos imports pandas/streamlit ────────────────────
 import functools, os, datetime as dt
 
-
 # ==========================================================
 #               FUNÇÕES AUXILIARES (MESMAS)
 # ==========================================================
@@ -8915,6 +8914,7 @@ def simulate_nav_cota() -> None:
         # ========================== Histórico empilhado (NOVO) ==========================
         with COL2:
             st.subheader("Histórico de DV01 & CoVaR")
+
         opt_freq = "Diária"
         weekly = (opt_freq == "Semanal")
 

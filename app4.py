@@ -8996,8 +8996,8 @@ def simulate_nav_cota() -> None:
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
                 #st.write(df_hist_cv)
                 b = st.session_state.get("_risk_bundle")
-                st.write(b['positions_ts'])
-                st.write(df_hist_cv)
+                #st.write(b['positions_ts'])
+                #st.write(df_hist_cv)
                 #Colocar o df_hist_cv absoluto
                 df_hist_cv_positive = df_hist_cv
                 #Tirar as datas 2025-11-11 00:00:00 e 2025-11-12 00:00:00
@@ -9027,6 +9027,65 @@ def simulate_nav_cota() -> None:
                 )
                 st.plotly_chart(fig_area2, use_container_width=True)
                 st.caption("Distribuição do CoVaR por estratégia ao longo do tempo.")
+
+                st.caption("CoVaR por estratégia — área empilhada (direção ancorada, magnitude preservada)")
+
+                # 0) Base
+                df_base = df_hist_cv.copy()
+
+                # 1) Remover datas específicas
+                drop_dates = pd.to_datetime(['2025-11-11', '2025-11-12'])
+                df_base = df_base.drop(drop_dates, axis=0, errors="ignore")
+
+                # 2) Filtrar colunas e agrupar por estratégia
+                existing_cols = [c for c in df_base.columns if c in ativos_para_estrategia]
+                df_filtrado = df_base[existing_cols]
+
+                mapper = {c: ativos_para_estrategia[c] for c in existing_cols}
+                df_cv_estrategia = df_filtrado.groupby(by=mapper, axis=1).sum()
+
+                # =========================
+                # 3) Definir DIREÇÃO-ÂNCORA (por dia)
+                # =========================
+                df_dir = df_cv_estrategia.fillna(0.0)
+
+                pos = df_dir.clip(lower=0).sum(axis=1)
+                neg = (-df_dir.clip(upper=0)).sum(axis=1)
+
+                anchor_sign = np.where(pos >= neg, 1.0, -1.0)
+                anchor_sign = pd.Series(anchor_sign, index=df_dir.index)
+                anchor_sign = anchor_sign.replace(0, np.nan).ffill().fillna(1.0)
+
+                # =========================
+                # 4) ANCORAR SEM NORMALIZAR
+                # =========================
+                df_anchored = df_dir.mul(anchor_sign, axis=0)
+
+                # =========================
+                # 5) Plot — MAGNITUDE ABSOLUTA
+                # =========================
+                fig_area2 = px.area(
+                    df_anchored,
+                    x=df_anchored.index,
+                    y=df_anchored.columns,
+                    labels={'value': 'CoVaR (R$)', 'variable': 'Estratégia'},
+                    title=" "
+                )
+
+
+                fig_area2.update_layout(margin=dict(l=10, r=10, t=10, b=10), legend_title_text="")
+                fig_area2.update_yaxes(zeroline=True, range=[0,1], tickformat=".0%", title="Proporção de CoVaR")
+
+                fig_area2.update_traces(
+                    hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>"
+                )
+
+                st.plotly_chart(fig_area2, use_container_width=True)
+
+                st.caption(
+                    "A direção do risco é ancorada diariamente na ponta dominante. "
+                    "Áreas positivas ancoram o risco; áreas negativas representam estratégias redutoras."
+                )
 
         st.subheader("Volatilidade histórica por ativo")
         st.plotly_chart(fig_vol_assets, use_container_width=True)

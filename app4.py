@@ -8995,7 +8995,7 @@ def simulate_nav_cota() -> None:
                 st.caption("CoVaR por estratégia — área empilhada")
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
                 #st.write(df_hist_cv)
-                b = st.session_state.get("_risk_bundle")
+                #b = st.session_state.get("_risk_bundle")
                 #st.write(b['positions_ts'])
                 #st.write(df_hist_cv)
                 #Colocar o df_hist_cv absoluto

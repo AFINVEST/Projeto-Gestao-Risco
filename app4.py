@@ -7573,7 +7573,7 @@ def simulate_nav_cota() -> None:
 
         fig_hist.update_layout(
             margin=dict(l=0, r=0, t=0, b=0),
-            height=28 + 30*len(anos) + 15,
+            height=28 + 60*len(anos) + 15,
             paper_bgcolor="rgba(0,0,0,0)"
         )
         #st.write("## Rentabilidade histórica")
@@ -9020,6 +9020,7 @@ def simulate_nav_cota() -> None:
                     labels={'value': 'Proporção', 'variable': 'Estratégia'},
                     title=" "
                 )
+
                 fig_area2.update_layout(margin=dict(l=10, r=10, t=10, b=10), legend_title_text="")
                 fig_area2.update_yaxes(range=[-1,1], tickformat=".0%", title="Proporção de CoVaR")
                 fig_area2.update_traces(

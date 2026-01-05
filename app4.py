@@ -8992,7 +8992,7 @@ def simulate_nav_cota() -> None:
             st.info("Sem histórico suficiente para CoVaR.")
         else:
             with colll2:
-                st.caption("CoVaR por estratégia — área empilhada")
+                #st.caption("CoVaR por estratégia — área empilhada")
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
                 #st.write(df_hist_cv)
                 #b = st.session_state.get("_risk_bundle")
@@ -9025,8 +9025,8 @@ def simulate_nav_cota() -> None:
                 fig_area2.update_traces(
                     hovertemplate="<b>%{fullData.name}</b><br>Share: %{y:.2%}<extra></extra>"
                 )
-                st.plotly_chart(fig_area2, use_container_width=True)
-                st.caption("Distribuição do CoVaR por estratégia ao longo do tempo.")
+                #st.plotly_chart(fig_area2, use_container_width=True)
+                #st.caption("Distribuição do CoVaR por estratégia ao longo do tempo.")
 
                 st.caption("CoVaR por estratégia — área empilhada (direção ancorada, magnitude preservada)")
 

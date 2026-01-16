@@ -42,6 +42,9 @@ from urllib3.util.retry import Retry
 PATH_LONG       = "Dados/df_ajustes_b3.parquet"                  # base longa
 PATH_PRECO      = "Dados/df_preco_de_ajuste_atual_completo.parquet"
 PATH_VALOR      = "Dados/df_valor_ajuste_contrato.parquet"
+PATH_JSON       = "Dados/df_preco_de_ajuste_atual_completo.json" # JSON pt-BR (texto)
+PATH_PRECO_CSV  = "Dados/df_preco_de_ajuste_atual_completo.csv"  # CSV pt-BR (texto)
+PATH_VALOR_CSV  = "Dados/df_valor_ajuste_contrato.csv"           # CSV pt-BR (texto)
 PATH_RUN_LOG    = "atualizacao_b3_log.txt"
 
 # Assets a EXCLUIR do output final (parquet/csv/json)
@@ -916,6 +919,18 @@ def main():
     wide_preco = _order(wide_preco)
     wide_valor = _order(wide_valor)
 
+    salvar_wide(wide_preco, PATH_PRECO, PATH_PRECO_CSV, csv_ptbr_text=True)
+    salvar_wide(wide_valor, PATH_VALOR, PATH_VALOR_CSV, csv_ptbr_text=True)
+    _append_log(f"Salvos: {PATH_PRECO} {wide_preco.shape} | {PATH_VALOR} {wide_valor.shape}")
+
+    # 7) JSON pt-BR (texto garantido) — missing vira ""
+    try:
+        json_text = wide_to_ptbr_json_text(wide_preco)
+        with open(PATH_JSON, "w", encoding="utf-8") as f:
+            f.write(json_text)
+        _append_log(f"Salvo JSON pt-BR de preços (texto): {PATH_JSON}")
+    except Exception as e:
+        _append_log(f"[warn] Falha ao gerar JSON pt-BR: {e}")
 
 if __name__ == "__main__":
     main()

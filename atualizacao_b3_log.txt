@@ -1,0 +1,19 @@
+[2026-01-16 15:01:30] [drop-dup] Removendo coluna duplicada 2026-01-15 (cópia de 2026-01-14)
+[2026-01-16 15:01:30] [drop-dup] Removendo coluna duplicada 2026-01-15 (cópia de 2026-01-14)
+[2026-01-16 15:01:30] Atualizando de 2026-01-14 até 2026-01-15 (DU B3: 2)
+[2026-01-16 15:01:31] [HTTP] ConsolidatedTradesDerivatives 2026-01-14 -> status=200 content-length=102873 t=0.64s
+[2026-01-16 15:01:31] [HTTP] md5=24fef3b25fc2e4cd8b6a06626b824aa3 bytes=488789 (ConsolidatedTradesDerivatives 2026-01-14)
+[2026-01-16 15:01:31] 2026-01-14: base longa atualizada; total linhas = 4508.
+[2026-01-16 15:01:31] 2026-01-14: preços/valores atualizados.
+[2026-01-16 15:01:32] [HTTP] ConsolidatedTradesDerivatives 2026-01-15 -> status=200 content-length=102355 t=0.47s
+[2026-01-16 15:01:32] [HTTP] md5=fa4e0406bf5b072e6efb31d542215535 bytes=491390 (ConsolidatedTradesDerivatives 2026-01-15)
+[2026-01-16 15:01:32] 2026-01-15: base longa atualizada; total linhas = 4626.
+[2026-01-16 15:01:32] 2026-01-15: preços/valores atualizados.
+[2026-01-16 15:01:32] [today-check] Coleta EXATA do dia 2026-01-15 (sem backfill).
+[2026-01-16 15:01:33] [HTTP] ConsolidatedTradesDerivatives 2026-01-15 -> status=200 content-length=102355 t=0.73s
+[2026-01-16 15:01:33] [HTTP] md5=fa4e0406bf5b072e6efb31d542215535 bytes=491390 (ConsolidatedTradesDerivatives 2026-01-15)
+[2026-01-16 15:01:33] [today-ok] Dados encontrados para 2026-01-15: 118 linhas.
+[2026-01-16 15:01:33] 2026-01-15: base longa atualizada (hoje); total linhas = 4626.
+[2026-01-16 15:01:33] 2026-01-15: preços/valores de HOJE adicionados.
+[2026-01-16 15:01:33] [dup-final] (preço) Duplicado 2026-01-15 -> 2026-01-16
+[2026-01-16 15:01:33] [dup-final] (valor) Duplicado 2026-01-15 -> 2026-01-16

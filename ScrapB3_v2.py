@@ -2,31 +2,31 @@
 """
 Pipeline B3 (BDI) — via ConsolidatedTradesDerivatives
 - Baixa UM endpoint: ConsolidatedTradesDerivatives
+- Filtra DI1 / DAP / WDO (e DOL como fallback) e T10 (Treasury) e transforma em:
+    * wide_preco: "Preço de Ajuste Atual" (coluna "Ajuste")
+    * wide_valor: "Variação em pontos" (coluna "Variação")
+      - EXCEÇÃO DAP: usa "Valor do ajuste por contrato (R$)" (cash) no lugar de IPCA
 - Backfill (se o dia vier vazio)
-- Exporta SOMENTE PARQUET (nada de CSV/JSON)
+- Exporta parquet + CSV (pt-BR em texto) + JSON (pt-BR em texto)
 - Remove do output final: DI_25, DAP_25, DAP25, DI25
 - Substitui "" / "-" por missing (pd.NA) no processamento e no parquet
 - TREASURY: pega sempre o contrato "mais próximo" (>= mês de referência), como o WDO
-
-NOVO LAYOUT DE DIRETÓRIO:
-- Todos os parquets ficam em ./Dados (pasta "Dados" no mesmo nível do .py)
-
-FIX (2026-01-13 bug):
-- Garante que WIDE (preço/valor) fique NUMÉRICO antes do to_parquet
-- Converte strings pt-BR tipo "100.000,00" -> 100000.00
 """
 
 from __future__ import annotations
 
+import csv
 import datetime as dt
 import hashlib
 import io
+import json
 import os
 import re
 import time
 import unicodedata
 from copy import deepcopy
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pandas as pd
 import requests
@@ -35,27 +35,22 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 
-# ============================================================
-# Diretórios / Paths (NOVO)
-# ============================================================
+# ==========================
+# Arquivos (bases)
+# ==========================
 
-BASE_DIR = Path(__file__).resolve().parent
-DADOS_DIR = BASE_DIR / "Dados"
-DADOS_DIR.mkdir(parents=True, exist_ok=True)
+PATH_LONG       = "Dados/df_ajustes_b3.parquet"                  # base longa
+PATH_PRECO      = "Dados/df_preco_de_ajuste_atual_completo.parquet"
+PATH_VALOR      = "Dados/df_valor_ajuste_contrato.parquet"
+PATH_RUN_LOG    = "atualizacao_b3_log.txt"
 
-PATH_LONG  = str(DADOS_DIR / "df_ajustes_b3.parquet")  # base longa
-PATH_PRECO = str(DADOS_DIR / "df_preco_de_ajuste_atual_completo.parquet")
-PATH_VALOR = str(DADOS_DIR / "df_valor_ajuste_contrato.parquet")
-
-PATH_RUN_LOG = str(DADOS_DIR / "atualizacao_b3_log.txt")  # log simples (txt)
-
-# Assets a EXCLUIR do output final (parquet)
+# Assets a EXCLUIR do output final (parquet/csv/json)
 ASSETS_EXCLUIR = ["DI_25", "DAP_25", "DAP25", "DI25"]
 
 
-# ============================================================
+# ==========================
 # HTTP — sessão com retries/timeouts
-# ============================================================
+# ==========================
 
 URL = "https://arquivos.b3.com.br/bdi/table/export/csv?lang=pt-BR"
 HEADERS = {
@@ -65,6 +60,7 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
 }
 
+# Nome ÚNICO do endpoint
 B3_NAME = "ConsolidatedTradesDerivatives"
 
 PAYLOAD_BASE = {
@@ -76,20 +72,30 @@ PAYLOAD_BASE = {
 }
 
 HTTP_CONNECT_TIMEOUT = 3.0
-HTTP_READ_TIMEOUT = 20.0
-BACKOFF_LIM = 15  # janela backoff (dias úteis) para backfill
+HTTP_READ_TIMEOUT    = 20.0
+HTTP_TOTAL_BUDGET    = 90.0
 
 RETRY_CFG = Retry(
     total=2,
     backoff_factor=0.6,
     status_forcelist=(500, 502, 503, 504),
-    allowed_methods=frozenset(["POST"]),
+    allowed_methods=frozenset(["POST"])
 )
 
 _session = requests.Session()
 _adapter = HTTPAdapter(max_retries=RETRY_CFG, pool_connections=10, pool_maxsize=10)
 _session.mount("https://", _adapter)
 _session.mount("http://", _adapter)
+
+
+# ==========================
+# Debug / inspeção
+# ==========================
+
+DEBUG_MAX_LINES = 40
+DEBUG_DUMP_DIR  = "debug_b3_csv"  # None para desativar
+BACKOFF_LIM     = 15              # janela backoff (dias ÚTEIS)
+
 
 try:
     from zoneinfo import ZoneInfo
@@ -98,15 +104,8 @@ except Exception:
     _TZ = None
 
 
-# ============================================================
-# Logging
-# ============================================================
-
-def _append_log(msg: str) -> None:
-    ts = (
-        dt.datetime.now(_TZ).strftime("%Y-%m-%d %H:%M:%S")
-        if _TZ else dt.datetime.now().isoformat(sep=" ", timespec="seconds")
-    )
+def _append_log(msg: str):
+    ts = dt.datetime.now(_TZ).strftime("%Y-%m-%d %H:%M:%S") if _TZ else dt.datetime.now().isoformat(sep=" ", timespec="seconds")
     line = f"[{ts}] {msg}"
     print(line)
     try:
@@ -116,23 +115,45 @@ def _append_log(msg: str) -> None:
         pass
 
 
-# ============================================================
-# Helpers de parsing / missing / NUMERICALIZE (FIX)
-# ============================================================
+def _ensure_debug_dir():
+    if DEBUG_DUMP_DIR:
+        Path(DEBUG_DUMP_DIR).mkdir(parents=True, exist_ok=True)
+
+
+def _dump_csv(data: dt.date, raw_bytes: bytes):
+    if not DEBUG_DUMP_DIR:
+        return
+    _ensure_debug_dir()
+    fn = Path(DEBUG_DUMP_DIR) / f"{B3_NAME}_{data.strftime('%Y-%m-%d')}.csv"
+    try:
+        fn.write_bytes(raw_bytes)
+        print(f"    [dump] CSV bruto salvo em: {fn}")
+    except Exception as e:
+        print(f"    [dump:fail] {e}")
+
+
+def _print_snippet(tag: str, text: str, max_lines: int = DEBUG_MAX_LINES):
+    lines = (text or "").splitlines()
+    header = f"----[ {tag} | primeiras {min(len(lines), max_lines)} de {len(lines)} linhas ]----"
+    print(header)
+    for ln in lines[:max_lines]:
+        print(ln)
+    print("-" * len(header))
+
+
+# ==========================
+# Helpers de parsing / missing
+# ==========================
 
 def _strip_accents(s: str) -> str:
     if not isinstance(s, str):
         s = str(s)
-    return "".join(
-        ch for ch in unicodedata.normalize("NFD", s)
-        if unicodedata.category(ch) != "Mn"
-    )
+    return ''.join(ch for ch in unicodedata.normalize('NFD', s) if unicodedata.category(ch) != 'Mn')
 
 
 def _normalize_missing_values_df(df: pd.DataFrame) -> pd.DataFrame:
     """
     Troca strings vazias/whitespace/"-" por pd.NA.
-    (mantém números intactos)
     """
     if df is None or df.empty:
         return df
@@ -145,12 +166,9 @@ def _normalize_missing_values_df(df: pd.DataFrame) -> pd.DataFrame:
 def ptbr_to_float(s):
     """
     Converte string pt-BR para float.
-    Exemplos:
-      "100.000,00" -> 100000.0
-      "13,20"      -> 13.2
     Retorna None para "", "-", None, NaN etc.
     """
-    if s is None or (isinstance(s, float) and pd.isna(s)):
+    if s is None:
         return None
     if isinstance(s, (int, float)):
         return float(s)
@@ -170,78 +188,65 @@ def ptbr_to_float(s):
         return None
 
 
-def _ptbr_series_to_float(s: pd.Series) -> pd.Series:
-    """
-    Vetorizado e seguro:
-    - Se já é numérico: retorna como float
-    - Se é object/string: converte pt-BR (milhar '.' / decimal ',')
-    - Mantém NA como NA
-    """
-    if s is None:
-        return s
-    if pd.api.types.is_numeric_dtype(s):
-        return s.astype("float64")
-
-    # strings/objects
-    x = s.astype("string")
-    x = x.str.strip()
-    x = x.replace({"": pd.NA, "-": pd.NA, "–": pd.NA, "—": pd.NA, "nan": pd.NA, "NaN": pd.NA, "None": pd.NA, "null": pd.NA, "NULL": pd.NA})
-
-    # remove qualquer coisa que não seja dígito/sinal/ponto/vírgula
-    x = x.str.replace(r"[^0-9\-,\.]", "", regex=True)
-
-    # remove milhar e ajusta decimal
-    x = x.str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
-
-    return pd.to_numeric(x, errors="coerce")
-
-
-def _ensure_wide_numeric(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    FIX PRINCIPAL:
-    Garante que TODAS as colunas de datas no wide sejam float64,
-    evitando ArrowInvalid ao salvar Parquet (pyarrow não aceita "100.000,00" como double).
-    """
-    if df is None or df.empty:
-        return df
-
-    df2 = df.copy()
-
-    # tenta identificar colunas que são datas (YYYY-MM-DD etc.)
-    date_cols = []
-    for c in df2.columns:
-        try:
-            pd.to_datetime(c)
-            date_cols.append(c)
-        except Exception:
-            pass
-
-    # se não conseguir identificar (colunas já podem estar como datetime), tenta assim:
-    if not date_cols:
-        try:
-            date_cols = [c for c in df2.columns if pd.api.types.is_datetime64_any_dtype(pd.Index([c]))]
-        except Exception:
-            date_cols = []
-
-    # fallback: se ainda nada, assume que todas as colunas são "valor" (wide puro)
-    if not date_cols:
-        date_cols = list(df2.columns)
-
-    for c in date_cols:
-        df2[c] = _ptbr_series_to_float(df2[c])
-
-    return df2
-
-
 def remover_assets_indesejados(w: pd.DataFrame) -> pd.DataFrame:
     if w is None or w.empty:
         return w
     return w.drop(index=ASSETS_EXCLUIR, errors="ignore")
 
 
-# ============================================================
+def _fmt_ptbr_2dec(x):
+    """
+    98252.84 -> "98.252,84"
+    Missing -> pd.NA
+    """
+    if x is None or pd.isna(x):
+        return pd.NA
+    if isinstance(x, str) and x.strip() == "":
+        return pd.NA
+
+    try:
+        v = float(x)
+    except Exception:
+        s = str(x)
+        return pd.NA if s.strip() == "" else s
+
+    s = f"{v:,.2f}"
+    return s.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def wide_to_ptbr_json_text(wide_df: pd.DataFrame) -> str:
+    if wide_df is None or wide_df.empty:
+        return "[]"
+
+    cols_norm = []
+    for c in wide_df.columns:
+        try:
+            cols_norm.append(pd.to_datetime(c).strftime("%Y-%m-%d"))
+        except Exception:
+            cols_norm.append(str(c))
+
+    df = wide_df.copy()
+    df.columns = cols_norm
+    df.index.name = "Assets"
+
+    df_txt = df.copy()
+    for c in df_txt.columns:
+        df_txt[c] = df_txt[c].map(_fmt_ptbr_2dec)
+
+    records = []
+    for asset, row in df_txt.iterrows():
+        rec = {"Assets": str(asset)}
+        for col in df_txt.columns:
+            val = row[col]
+            rec[str(col)] = "" if (val is None or pd.isna(val)) else str(val)
+        records.append(rec)
+
+    return json.dumps(records, ensure_ascii=False)
+
+
+# ==========================
 # Payload / download do CSV
-# ============================================================
+# ==========================
 
 def montar_payload(data: dt.date) -> dict:
     p = deepcopy(PAYLOAD_BASE)
@@ -268,9 +273,11 @@ def baixar_csv_b3(data: dt.date) -> str:
     if not r.content:
         raise RuntimeError(f"{data}: CSV vazio")
 
+    _dump_csv(data, r.content)
     md5 = hashlib.md5(r.content).hexdigest()
     _append_log(f"[HTTP] md5={md5} bytes={len(r.content)} ({B3_NAME} {data})")
 
+    # decode
     txt = None
     for enc in ("utf-8-sig", "utf-8", "latin-1"):
         try:
@@ -281,12 +288,13 @@ def baixar_csv_b3(data: dt.date) -> str:
     if txt is None:
         txt = r.content.decode("utf-8", errors="replace")
 
+    _print_snippet(f"RAW {B3_NAME} {data}", txt)
     return txt
 
 
-# ============================================================
+# ==========================
 # Mapeamento de ativos
-# ============================================================
+# ==========================
 
 MONTH_CODE = {
     "F": 1, "G": 2, "H": 3, "J": 4, "K": 5, "M": 6,
@@ -358,13 +366,25 @@ def mapear_asset(name: str, venc: str) -> str | None:
     return None
 
 
-# ============================================================
+# ==========================
 # Parsing do ConsolidatedTradesDerivatives
-# ============================================================
+# ==========================
 
 def parse_consolidated_trades(csv_text: str, data_ref: dt.date) -> pd.DataFrame:
     """
     Lê o CSV do ConsolidatedTradesDerivatives e devolve DF “long” já enxuto.
+
+    Inclui: DI1 / DAP / WDO / DOL / T10 (Treasury)
+
+    Colunas finais:
+      - Instrumento
+      - Vencimento (ex.: F26 / H26 / M26)
+      - Name (DI1Day / IPCACoupon / WDOMiniFuture / BusinessDollar / USTNOTEFuture)
+      - PrecoAjusteAtual (float)  <- coluna "Ajuste"
+      - Pontos (float)            <- coluna "Variação"
+      - ValorAjusteR$ (float)     <- coluna "Valor do ajuste por contrato (R$)"
+      - Data_Referencia (datetime)
+      - ValorIndiceDia (NA)
     """
     df_raw = pd.read_csv(
         io.StringIO(csv_text),
@@ -374,15 +394,12 @@ def parse_consolidated_trades(csv_text: str, data_ref: dt.date) -> pd.DataFrame:
         engine="python",
         on_bad_lines="skip",
     )
-
-    cols_out = [
-        "Instrumento", "Vencimento", "Name",
-        "PrecoAjusteAtual", "Pontos", "ValorAjusteR$",
-        "Data_Referencia", "ValorIndiceDia",
-    ]
-
     if df_raw is None or df_raw.empty:
-        return pd.DataFrame(columns=cols_out)
+        return pd.DataFrame(columns=[
+            "Instrumento","Vencimento","Name",
+            "PrecoAjusteAtual","Pontos","ValorAjusteR$",
+            "Data_Referencia","ValorIndiceDia"
+        ])
 
     df_raw = _normalize_missing_values_df(df_raw)
 
@@ -401,17 +418,27 @@ def parse_consolidated_trades(csv_text: str, data_ref: dt.date) -> pd.DataFrame:
 
     if not all([c_inst, c_ajuste, c_var, c_val_adj]):
         _append_log(f"[parse] Colunas esperadas não encontradas. Vistas: {list(df_raw.columns)}")
-        return pd.DataFrame(columns=cols_out)
+        return pd.DataFrame(columns=[
+            "Instrumento","Vencimento","Name",
+            "PrecoAjusteAtual","Pontos","ValorAjusteR$",
+            "Data_Referencia","ValorIndiceDia"
+        ])
 
     df = df_raw[[c_inst, c_ajuste, c_var, c_val_adj]].copy()
     df.columns = ["Instrumento", "PrecoAjusteAtual", "Pontos", "ValorAjusteR$"]
 
+    # Mantém apenas tickers “curtos” (6 chars) e prefixos relevantes (inclui T10)
     s = df["Instrumento"].astype(str)
     df = df[s.str.len().eq(6) & s.str.match(r"^(DI1|DAP|WDO|DOL|T10)", na=False)].copy()
 
     if df.empty:
-        return pd.DataFrame(columns=cols_out)
+        return pd.DataFrame(columns=[
+            "Instrumento","Vencimento","Name",
+            "PrecoAjusteAtual","Pontos","ValorAjusteR$",
+            "Data_Referencia","ValorIndiceDia"
+        ])
 
+    # Vencimento = parte após o prefixo (3 chars): ex DI1F26 -> F26 / T10H26 -> H26
     df["Vencimento"] = df["Instrumento"].astype(str).str[3:]
 
     def _name_from_inst(x: str) -> str:
@@ -429,7 +456,6 @@ def parse_consolidated_trades(csv_text: str, data_ref: dt.date) -> pd.DataFrame:
 
     df["Name"] = df["Instrumento"].astype(str).map(_name_from_inst)
 
-    # long já nasce numérico (evita lixo virar string)
     df["PrecoAjusteAtual"] = df["PrecoAjusteAtual"].map(ptbr_to_float)
     df["Pontos"] = df["Pontos"].map(ptbr_to_float)
     df["ValorAjusteR$"] = df["ValorAjusteR$"].map(ptbr_to_float)
@@ -437,29 +463,38 @@ def parse_consolidated_trades(csv_text: str, data_ref: dt.date) -> pd.DataFrame:
     df["Data_Referencia"] = pd.to_datetime(data_ref)
     df["ValorIndiceDia"] = pd.NA
 
-    df = df[
-        (pd.notna(df["PrecoAjusteAtual"]))
-        | (pd.notna(df["Pontos"]))
-        | (pd.notna(df["ValorAjusteR$"]))
-    ].copy()
+    df = df[(pd.notna(df["PrecoAjusteAtual"])) | (pd.notna(df["Pontos"])) | (pd.notna(df["ValorAjusteR$"]))].copy()
 
-    return df[cols_out].reset_index(drop=True)
+    return df[[
+        "Instrumento","Vencimento","Name",
+        "PrecoAjusteAtual","Pontos","ValorAjusteR$",
+        "Data_Referencia","ValorIndiceDia"
+    ]].reset_index(drop=True)
 
 
 def selecionar_vertices(df_day: pd.DataFrame, data_ref: dt.date) -> pd.DataFrame:
+    """
+    - DI: mantém só DI1Fyy (Jan) por ano -> DI_yy
+    - DAP: regra par/ímpar (Q/K) -> DAPyy
+    - WDO1: escolhe 1 contrato (prefere WDO, senão DOL) com vencimento mais próximo (>= mês ref)
+    - TREASURY: escolhe 1 contrato T10 com vencimento mais próximo (>= mês ref), igual WDO
+    """
     if df_day is None or df_day.empty:
         return df_day
 
     df = df_day.copy()
 
+    # DI: keep apenas mês "F" (Jan)
     di_mask = df["Name"].eq("DI1Day")
     df = df[~di_mask | df["Vencimento"].astype(str).str.startswith("F", na=False)].copy()
 
+    # Mapeia Asset
     df["Asset"] = [mapear_asset(n, v) for n, v in zip(df["Name"], df["Vencimento"])]
     df = df[df["Asset"].notna()].copy()
 
     ref_month = dt.date(data_ref.year, data_ref.month, 1)
 
+    # Seleção do WDO1
     w = df[df["Asset"].eq("WDO1")].copy()
     if not w.empty:
         w["Prefix"] = w["Instrumento"].astype(str).str[:3]
@@ -476,6 +511,7 @@ def selecionar_vertices(df_day: pd.DataFrame, data_ref: dt.date) -> pd.DataFrame
         best = use.sort_values("MatDate2").head(1)
         df = pd.concat([df[df["Asset"].ne("WDO1")], best], ignore_index=True)
 
+    # Seleção do TREASURY (T10)
     t = df[df["Asset"].eq("TREASURY")].copy()
     if not t.empty:
         t["MatDate"] = t["Vencimento"].map(maturity_date_from_venc)
@@ -489,14 +525,14 @@ def selecionar_vertices(df_day: pd.DataFrame, data_ref: dt.date) -> pd.DataFrame
     return df.reset_index(drop=True)
 
 
-# ============================================================
+# ==========================
 # Base longa
-# ============================================================
+# ==========================
 
 LONG_COLS = [
-    "Instrumento", "Vencimento", "Name",
-    "PrecoAjusteAtual", "Pontos", "ValorAjusteR$",
-    "Data_Referencia", "ValorIndiceDia",
+    "Instrumento","Vencimento","Name",
+    "PrecoAjusteAtual","Pontos","ValorAjusteR$",
+    "Data_Referencia","ValorIndiceDia"
 ]
 
 
@@ -507,17 +543,14 @@ def carregar_base_parquet_long(path_parquet: str) -> pd.DataFrame:
         for c in LONG_COLS:
             if c not in base.columns:
                 base[c] = pd.NA
-        return base[LONG_COLS].copy()
+        base = base[LONG_COLS].copy()
+        return base
     return pd.DataFrame(columns=LONG_COLS)
 
 
-def incrementar_base_ajuste(
-    path_parquet: str,
-    df_novo: pd.DataFrame,
-    chaves=("Data_Referencia", "Name", "Vencimento"),
-) -> pd.DataFrame:
+def incrementar_base_ajuste(path_parquet: str, df_novo: pd.DataFrame,
+                           chaves=("Data_Referencia","Name","Vencimento")) -> pd.DataFrame:
     df_base = carregar_base_parquet_long(path_parquet)
-
     df_novo2 = df_novo.copy()
     for c in LONG_COLS:
         if c not in df_novo2.columns:
@@ -526,14 +559,13 @@ def incrementar_base_ajuste(
 
     df_comb = pd.concat([df_base, df_novo2], ignore_index=True) if not df_base.empty else df_novo2.copy()
     df_comb = df_comb.drop_duplicates(subset=list(chaves), keep="last")
-
     df_comb.to_parquet(path_parquet, index=False)
     return df_comb
 
 
-# ============================================================
+# ==========================
 # Wides (preço e valor)
-# ============================================================
+# ==========================
 
 def b3_calendar():
     return mcal.get_calendar("B3")
@@ -545,6 +577,10 @@ def b3_valid_days(start: dt.date, end: dt.date) -> list[dt.date]:
 
 
 def drop_tail_duplicate(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Se a última coluna for apenas uma cópia da penúltima e representar
+    exatamente o próximo dia útil B3, remove essa coluna.
+    """
     if df is None or df.empty or df.shape[1] < 2:
         return df
 
@@ -585,7 +621,6 @@ def ler_wide(path: str) -> pd.DataFrame:
 
     if "Assets" in df.columns:
         df = df.set_index("Assets")
-
     df.index.name = "Assets"
 
     try:
@@ -598,34 +633,38 @@ def ler_wide(path: str) -> pd.DataFrame:
     df = drop_tail_duplicate(df)
     df = _normalize_missing_values_df(df)
     df = remover_assets_indesejados(df)
-
-    # FIX: garante numérico já na leitura
-    df = _ensure_wide_numeric(df)
-
     return df
 
 
-def salvar_wide_parquet_only(df: pd.DataFrame, path_parquet: str) -> None:
-    """
-    Salva SOMENTE parquet, no formato: coluna "Assets" + colunas de datas.
-    (FIX: força wide numérico antes de salvar)
-    """
+def salvar_wide(df: pd.DataFrame, path_parquet: str, path_csv: str, csv_ptbr_text: bool = True):
     df2 = df.copy()
     df2.index.name = "Assets"
+    base = df2.reset_index().rename(columns={df2.reset_index().columns[0]: "Assets"})
 
-    cols_norm = []
-    for c in df2.columns:
-        try:
-            cols_norm.append(pd.to_datetime(c).strftime("%Y-%m-%d"))
-        except Exception:
-            cols_norm.append(str(c))
-    df2.columns = cols_norm
+    if csv_ptbr_text:
+        out_txt = base.copy()
 
-    # FIX: garante numérico antes do to_parquet (evita ArrowInvalid)
-    df2 = _ensure_wide_numeric(df2)
+        cols_norm = []
+        for c in out_txt.columns:
+            if c == "Assets":
+                cols_norm.append(c)
+            else:
+                try:
+                    cols_norm.append(pd.to_datetime(c).strftime("%Y-%m-%d"))
+                except Exception:
+                    cols_norm.append(str(c))
+        out_txt.columns = cols_norm
 
-    out = df2.reset_index()
-    out.to_parquet(path_parquet, index=False)
+        for c in out_txt.columns:
+            if c == "Assets":
+                continue
+            out_txt[c] = out_txt[c].map(_fmt_ptbr_2dec)
+
+        out_txt.to_parquet(path_parquet, index=False)
+        out_txt.to_csv(path_csv, index=False, encoding="utf-8")
+    else:
+        base.to_parquet(path_parquet, index=False)
+        base.to_csv(path_csv, index=False, encoding="utf-8")
 
 
 def adicionar_coluna_duplicada_final(wp: pd.DataFrame, wv: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -664,11 +703,11 @@ def adicionar_coluna_duplicada_final(wp: pd.DataFrame, wv: pd.DataFrame) -> tupl
         _append_log(f"[dup-final] Coluna {prox_col} já existe em preços e valores → nenhuma duplicação feita.")
         return wp, wv
 
-    if wp is not None and wp.shape[1] > 0 and (not already_p) and (last_col in wp.columns):
+    if wp is not None and wp.shape[1] > 0 and not already_p and last_col in wp.columns:
         wp[prox_col] = wp[last_col]
         _append_log(f"[dup-final] (preço) Duplicado {last_col} -> {prox_col}")
 
-    if wv is not None and wv.shape[1] > 0 and (not already_v) and (last_col in wv.columns):
+    if wv is not None and wv.shape[1] > 0 and not already_v and last_col in wv.columns:
         wv[prox_col] = wv[last_col]
         _append_log(f"[dup-final] (valor) Duplicado {last_col} -> {prox_col}")
 
@@ -676,10 +715,14 @@ def adicionar_coluna_duplicada_final(wp: pd.DataFrame, wv: pd.DataFrame) -> tupl
 
 
 def construir_colunas_wide_duplas(df_long_dia: pd.DataFrame, data_ref: dt.date) -> tuple[pd.Series, pd.Series]:
+    """
+    - s_preco: PrecoAjusteAtual (Ajuste)
+    - s_valor: Pontos (Variação) para DI/WDO/TREASURY
+      - DAP: usa ValorAjusteR$ (Valor do ajuste por contrato (R$))
+    """
     df = selecionar_vertices(df_long_dia, data_ref)
-    col_name = pd.to_datetime(data_ref).strftime("%Y-%m-%d")
-
     if df is None or df.empty:
+        col_name = pd.to_datetime(data_ref).strftime("%Y-%m-%d")
         s_preco = pd.Series(dtype="float64", name=col_name)
         s_valor = pd.Series(dtype="float64", name=col_name)
         return s_preco, s_valor
@@ -701,18 +744,15 @@ def construir_colunas_wide_duplas(df_long_dia: pd.DataFrame, data_ref: dt.date) 
             if pd.notna(v):
                 s_valor.loc[a] = v
 
-    # FIX: garante que séries sejam float64
-    s_preco = pd.to_numeric(s_preco, errors="coerce").astype("float64")
-    s_valor = pd.to_numeric(s_valor, errors="coerce").astype("float64")
-
+    col_name = pd.to_datetime(data_ref).strftime("%Y-%m-%d")
     s_preco.name = col_name
     s_valor.name = col_name
     return s_preco, s_valor
 
 
-# ============================================================
+# ==========================
 # Fetch com backoff (histórico) + “hoje” exato
-# ============================================================
+# ==========================
 
 def buscar_dia_com_backoff(target_d: dt.date) -> pd.DataFrame:
     validos_back = b3_valid_days(target_d - dt.timedelta(days=60), target_d)[::-1]
@@ -755,9 +795,9 @@ def buscar_dia_EXATO_sem_backfill(target_d: dt.date) -> pd.DataFrame:
     return pd.DataFrame(columns=LONG_COLS)
 
 
-# ============================================================
+# ==========================
 # Calendário / range
-# ============================================================
+# ==========================
 
 def ultimo_dia_util_ANTES_de_hoje() -> dt.date:
     today = dt.date.today()
@@ -765,23 +805,16 @@ def ultimo_dia_util_ANTES_de_hoje() -> dt.date:
     return v[-1].date()
 
 
-# ============================================================
+# ==========================
 # Pipeline principal
-# ============================================================
+# ==========================
 
 def main():
-    _append_log(f"[BOOT] BASE_DIR={BASE_DIR}")
-    _append_log(f"[BOOT] DADOS_DIR={DADOS_DIR}")
-
     wide_preco = ler_wide(PATH_PRECO)
     wide_valor = ler_wide(PATH_VALOR)
 
     wide_preco = remover_assets_indesejados(_normalize_missing_values_df(wide_preco))
     wide_valor = remover_assets_indesejados(_normalize_missing_values_df(wide_valor))
-
-    # FIX: garante que wide lido já esteja numérico
-    wide_preco = _ensure_wide_numeric(wide_preco)
-    wide_valor = _ensure_wide_numeric(wide_valor)
 
     def _last_col_date(df):
         if df is None or df.empty or len(df.columns) == 0:
@@ -832,10 +865,6 @@ def main():
         wide_preco = remover_assets_indesejados(_normalize_missing_values_df(wide_preco))
         wide_valor = remover_assets_indesejados(_normalize_missing_values_df(wide_valor))
 
-        # FIX: a cada loop, garante wide numérico (mata "100.000,00" antes de acumular)
-        wide_preco = _ensure_wide_numeric(wide_preco)
-        wide_valor = _ensure_wide_numeric(wide_valor)
-
         _append_log(f"{dref}: preços/valores atualizados.")
 
     # 3) tentar “hoje” (mantive sua lógica: pega ontem)
@@ -857,10 +886,6 @@ def main():
 
             wide_preco = remover_assets_indesejados(_normalize_missing_values_df(wide_preco))
             wide_valor = remover_assets_indesejados(_normalize_missing_values_df(wide_valor))
-
-            # FIX: garante wide numérico pós-hoje
-            wide_preco = _ensure_wide_numeric(wide_preco)
-            wide_valor = _ensure_wide_numeric(wide_valor)
 
             _append_log(f"{today}: preços/valores de HOJE adicionados.")
         else:
@@ -888,20 +913,8 @@ def main():
     wide_preco = remover_assets_indesejados(_normalize_missing_values_df(wide_preco))
     wide_valor = remover_assets_indesejados(_normalize_missing_values_df(wide_valor))
 
-    # FIX FINAL: garante wide numérico antes de salvar
-    wide_preco = _ensure_wide_numeric(wide_preco)
-    wide_valor = _ensure_wide_numeric(wide_valor)
-
     wide_preco = _order(wide_preco)
     wide_valor = _order(wide_valor)
-
-    # 7) salva SOMENTE PARQUET (overwrite)
-    salvar_wide_parquet_only(wide_preco, PATH_PRECO)
-    salvar_wide_parquet_only(wide_valor, PATH_VALOR)
-
-    _append_log(f"[SAVE] {PATH_PRECO} shape={wide_preco.shape}")
-    _append_log(f"[SAVE] {PATH_VALOR} shape={wide_valor.shape}")
-    _append_log("[DONE] atualização concluída.")
 
 
 if __name__ == "__main__":

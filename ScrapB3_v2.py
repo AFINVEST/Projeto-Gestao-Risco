@@ -50,7 +50,6 @@ PATH_RUN_LOG    = "atualizacao_b3_log.txt"
 # Assets a EXCLUIR do output final (parquet/csv/json)
 ASSETS_EXCLUIR = ["DI_25", "DAP_25", "DAP25", "DI25"]
 
-
 # ==========================
 # HTTP — sessão com retries/timeouts
 # ==========================

@@ -5361,8 +5361,10 @@ def analisar_dados_fundos2(
         #Se o fundo for Total skipa
         if fundo.upper() == "TOTAL":
             continue
+
         if 'Ativo' in df_f.columns:
             df_f = df_f.set_index('Ativo')
+            
         elif df_f.index.name is None:
             df_f.index.name = 'Ativo'
 

@@ -261,38 +261,62 @@ def calculate_portfolio_values(df_precos, df_pl_processado, var_bps):
 
 def processar_b3_portifolio():
     """
-    Exemplo de função que carrega dois dataframes de parquet:
-     - Dados/df_preco_de_ajuste_atual_completo.parquet : preços de fechamento (colunas de datas)
-     - df_variacao.parquet : variação diária dos ativos (colunas de datas)
+    Carrega o parquet de preços (wide: Assets + colunas de datas) e:
+    - limpa strings vazias e placeholders
+    - remove separador de milhar e troca vírgula por ponto
+    - converte colunas de datas para float (coerce)
+    - forward-fill horizontal SOMENTE nas colunas de datas
+    - remove DAP25
+    - ajusta escala TREASURY e WDO1
     """
-    df_b3_fechamento = pd.read_parquet(
-        "Dados/df_preco_de_ajuste_atual_completo.parquet")
-    # df_b3_fechamento possui colunas: ['Ativo', '17/01/2025', '18/01/2025', ...]
+    df = pd.read_parquet("Dados/df_preco_de_ajuste_atual_completo.parquet")
 
-    # df_b3_variacao possui colunas: ['Ativo', '17/01/2025', '18/01/2025', ...]
-    # Tirar o pontos das casas de milhar
-    #Percorrer as linhas e o que for ''' ou "" ou " " ou ' ' substituir por NaN
-    df_b3_fechamento = df_b3_fechamento.replace(r"^\s*$", float("NaN"), regex=True)
-    #Fazer um foward fill para preencher os NaN
-    df_b3_fechamento = df_b3_fechamento.fillna(method='ffill', axis=1)
-    #Dropar a linha que estiver asset = "DAP25"
-    df_b3_fechamento = df_b3_fechamento[df_b3_fechamento['Assets'] != 'DAP25'] 
+    # Garantia de nome da coluna chave
+    if "Assets" not in df.columns:
+        # fallback caso venha como "Ativo" por algum motivo
+        if "Ativo" in df.columns:
+            df = df.rename(columns={"Ativo": "Assets"})
+        else:
+            raise KeyError("Não encontrei coluna 'Assets' (nem 'Ativo') no parquet.")
 
-    df_b3_fechamento = df_b3_fechamento.replace('\.', '', regex=True)
+    # Colunas numéricas (todas exceto Assets)
+    val_cols = [c for c in df.columns if c != "Assets"]
 
-    # Trocar Virgula por Ponto
-    df_b3_fechamento = df_b3_fechamento.replace(',', '.', regex=True)
+    # 1) Normalizar vazios / placeholders somente nas colunas de valores
+    df[val_cols] = df[val_cols].replace(
+        to_replace=[r"^\s*$", "", " ", "  ", "-", "—", "None", "nan", "NaN"],
+        value=np.nan,
+        regex=True
+    )
 
-    # Converter para Float menos a primeira coluna
-    df_b3_fechamento.iloc[:, 1:] = df_b3_fechamento.iloc[:, 1:].astype(float)
+    # 2) Remover separador de milhar e trocar vírgula por ponto (somente colunas de valores)
+    # Ex.: "88.536,62" -> "88536.62"
+    df[val_cols] = (
+        df[val_cols]
+        .astype("string")
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False)
+    )
 
-    # Multiplicar a linha da treasury por 1000
-    df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns !=
-                         'Assets'] = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'TREASURY', df_b3_fechamento.columns != 'Assets'] * 1000
-    df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', df_b3_fechamento.columns !=
-                         'Assets'] = df_b3_fechamento.loc[df_b3_fechamento['Assets'] == 'WDO1', df_b3_fechamento.columns != 'Assets'] * 10
+    # 3) Converter para numérico com coerce (qualquer lixo vira NaN)
+    df[val_cols] = df[val_cols].apply(pd.to_numeric, errors="coerce")
 
-    return df_b3_fechamento
+    # 4) Forward-fill horizontal SOMENTE nas colunas de valores
+    df[val_cols] = df[val_cols].ffill(axis=1)
+
+    # 5) Dropar DAP25
+    df = df[df["Assets"] != "DAP25"].copy()
+
+    # 6) Ajustes de escala
+    mask_t = df["Assets"] == "TREASURY"
+    if mask_t.any():
+        df.loc[mask_t, val_cols] = df.loc[mask_t, val_cols] * 1000
+
+    mask_wdo = df["Assets"] == "WDO1"
+    if mask_wdo.any():
+        df.loc[mask_wdo, val_cols] = df.loc[mask_wdo, val_cols] * 10
+
+    return df
 
 
 ################ DEIXAR ESSA FUNÇÃO ATUALIZADA COM A LISTA DE ASSETS DEFAUTL DO PORTIFÓLIO E SUAS QUANTIDADES ################

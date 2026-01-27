@@ -260,45 +260,38 @@ def calculate_portfolio_values(df_precos, df_pl_processado, var_bps):
 
 
 def processar_b3_portifolio():
-    """
-    Carrega o parquet de preços (wide: Assets + colunas de datas) e:
-    - limpa strings vazias e placeholders
-    - remove separador de milhar e troca vírgula por ponto
-    - converte colunas de datas para float (coerce)
-    - forward-fill horizontal SOMENTE nas colunas de datas
-    - remove DAP25
-    - ajusta escala TREASURY e WDO1
-    """
     df = pd.read_parquet("Dados/df_preco_de_ajuste_atual_completo.parquet")
 
-    # Garantia de nome da coluna chave
+    # Garantir coluna chave
     if "Assets" not in df.columns:
-        # fallback caso venha como "Ativo" por algum motivo
         if "Ativo" in df.columns:
             df = df.rename(columns={"Ativo": "Assets"})
         else:
             raise KeyError("Não encontrei coluna 'Assets' (nem 'Ativo') no parquet.")
 
-    # Colunas numéricas (todas exceto Assets)
     val_cols = [c for c in df.columns if c != "Assets"]
 
-    # 1) Normalizar vazios / placeholders somente nas colunas de valores
-    df[val_cols] = df[val_cols].replace(
-        to_replace=[r"^\s*$", "", " ", "  ", "-", "—", "None", "nan", "NaN"],
-        value=np.nan,
-        regex=True
-    )
+    # 1) Normalizar vazios/placeholders somente nas colunas de valores
+    df[val_cols] = df[val_cols].replace(r"^\s*$", np.nan, regex=True)
+    df[val_cols] = df[val_cols].replace(["", " ", "  ", "-", "—"], np.nan)
 
-    # 2) Remover separador de milhar e trocar vírgula por ponto (somente colunas de valores)
-    # Ex.: "88.536,62" -> "88536.62"
-    df[val_cols] = (
-        df[val_cols]
-        .astype("string")
-        .str.replace(".", "", regex=False)
-        .str.replace(",", ".", regex=False)
-    )
+    # 2) Garantir string apenas para operar limpeza (por coluna)
+    #    - Remove separador de milhar: "."  (ex.: 88.536,62 -> 88536,62)
+    #    - Troca vírgula por ponto: "," -> "."
+    for c in val_cols:
+        s = df[c]
 
-    # 3) Converter para numérico com coerce (qualquer lixo vira NaN)
+        # se já é numérico, pula a limpeza de string
+        if pd.api.types.is_numeric_dtype(s):
+            continue
+
+        s = s.astype("string")
+        s = s.str.replace(".", "", regex=False)
+        s = s.str.replace(",", ".", regex=False)
+
+        df[c] = s
+
+    # 3) Converter tudo para numérico (lixo vira NaN)
     df[val_cols] = df[val_cols].apply(pd.to_numeric, errors="coerce")
 
     # 4) Forward-fill horizontal SOMENTE nas colunas de valores
@@ -317,7 +310,6 @@ def processar_b3_portifolio():
         df.loc[mask_wdo, val_cols] = df.loc[mask_wdo, val_cols] * 10
 
     return df
-
 
 ################ DEIXAR ESSA FUNÇÃO ATUALIZADA COM A LISTA DE ASSETS DEFAUTL DO PORTIFÓLIO E SUAS QUANTIDADES ################
 def processar_dados_port():

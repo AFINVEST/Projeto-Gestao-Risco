@@ -6613,6 +6613,7 @@ MONTH_CODE: Dict[str, int] = {"F":1,"G":2,"H":3,"J":4,"K":5,"M":6,"N":7,"Q":8,"U
 def first_bday_of_month(year: int, month: int) -> pd.Timestamp:
     return pd.date_range(pd.Timestamp(year, month, 1), periods=1, freq="BMS")[0]
 
+
 def di_maturity_from_ticker(ticker: str) -> Optional[pd.Timestamp]:
     """
     'ODF26 Comdty' (ou 'ODF26') -> 1º dia útil de jan/2026 (F=Jan...Z=Dez).
@@ -6631,15 +6632,18 @@ def di_maturity_from_ticker(ticker: str) -> Optional[pd.Timestamp]:
     except Exception:
         return None
 
+
 def bday_count(d0: pd.Timestamp, d1: pd.Timestamp) -> int:
     """# de dias úteis (B3) em (d0, d1], exclusivo d0 e inclusivo d1."""
     if pd.isna(d0) or pd.isna(d1) or d1 <= d0:
         return 0
     return len(pd.bdate_range(d0, d1, inclusive="right"))
 
+
 def aa_to_daily_scalar(r_aa: float) -> float:
     """Taxa a.a. (fração) -> taxa diária efetiva, base 252."""
     return (1.0 + r_aa)**(1.0/252.0) - 1.0
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Leitura e limpeza do Excel

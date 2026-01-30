@@ -34,6 +34,8 @@ pytz>=2024.1
 # Charts / viz
 # ─────────────────────────────────────────────────────────────
 plotly>=5.18
+plotnine
+altair
 
 # ─────────────────────────────────────────────────────────────
 # Auth / crypto (login)
@@ -55,3 +57,7 @@ webdriver-manager>=4.0
 # Qualidade de vida / compat
 # ─────────────────────────────────────────────────────────────
 tqdm>=4.66
+
+psycopg2-binary
+supabase 
+typing

@@ -6650,11 +6650,13 @@ def aa_to_daily_scalar(r_aa: float) -> float:
 # ──────────────────────────────────────────────────────────────────────────────
 
 def read_dadosjuros_xlsx(path: str | Path) -> pd.DataFrame:
+    
     """
     Lê 'DadosJuros.xlsx' no padrão:
       • dropa a 2ª linha; • remove a 1ª coluna; • renomeia a nova 1ª para 'Datas';
       • converte taxas (aceita vírgula e '%'); • ordena por 'Datas'.
     """
+
     path = Path(path)
     df = pd.read_excel(path, dtype=str)
 
@@ -9183,7 +9185,7 @@ def _check_password(user: str, pwd: str, users: dict) -> bool:
 # Login Gate (sem UI de sessão / sem botão de sair)
 # -------------------------------------------------------------------
 def login_gate(
-    config_json_path: str = "teste.json",
+    config_json_path: str = "Dados/config.json",
     form_key: str | None = None,
 ) -> bool:
     """
@@ -9251,9 +9253,7 @@ def login_gate(
 # Id da página atual para ter uma key de form estável
 page_id = st.session_state.get("current_page", "main")
 
-CONFIG_PATH = "teste.json"  # ajuste se quiser
-
-
+CONFIG_PATH = "Dados/config.json"
 
 
 # ==========================================================

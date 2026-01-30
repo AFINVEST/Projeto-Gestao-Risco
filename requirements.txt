@@ -58,7 +58,7 @@ webdriver-manager>=4.0
 # ─────────────────────────────────────────────────────────────
 tqdm>=4.66
 
-psycopg2-binary
+psycopg2-binary 
 supabase 
-typing
+typing 
 seaborn 

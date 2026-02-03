@@ -1,0 +1,957 @@
+<!DOCTYPE html><html><head>
+      <title>README</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      
+      <link rel="stylesheet" href="file:///c:\Users\clara.lima\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.20\crossnote\dependencies\katex\katex.min.css">
+      
+      
+      
+      
+      
+      <style>
+      code[class*=language-],pre[class*=language-]{color:#333;background:0 0;font-family:Consolas,"Liberation Mono",Menlo,Courier,monospace;text-align:left;white-space:pre;word-spacing:normal;word-break:normal;word-wrap:normal;line-height:1.4;-moz-tab-size:8;-o-tab-size:8;tab-size:8;-webkit-hyphens:none;-moz-hyphens:none;-ms-hyphens:none;hyphens:none}pre[class*=language-]{padding:.8em;overflow:auto;border-radius:3px;background:#f5f5f5}:not(pre)>code[class*=language-]{padding:.1em;border-radius:.3em;white-space:normal;background:#f5f5f5}.token.blockquote,.token.comment{color:#969896}.token.cdata{color:#183691}.token.doctype,.token.macro.property,.token.punctuation,.token.variable{color:#333}.token.builtin,.token.important,.token.keyword,.token.operator,.token.rule{color:#a71d5d}.token.attr-value,.token.regex,.token.string,.token.url{color:#183691}.token.atrule,.token.boolean,.token.code,.token.command,.token.constant,.token.entity,.token.number,.token.property,.token.symbol{color:#0086b3}.token.prolog,.token.selector,.token.tag{color:#63a35c}.token.attr-name,.token.class,.token.class-name,.token.function,.token.id,.token.namespace,.token.pseudo-class,.token.pseudo-element,.token.url-reference .token.variable{color:#795da3}.token.entity{cursor:help}.token.title,.token.title .token.punctuation{font-weight:700;color:#1d3e81}.token.list{color:#ed6a43}.token.inserted{background-color:#eaffea;color:#55a532}.token.deleted{background-color:#ffecec;color:#bd2c00}.token.bold{font-weight:700}.token.italic{font-style:italic}.language-json .token.property{color:#183691}.language-markup .token.tag .token.punctuation{color:#333}.language-css .token.function,code.language-css{color:#0086b3}.language-yaml .token.atrule{color:#63a35c}code.language-yaml{color:#183691}.language-ruby .token.function{color:#333}.language-markdown .token.url{color:#795da3}.language-makefile .token.symbol{color:#795da3}.language-makefile .token.variable{color:#183691}.language-makefile .token.builtin{color:#0086b3}.language-bash .token.keyword{color:#0086b3}pre[data-line]{position:relative;padding:1em 0 1em 3em}pre[data-line] .line-highlight-wrapper{position:absolute;top:0;left:0;background-color:transparent;display:block;width:100%}pre[data-line] .line-highlight{position:absolute;left:0;right:0;padding:inherit 0;margin-top:1em;background:hsla(24,20%,50%,.08);background:linear-gradient(to right,hsla(24,20%,50%,.1) 70%,hsla(24,20%,50%,0));pointer-events:none;line-height:inherit;white-space:pre}pre[data-line] .line-highlight:before,pre[data-line] .line-highlight[data-end]:after{content:attr(data-start);position:absolute;top:.4em;left:.6em;min-width:1em;padding:0 .5em;background-color:hsla(24,20%,50%,.4);color:#f4f1ef;font:bold 65%/1.5 sans-serif;text-align:center;vertical-align:.3em;border-radius:999px;text-shadow:none;box-shadow:0 1px #fff}pre[data-line] .line-highlight[data-end]:after{content:attr(data-end);top:auto;bottom:.4em}html body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,freesans,sans-serif;font-size:16px;line-height:1.6;color:#333;background-color:#fff;overflow:initial;box-sizing:border-box;word-wrap:break-word}html body>:first-child{margin-top:0}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{line-height:1.2;margin-top:1em;margin-bottom:16px;color:#000}html body h1{font-size:2.25em;font-weight:300;padding-bottom:.3em}html body h2{font-size:1.75em;font-weight:400;padding-bottom:.3em}html body h3{font-size:1.5em;font-weight:500}html body h4{font-size:1.25em;font-weight:600}html body h5{font-size:1.1em;font-weight:600}html body h6{font-size:1em;font-weight:600}html body h1,html body h2,html body h3,html body h4,html body h5{font-weight:600}html body h5{font-size:1em}html body h6{color:#5c5c5c}html body strong{color:#000}html body del{color:#5c5c5c}html body a:not([href]){color:inherit;text-decoration:none}html body a{color:#08c;text-decoration:none}html body a:hover{color:#00a3f5;text-decoration:none}html body img{max-width:100%}html body>p{margin-top:0;margin-bottom:16px;word-wrap:break-word}html body>ol,html body>ul{margin-bottom:16px}html body ol,html body ul{padding-left:2em}html body ol.no-list,html body ul.no-list{padding:0;list-style-type:none}html body ol ol,html body ol ul,html body ul ol,html body ul ul{margin-top:0;margin-bottom:0}html body li{margin-bottom:0}html body li.task-list-item{list-style:none}html body li>p{margin-top:0;margin-bottom:0}html body .task-list-item-checkbox{margin:0 .2em .25em -1.8em;vertical-align:middle}html body .task-list-item-checkbox:hover{cursor:pointer}html body blockquote{margin:16px 0;font-size:inherit;padding:0 15px;color:#5c5c5c;background-color:#f0f0f0;border-left:4px solid #d6d6d6}html body blockquote>:first-child{margin-top:0}html body blockquote>:last-child{margin-bottom:0}html body hr{height:4px;margin:32px 0;background-color:#d6d6d6;border:0 none}html body table{margin:10px 0 15px 0;border-collapse:collapse;border-spacing:0;display:block;width:100%;overflow:auto;word-break:normal;word-break:keep-all}html body table th{font-weight:700;color:#000}html body table td,html body table th{border:1px solid #d6d6d6;padding:6px 13px}html body dl{padding:0}html body dl dt{padding:0;margin-top:16px;font-size:1em;font-style:italic;font-weight:700}html body dl dd{padding:0 16px;margin-bottom:16px}html body code{font-family:Menlo,Monaco,Consolas,'Courier New',monospace;font-size:.85em;color:#000;background-color:#f0f0f0;border-radius:3px;padding:.2em 0}html body code::after,html body code::before{letter-spacing:-.2em;content:'\00a0'}html body pre>code{padding:0;margin:0;word-break:normal;white-space:pre;background:0 0;border:0}html body .highlight{margin-bottom:16px}html body .highlight pre,html body pre{padding:1em;overflow:auto;line-height:1.45;border:#d6d6d6;border-radius:3px}html body .highlight pre{margin-bottom:0;word-break:normal}html body pre code,html body pre tt{display:inline;max-width:initial;padding:0;margin:0;overflow:initial;line-height:inherit;word-wrap:normal;background-color:transparent;border:0}html body pre code:after,html body pre code:before,html body pre tt:after,html body pre tt:before{content:normal}html body blockquote,html body dl,html body ol,html body p,html body pre,html body ul{margin-top:0;margin-bottom:16px}html body kbd{color:#000;border:1px solid #d6d6d6;border-bottom:2px solid #c7c7c7;padding:2px 4px;background-color:#f0f0f0;border-radius:3px}@media print{html body{background-color:#fff}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{color:#000;page-break-after:avoid}html body blockquote{color:#5c5c5c}html body pre{page-break-inside:avoid}html body table{display:table}html body img{display:block;max-width:100%;max-height:100%}html body code,html body pre{word-wrap:break-word;white-space:pre}}.markdown-preview{width:100%;height:100%;box-sizing:border-box}.markdown-preview ul{list-style:disc}.markdown-preview ul ul{list-style:circle}.markdown-preview ul ul ul{list-style:square}.markdown-preview ol{list-style:decimal}.markdown-preview ol ol,.markdown-preview ul ol{list-style-type:lower-roman}.markdown-preview ol ol ol,.markdown-preview ol ul ol,.markdown-preview ul ol ol,.markdown-preview ul ul ol{list-style-type:lower-alpha}.markdown-preview .newpage,.markdown-preview .pagebreak{page-break-before:always}.markdown-preview pre.line-numbers{position:relative;padding-left:3.8em;counter-reset:linenumber}.markdown-preview pre.line-numbers>code{position:relative}.markdown-preview pre.line-numbers .line-numbers-rows{position:absolute;pointer-events:none;top:1em;font-size:100%;left:0;width:3em;letter-spacing:-1px;border-right:1px solid #999;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.markdown-preview pre.line-numbers .line-numbers-rows>span{pointer-events:none;display:block;counter-increment:linenumber}.markdown-preview pre.line-numbers .line-numbers-rows>span:before{content:counter(linenumber);color:#999;display:block;padding-right:.8em;text-align:right}.markdown-preview .mathjax-exps .MathJax_Display{text-align:center!important}.markdown-preview:not([data-for=preview]) .code-chunk .code-chunk-btn-group{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .status{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .output-div{margin-bottom:16px}.markdown-preview .md-toc{padding:0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link div,.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}.markdown-preview .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}.scrollbar-style::-webkit-scrollbar{width:8px}.scrollbar-style::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}.scrollbar-style::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode]){position:relative;width:100%;height:100%;top:0;left:0;margin:0;padding:0;overflow:auto}html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{position:relative;top:0;min-height:100vh}@media screen and (min-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em calc(50% - 457px + 2em)}}@media screen and (max-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{font-size:14px!important;padding:1em}}@media print{html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{display:none}}html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{position:fixed;bottom:8px;left:8px;font-size:28px;cursor:pointer;color:inherit;z-index:99;width:32px;text-align:center;opacity:.4}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] #sidebar-toc-btn{opacity:1}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc{position:fixed;top:0;left:0;width:300px;height:100%;padding:32px 0 48px 0;font-size:14px;box-shadow:0 0 4px rgba(150,150,150,.33);box-sizing:border-box;overflow:auto;background-color:inherit}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar{width:8px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc a{text-decoration:none}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc{padding:0 16px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link div,html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{left:300px;width:calc(100% - 300px);padding:2em calc(50% - 457px - 300px / 2);margin:0;box-sizing:border-box}@media screen and (max-width:1274px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{width:100%}}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .markdown-preview{left:50%;transform:translateX(-50%)}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .md-sidebar-toc{display:none}
+/* Please visit the URL below for more information: */
+/*   https://shd101wyy.github.io/markdown-preview-enhanced/#/customize-css */
+
+      </style>
+      <!-- The content below will be included at the end of the <head> element. --><script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script></head><body for="html-export">
+    
+    
+      <div class="crossnote markdown-preview  ">
+      
+<h1 id="dashboard-de-risco-streamlit--app4py--pipeline-de-atualização-scrapersetl">Dashboard de Risco (Streamlit) — <code>app4.py</code> + Pipeline de Atualização (Scrapers/ETL) </h1>
+<p>Este repositório contém um <strong>dashboard em Streamlit</strong> (<code>app4.py</code>) para análise e gestão de portfólio (VaR, stress, simulação de cota etc.) e um <strong>pipeline de atualização de dados</strong> via scripts auxiliares:</p>
+<ul>
+<li><code>ScrapAF3.py</code> → coleta <strong>PL diário</strong> dos fundos no portal interno AF (Selenium) e salva histórico em parquet</li>
+<li><code>ScrapB3_v2.py</code> → coleta <strong>dados B3</strong> (DI/DAP/WDO/TREASURY) e gera bases wide/long em parquet (+ CSV/JSON pt-BR)</li>
+<li><code>TransformarRetornosParquet.py</code> → “ETL canivete suíço”: converte CSV→parquet, gera <code>df_inicial</code>, <code>df_divone</code>, mescla NTNBs no parquet B3, exporta série LFT</li>
+</ul>
+<hr>
+<h2 id="sumário">Sumário </h2>
+<ul>
+<li><a href="#1-vis%C3%A3o-geral-do-sistema">1) Visão geral do sistema</a></li>
+<li><a href="#2-estrutura-de-diret%C3%B3rios">2) Estrutura de diretórios</a></li>
+<li><a href="#3-como-rodar-ordem-recomendada">3) Como rodar (ordem recomendada)</a></li>
+<li><a href="#4-app4py--o-que-faz-e-como-funciona">4) <code>app4.py</code> — o que faz e como funciona</a>
+<ul>
+<li><a href="#41-login">4.1 Login</a></li>
+<li><a href="#42-persist%C3%AAncia-supabase--parquet-local">4.2 Persistência (Supabase ↔ parquet local)</a></li>
+<li><a href="#43-arquivos-que-o-app-consome">4.3 Arquivos que o app consome</a></li>
+<li><a href="#44-telas-e-fluxo-de-uso">4.4 Telas e fluxo de uso</a></li>
+<li><a href="#45-simula%C3%A7%C3%A3o-de-cota">4.5 Simulação de Cota</a></li>
+</ul>
+</li>
+<li><a href="#5-pipeline-de-dados--scripts">5) Pipeline de dados — scripts</a>
+<ul>
+<li><a href="#51-scrapaf3py-pl-fundos">5.1 <code>ScrapAF3.py</code> (PL fundos)</a></li>
+<li><a href="#52-scrapb3_v2py-b3-didapwdotreasury">5.2 <code>ScrapB3_v2.py</code> (B3 DI/DAP/WDO/TREASURY)</a></li>
+<li><a href="#53-transformarretornosparquetpy-etlnormaliza%C3%A7%C3%B5es">5.3 <code>TransformarRetornosParquet.py</code> (ETL/normalizações)</a></li>
+</ul>
+</li>
+<li><a href="#6-como-adicionarremover-fundos">6) Como adicionar/remover fundos</a></li>
+<li><a href="#7-como-adicionarremover-ativos">7) Como adicionar/remover ativos</a></li>
+<li><a href="#8-manuten%C3%A7%C3%A3o-e-boas-pr%C3%A1ticas">8) Manutenção e boas práticas</a></li>
+<li><a href="#9-checklist-de-verifica%C3%A7%C3%A3o-sanity-check">9) Checklist de verificação (sanity check)</a></li>
+<li><a href="#10-troubleshooting-problemas-comuns">10) Troubleshooting (problemas comuns)</a></li>
+</ul>
+<hr>
+<h2 id="1-visão-geral-do-sistema">1) Visão geral do sistema </h2>
+<p>O projeto é composto por:</p>
+<ol>
+<li>
+<p><strong>App (Streamlit):</strong> <code>app4.py</code></p>
+<ul>
+<li>Permite montar/editar portfólio, analisar risco (VaR, vol), rodar stress tests e simular cota.</li>
+<li>Usa <strong>dados locais (parquet/csv/xlsx)</strong> e também persiste um “snapshot” do portfólio no <strong>Supabase</strong>.</li>
+</ul>
+</li>
+<li>
+<p><strong>Atualização de dados (ETL):</strong></p>
+<ul>
+<li><code>ScrapAF3.py</code> atualiza PL histórico dos fundos no parquet <code>Dados/pl_fundos_teste.parquet</code> (ou <code>Dados/pl_fundos.parquet</code>)</li>
+<li><code>ScrapB3_v2.py</code> atualiza bases B3 em:
+<ul>
+<li><code>Dados/df_preco_de_ajuste_atual_completo.parquet</code> (preços/ajustes)</li>
+<li><code>Dados/df_valor_ajuste_contrato.parquet</code> (variações/valores por contrato)</li>
+<li>e uma base longa <code>Dados/df_ajustes_b3.parquet</code></li>
+</ul>
+</li>
+<li><code>TransformarRetornosParquet.py</code> normaliza e produz:
+<ul>
+<li><code>Dados/df_inicial.parquet</code> (universo/histórico wide)</li>
+<li><code>Dados/df_divone.parquet</code> (DV01/DIV01)</li>
+<li>merge de NTNBs no parquet de preços B3</li>
+<li><code>Dados/dados_lft.csv</code> (retorno LFT)</li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2 id="2-estrutura-de-diretórios">2) Estrutura de diretórios </h2>
+<p>Estrutura recomendada:</p>
+<pre data-role="codeBlock" data-info="text" class="language-text text"><code>.
+├─ app4.py
+├─ ScrapAF3.py
+├─ ScrapB3_v2.py
+├─ TransformarRetornosParquet.py
+├─ Dados/
+│  ├─ config.json
+│  ├─ pl_fundos.parquet                          (opcional)
+│  ├─ pl_fundos_teste.parquet                    (principal na prática atual)
+│  ├─ df_inicial.parquet
+│  ├─ df_divone.parquet
+│  ├─ df_preco_de_ajuste_atual_completo.parquet
+│  ├─ df_valor_ajuste_contrato.parquet
+│  ├─ df_ajustes_b3.parquet
+│  ├─ df_preco_de_ajuste_atual_completo.csv
+│  ├─ df_valor_ajuste_contrato.csv
+│  ├─ df_preco_de_ajuste_atual_completo.json
+│  ├─ BBG - ECO DASH.xlsx
+│  ├─ FechamentoNTNBs.xlsx
+│  └─ dados_lft.csv
+└─ BaseFundos/
+   ├─ &lt;FUNDO_1&gt;.parquet
+   ├─ &lt;FUNDO_2&gt;.parquet
+   └─ ...
+
+</code></pre><h2 id="3-como-rodar-ordem-recomendada">3) Como rodar (ordem recomendada) </h2>
+<p>Ordem diária sugerida para atualizar tudo que o <a href="http://app4.py">app4.py</a> usa.</p>
+<ol>
+<li>
+<p><strong>Atualizar PL dos fundos (AF interno)</strong><br>
+python <a href="http://ScrapAF3.py">ScrapAF3.py</a></p>
+</li>
+<li>
+<p><strong>Atualizar dados B3 (DI/DAP/WDO/TREASURY)</strong><br>
+python ScrapB3_v2.py</p>
+</li>
+<li>
+<p><strong>Rodar normalizações/ETL (BBG → parquets, NTNB merge, LFT, conversões)</strong><br>
+python <a href="http://TransformarRetornosParquet.py">TransformarRetornosParquet.py</a></p>
+</li>
+<li>
+<p><strong>Abrir o app</strong><br>
+streamlit run <a href="http://app4.py">app4.py</a></p>
+</li>
+</ol>
+<h2 id="3-como-rodar-ordem-recomendada-1">3) Como rodar (ordem recomendada) </h2>
+<hr>
+<p>Ordem diária sugerida para atualizar tudo que o <code>app4.py</code> usa:</p>
+<ol>
+<li><strong>Atualizar PL dos fundos (AF interno)</strong></li>
+</ol>
+<p><code>python ScrapAF3.py</code></p>
+<ol>
+<li><strong>Atualizar dados B3 (DI/DAP/WDO/TREASURY)</strong></li>
+</ol>
+<p><code>python ScrapB3_v2.py</code></p>
+<ol>
+<li><strong>Rodar normalizações/ETL (BBG → parquets, NTNB merge, LFT, conversões)</strong></li>
+</ol>
+<p><code>python TransformarRetornosParquet.py</code></p>
+<ol>
+<li><strong>Abrir o app</strong></li>
+</ol>
+<p><code>streamlit run app4.py</code></p>
+<hr>
+<h2 id="4-app4py---o-que-faz-e-como-funciona">4) <code>app4.py</code> --- o que faz e como funciona </h2>
+<hr>
+<p>O <code>app4.py</code> é um dashboard Streamlit que:</p>
+<ul>
+<li>
+<p>Monta/edita um portfólio de ativos (ex.: DI, DAP, WDO1, TREASURY, IBOV, NTNBs etc.)</p>
+</li>
+<li>
+<p>Calcula métricas de risco (VaR, volatilidade, contribuições)</p>
+</li>
+<li>
+<p>Faz stress tests (choques em juros e FX usando DV01/"DIV01" e transformações auxiliares)</p>
+</li>
+<li>
+<p>Mantém um snapshot do portfólio atual em Supabase (<code>portfolio_posicoes</code>) e também salva um espelho local em parquet</p>
+</li>
+<li>
+<p>Mantém histórico por fundo em <code>BaseFundos/&lt;FUNDO&gt;.parquet</code></p>
+</li>
+<li>
+<p>Possui tela de Simulação de Cota (NAV) usando série de PL + retornos (LFT + análises internas)</p>
+</li>
+</ul>
+<h3 id="41-login">4.1) Login </h3>
+<p>O app implementa um login antes de liberar as telas:</p>
+<ul>
+<li>
+<p><strong>Config:</strong> <code>Dados/config.json</code></p>
+</li>
+<li>
+<p><strong>Sessão:</strong> expira após <code>session_timeout_min</code></p>
+</li>
+<li>
+<p><strong>Hash:</strong> usa <code>bcrypt</code> se o hash estiver no JSON</p>
+</li>
+</ul>
+<p>Formato esperado (exemplo):</p>
+<p><code>{   "users": {     "usuario1": "$2b$12$...hash_bcrypt...",     "usuario2": "$2b$12$...hash_bcrypt..."   },   "auth": {     "session_timeout_min": 60   } }</code></p>
+<p>Observação: pode haver fallback para senha em texto puro (não recomendado).</p>
+<h3 id="42-persistência-supabase--parquet-local">4.2) Persistência (Supabase ↔ parquet local) </h3>
+<p>O app utiliza Supabase para armazenar o portfólio atual:</p>
+<ul>
+<li>
+<p><strong>Tabela:</strong> <code>portfolio_posicoes</code></p>
+</li>
+<li>
+<p><strong>Ações típicas:</strong></p>
+<ul>
+<li>
+<p><code>load</code> (lê tudo)</p>
+</li>
+<li>
+<p><code>add</code> (apaga tudo e reinsere --- replace total)</p>
+</li>
+<li>
+<p><code>update</code> (atualiza por chave: Ativo + Dia de Compra)</p>
+</li>
+<li>
+<p><code>delete</code> (remove por Ativo + Dia de Compra)</p>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Espelho local:</strong></p>
+<ul>
+<li><code>Dados/portifolio_posições.parquet</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Fluxo comum do app:</strong></p>
+<ul>
+<li>
+<p>Atualizar base de fundos / sincronizar portfólio</p>
+</li>
+<li>
+<p>Carregar dados locais (PL, <code>df_inicial</code> etc.)</p>
+</li>
+<li>
+<p>Operar nas telas</p>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="43-arquivos-que-o-app-consome">4.3) Arquivos que o app consome </h3>
+<p>Principais arquivos/datasets usados pelo <code>app4.py</code>:</p>
+<ul>
+<li>
+<p><strong>PL dos fundos</strong></p>
+<ul>
+<li><code>Dados/pl_fundos.parquet</code> <strong>ou</strong> <code>Dados/pl_fundos_teste.parquet</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Universo e histórico de preços</strong></p>
+<ul>
+<li><code>Dados/df_inicial.parquet</code></li>
+</ul>
+</li>
+<li>
+<p><strong>DV01/DIV01 (stress)</strong></p>
+<ul>
+<li><code>Dados/df_divone.parquet</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Preços/ajustes B3</strong></p>
+<ul>
+<li>
+<p><code>Dados/df_preco_de_ajuste_atual_completo.parquet</code></p>
+</li>
+<li>
+<p><code>Dados/df_valor_ajuste_contrato.parquet</code></p>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Macro/Bloomberg</strong></p>
+<ul>
+<li><code>Dados/BBG - ECO DASH.xlsx</code> (quando usado no pipeline para gerar parquets)</li>
+</ul>
+</li>
+<li>
+<p><strong>Retorno LFT (simulação de cota)</strong></p>
+<ul>
+<li><code>Dados/dados_lft.csv</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="44-telas-e-fluxo-de-uso">4.4) Telas e fluxo de uso </h3>
+<p>O app organiza o uso por "telas" via sidebar (por exemplo):</p>
+<h4 id="441-ver-portfólio">4.4.1) Ver Portfólio </h4>
+<ul>
+<li>Visualização do portfólio consolidado e outputs (dependendo da implementação local).</li>
+</ul>
+<h4 id="442-adicionar-ativos">4.4.2) Adicionar Ativos </h4>
+<p>Fluxo típico:</p>
+<ol>
+<li>
+<p>Escolher ativos do universo (colunas de <code>df_inicial.parquet</code>)</p>
+</li>
+<li>
+<p>Informar quantidades e preços (com suporte opcional a CSV de execuções)</p>
+</li>
+<li>
+<p>Calcular retornos/vol/VaR do portfólio</p>
+</li>
+<li>
+<p>Rodar stress tests usando DV01 e normalizações</p>
+</li>
+<li>
+<p>Persistir portfólio (Supabase/parquet) e alimentar <code>BaseFundos</code> quando aplicável</p>
+</li>
+</ol>
+<h4 id="443-remover-ativos--apagar-dados">4.4.3) Remover Ativos / Apagar Dados </h4>
+<ul>
+<li>Remove entradas do portfólio atual (por ativo e data de compra) e/ou faz limpeza.</li>
+</ul>
+<h4 id="444-simular-cota">4.4.4) Simular Cota </h4>
+<ul>
+<li>Simula o NAV (cota) com base em PL diário + séries de retorno (LFT + componentes do portfólio).</li>
+</ul>
+<h4 id="445-csv-de-execuções-opcional">4.4.5) CSV de execuções (opcional) </h4>
+<p>O app permite subir um CSV de execuções para pré-preencher:</p>
+<ul>
+<li>
+<p>quantidade por ativo</p>
+</li>
+<li>
+<p>preço médio/compra</p>
+</li>
+</ul>
+<p>Além disso, faz "normalização" de tickers (ex.: DI e DAP) dependendo do padrão.</p>
+<h3 id="45-simulação-de-cota">4.5) Simulação de Cota </h3>
+<p>A simulação de cota normalmente:</p>
+<ol>
+<li>
+<p>Pede % do PL para investir</p>
+</li>
+<li>
+<p>Carrega série de PL total e série de retorno LFT</p>
+</li>
+<li>
+<p>Combina com retornos do portfólio/ativos e aplica custos (taxa adm/performance) se configurado</p>
+</li>
+<li>
+<p>Gera uma série simulada de NAV/cota e métricas associadas</p>
+</li>
+</ol>
+<hr>
+<h2 id="5-pipeline-de-dados---scripts">5) Pipeline de dados --- scripts </h2>
+<hr>
+<h3 id="51-scrapaf3py-pl-fundos">5.1) <code>ScrapAF3.py</code> (PL fundos) </h3>
+<h4 id="511-objetivo">5.1.1) Objetivo </h4>
+<p>Coletar PL/patrimônio dos fundos no portal interno AF via Selenium e manter histórico em parquet.</p>
+<ul>
+<li><strong>Saída:</strong> <code>Dados/pl_fundos_teste.parquet</code> (configurável)</li>
+</ul>
+<h4 id="512-principais-parâmetros">5.1.2) Principais parâmetros </h4>
+<ul>
+<li>
+<p><code>PARQUET_PATH</code>: caminho do parquet final</p>
+</li>
+<li>
+<p><code>TARGET_FUND</code>, <code>CUTOFF_DATE</code>: regra para zerar fundo a partir de uma data</p>
+</li>
+<li>
+<p><code>LOOKBACK_DAYS</code>: janela para detectar valores repetidos e forçar re-scrape</p>
+</li>
+<li>
+<p><code>INDICES_TOTAL</code>: índices de linhas para calcular o TOTAL (hardcoded)</p>
+</li>
+<li>
+<p><code>IGNORE_FUND_DUPES</code>: fundos ignorados na regra de duplicados</p>
+</li>
+</ul>
+<h4 id="513-processual-completo">5.1.3) Processual completo </h4>
+<ol>
+<li>
+<p>Carrega parquet existente (ou cria base inicial <code>fundos_base</code>)</p>
+</li>
+<li>
+<p>Descobre última data já salva (colunas <code>YYYY-MM-DD</code>)</p>
+</li>
+<li>
+<p>Define:</p>
+<ul>
+<li>
+<p><code>new_dates</code>: todas as datas do dia seguinte até hoje (inclui fds/feriados)</p>
+</li>
+<li>
+<p><code>dates_repeated</code>: dias úteis recentes com PL repetido para re-scrape</p>
+</li>
+</ul>
+</li>
+<li>
+<p>Selenium:</p>
+<ul>
+<li>
+<p>login no portal</p>
+</li>
+<li>
+<p>abre relatório de patrimônios</p>
+</li>
+<li>
+<p>seleciona data custom</p>
+</li>
+</ul>
+</li>
+<li>
+<p>Para cada data a coletar:</p>
+<ul>
+<li>
+<p>digita a data</p>
+</li>
+<li>
+<p>lê a tabela</p>
+</li>
+<li>
+<p>aplica regra de zerar fundo após cutoff</p>
+</li>
+<li>
+<p>preenche coluna <code>YYYY-MM-DD</code></p>
+</li>
+<li>
+<p>recalcula TOTAL somando os fundos de <code>INDICES_TOTAL</code></p>
+</li>
+</ul>
+</li>
+<li>
+<p>Reforça a regra do fundo zerado em TODAS as colunas <code>&gt;= cutoff</code> e recalcula TOTAL</p>
+</li>
+<li>
+<p>Finaliza:</p>
+<ul>
+<li>
+<p>calcula Último Valor</p>
+</li>
+<li>
+<p>ordena colunas</p>
+</li>
+<li>
+<p>forward-fill horizontal (substitui <code>"--"</code> pelo dia anterior)</p>
+</li>
+<li>
+<p>salva parquet</p>
+</li>
+</ul>
+</li>
+</ol>
+<h4 id="514-saídas">5.1.4) Saídas </h4>
+<ul>
+<li><code>Dados/pl_fundos_teste.parquet</code> (ou <code>Dados/pl_fundos.parquet</code>)</li>
+</ul>
+<h4 id="515-pontos-de-atenção">5.1.5) Pontos de atenção </h4>
+<ul>
+<li>
+<p>Credenciais hardcoded (risco alto)</p>
+</li>
+<li>
+<p>TOTAL calculado por índice (quebra se ordem/lista mudar)</p>
+</li>
+<li>
+<p>Se aparecer fundo novo, precisa adicioná-lo em <code>fundos_base</code> para ter linha no histórico</p>
+</li>
+</ul>
+<hr>
+<h3 id="52-scrapb3_v2py-b3-didapwdotreasury">5.2) <code>ScrapB3_v2.py</code> (B3 DI/DAP/WDO/TREASURY) </h3>
+<h4 id="521-objetivo">5.2.1) Objetivo </h4>
+<p>Consumir o endpoint da B3 <code>ConsolidatedTradesDerivatives</code>, filtrar e transformar em:</p>
+<ul>
+<li>
+<p><code>Dados/df_preco_de_ajuste_atual_completo.parquet</code> (Ajuste)</p>
+</li>
+<li>
+<p><code>Dados/df_valor_ajuste_contrato.parquet</code> (Variação/Valor por contrato)</p>
+</li>
+</ul>
+<p>Além de CSV/JSON pt-BR e log de execução.</p>
+<h4 id="522-o-que-entra-e-o-que-sai">5.2.2) O que entra e o que sai </h4>
+<p><strong>Entradas</strong></p>
+<ul>
+<li>
+<p>Parquets wide existentes (se já existirem)</p>
+</li>
+<li>
+<p>Endpoint B3 via POST</p>
+</li>
+</ul>
+<p><strong>Saídas</strong></p>
+<ul>
+<li>
+<p><code>Dados/df_ajustes_b3.parquet</code> (base longa histórica)</p>
+</li>
+<li>
+<p><code>Dados/df_preco_de_ajuste_atual_completo.parquet</code> + <code>.csv</code> + <code>.json</code></p>
+</li>
+<li>
+<p><code>Dados/df_valor_ajuste_contrato.parquet</code> + <code>.csv</code></p>
+</li>
+<li>
+<p><code>atualizacao_b3_log.txt</code></p>
+</li>
+<li>
+<p><code>debug_b3_csv/</code> (se ativado)</p>
+</li>
+</ul>
+<h4 id="523-processual-completo">5.2.3) Processual completo </h4>
+<ol>
+<li>
+<p>Carrega <code>wide_preco</code> e <code>wide_valor</code> já existentes</p>
+</li>
+<li>
+<p>Determina <code>start_dt</code> = última data presente</p>
+</li>
+<li>
+<p>Define <code>end_dt_hist</code> = último dia útil B3 antes de hoje</p>
+</li>
+<li>
+<p>Para cada dia útil B3 no range:</p>
+<ul>
+<li>
+<p>baixa CSV do endpoint</p>
+</li>
+<li>
+<p>se o dia estiver vazio, faz backoff/backfill usando dias úteis anteriores</p>
+</li>
+<li>
+<p>faz parse do CSV (normaliza colunas e converte pt-BR → float)</p>
+</li>
+<li>
+<p>reduz universo aplicando regras de "vértices":</p>
+<ul>
+<li>
+<p><strong>DI:</strong> apenas mês "F" por ano (<code>DI_yy</code>)</p>
+</li>
+<li>
+<p><strong>DAP:</strong> regra par/ímpar (<code>DAPyy</code>, mantendo K/Q conforme regra)</p>
+</li>
+<li>
+<p><strong>WDO1:</strong> escolhe contrato mais próximo (WDO preferencial, DOL fallback)</p>
+</li>
+<li>
+<p><strong>TREASURY:</strong> escolhe contrato T10 mais próximo (&gt;= mês referência)</p>
+</li>
+</ul>
+</li>
+<li>
+<p>cria colunas wide:</p>
+<ul>
+<li>
+<p>preço = <code>PrecoAjusteAtual</code></p>
+</li>
+<li>
+<p>valor = <code>Pontos</code>, exceto DAP que usa <code>ValorAjusteR$</code></p>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p>Tenta "hoje" (no código atual, tenta <code>today = hoje - 1 dia</code>), sem backfill</p>
+</li>
+<li>
+<p>Cria uma coluna duplicada para o próximo DU B3 como cópia da última (se ainda não existir)</p>
+</li>
+<li>
+<p>Exporta tudo e registra logs</p>
+</li>
+</ol>
+<h4 id="524-pontos-de-atenção">5.2.4) Pontos de atenção </h4>
+<ul>
+<li>
+<p>Mudança no layout/colunas do CSV da B3 pode quebrar o parse</p>
+</li>
+<li>
+<p>A duplicação do próximo DU não é "dado real" (cuidado em análises)</p>
+</li>
+<li>
+<p>Exclusões (<code>ASSETS_EXCLUIR</code>) precisam acompanhar o universo do app</p>
+</li>
+</ul>
+<hr>
+<h3 id="53-transformarretornosparquetpy-etlnormalizações">5.3) <code>TransformarRetornosParquet.py</code> (ETL/normalizações) </h3>
+<h4 id="531-objetivo">5.3.1) Objetivo </h4>
+<p>Script de normalização e geração de bases para o app:</p>
+<ul>
+<li>
+<p>Converter CSVs (root e <code>BaseFundos/</code>) → parquet</p>
+</li>
+<li>
+<p>Gerar <code>df_inicial.parquet</code> e <code>df_divone.parquet</code> a partir do Excel <code>BBG - ECO DASH.xlsx</code></p>
+</li>
+<li>
+<p>Mesclar NTNBs (<code>FechamentoNTNBs.xlsx</code>) dentro do parquet de preços B3 e fazer forward-fill por data</p>
+</li>
+<li>
+<p>Exportar série LFT (<code>dados_lft.csv</code>) a partir de planilha interna em rede</p>
+</li>
+</ul>
+<h4 id="532-processual-completo">5.3.2) Processual completo </h4>
+<ol>
+<li>
+<p>Converte <code>*.csv</code> do diretório atual para <code>.parquet</code> e remove os CSVs</p>
+</li>
+<li>
+<p>Converte <code>BaseFundos/*.csv</code> para <code>.parquet</code> e remove os CSVs</p>
+</li>
+<li>
+<p>Lê <code>Dados/BBG - ECO DASH.xlsx</code>:</p>
+<ul>
+<li>
+<p>aba <strong>BZ RATES</strong> → limpa/renomeia colunas → salva <code>Dados/df_inicial.parquet</code></p>
+</li>
+<li>
+<p>aba <strong>DIV01</strong> → transpõe e renomeia → salva <code>Dados/df_divone.parquet</code></p>
+</li>
+</ul>
+</li>
+<li>
+<p>Lê <code>Dados/FechamentoNTNBs.xlsx</code>:</p>
+<ul>
+<li>
+<p>ajusta formato wide</p>
+</li>
+<li>
+<p>concatena com <code>Dados/df_preco_de_ajuste_atual_completo.parquet</code></p>
+</li>
+<li>
+<p>ordena colunas por data e aplica <code>ffill(axis=1)</code></p>
+</li>
+<li>
+<p>salva de volta <code>Dados/df_preco_de_ajuste_atual_completo.parquet</code></p>
+</li>
+</ul>
+</li>
+<li>
+<p>Lê planilha interna de LFT (caminho <code>Z:\...dashboard LFT.xlsx</code>):</p>
+<ul>
+<li>
+<p>extrai coluna <code>BLFT 0 06/01/30</code></p>
+</li>
+<li>
+<p>salva <code>Dados/dados_lft.csv</code></p>
+</li>
+</ul>
+</li>
+</ol>
+<h4 id="533-pontos-de-atenção">5.3.3) Pontos de atenção </h4>
+<ul>
+<li>
+<p>Depende do layout do Excel Bloomberg (<code>BBG - ECO DASH.xlsx</code>) estar conforme esperado (abas/colunas)</p>
+</li>
+<li>
+<p>Depende de acesso ao caminho de rede <code>Z:\...</code> para LFT</p>
+</li>
+<li>
+<p>Converte ponto↔vírgula (texto pt-BR) em alguns trechos; se o app precisar de float, é necessário reconverter</p>
+</li>
+</ul>
+<hr>
+<h2 id="6-como-adicionarremover-fundos">6) Como adicionar/remover fundos </h2>
+<hr>
+<h3 id="61-onde-um-fundo-existe">6.1) Onde um fundo "existe" </h3>
+<p>Você precisa alinhar fundo em três camadas:</p>
+<ol>
+<li><strong>PL histórico (Scraper AF)</strong></li>
+</ol>
+<ul>
+<li>
+<p><code>ScrapAF3.py</code>: adicionar fundo em <code>fundos_base</code></p>
+</li>
+<li>
+<p>Revisar:</p>
+<ul>
+<li>
+<p><code>INDICES_TOTAL</code> (quais fundos entram no TOTAL)</p>
+</li>
+<li>
+<p><code>IGNORE_FUND_DUPES</code> (se o fundo deve ser ignorado no check de duplicados)</p>
+</li>
+</ul>
+</li>
+</ul>
+<ol>
+<li><strong>UI e pesos (<a href="http://app4.py">app4.py</a>)</strong></li>
+</ol>
+<ul>
+<li>
+<p>Adicionar no dicionário/lista de pesos exibida no sidebar</p>
+</li>
+<li>
+<p>Garantir que cálculos que dependem de fundos não estejam hardcoded por posição</p>
+</li>
+</ul>
+<ol>
+<li><strong>Histórico por fundo (BaseFundos)</strong></li>
+</ol>
+<ul>
+<li>
+<p>Se o fundo participa do histórico/simulação:</p>
+<ul>
+<li>
+<p>Garantir que <code>BaseFundos/&lt;FUNDO&gt;.parquet</code> exista (ou será criado)</p>
+</li>
+<li>
+<p>Garantir que o app "enxerga" esse arquivo no carregamento</p>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="62-checklist-para-adicionar-fundo">6.2) Checklist para adicionar fundo </h3>
+<ul>
+<li>
+<p>Incluir no <code>fundos_base</code> em <code>ScrapAF3.py</code></p>
+</li>
+<li>
+<p>Revisar <code>INDICES_TOTAL</code> e <code>IGNORE_FUND_DUPES</code></p>
+</li>
+<li>
+<p>Garantir que o parquet de PL (em <code>Dados/</code>) mantém o fundo como linha</p>
+</li>
+<li>
+<p>Incluir fundo nos pesos do <code>app4.py</code></p>
+</li>
+<li>
+<p>Criar/validar <code>BaseFundos/&lt;FUNDO&gt;.parquet</code> se necessário</p>
+</li>
+</ul>
+<h3 id="63-checklist-para-remover-fundo">6.3) Checklist para remover fundo </h3>
+<ul>
+<li>
+<p>Remover do <code>fundos_base</code> (ou manter e zerar se quiser histórico)</p>
+</li>
+<li>
+<p>Revisar <code>INDICES_TOTAL</code></p>
+</li>
+<li>
+<p>Remover dos pesos no <code>app4.py</code></p>
+</li>
+<li>
+<p>Arquivar/remover <code>BaseFundos/&lt;FUNDO&gt;.parquet</code> se não usado</p>
+</li>
+</ul>
+<hr>
+<h2 id="7-como-adicionarremover-ativos">7) Como adicionar/remover ativos </h2>
+<hr>
+<h3 id="71-onde-um-ativo-existe">7.1) Onde um ativo "existe" </h3>
+<ol>
+<li><strong>Universo do app (<code>Dados/df_inicial.parquet</code>)</strong></li>
+</ol>
+<ul>
+<li>Se o ativo não existir como coluna no <code>df_inicial</code>, ele não aparece no multiselect</li>
+</ul>
+<ol>
+<li><strong>DV01/DIV01 (<code>Dados/df_divone.parquet</code>)</strong></li>
+</ol>
+<ul>
+<li>Stress depende do ativo ter DV01 (ou regra de tratamento)</li>
+</ul>
+<ol>
+<li><strong>Preços/ajustes (<code>Dados/df_preco_de_ajuste_atual_completo.parquet</code>)</strong></li>
+</ol>
+<ul>
+<li>Para histórico/precificação</li>
+</ul>
+<ol>
+<li><strong>ScrapB3 (se derivativo B3)</strong></li>
+</ol>
+<ul>
+<li>Atualizar <code>mapear_asset()</code> e filtros de instrumentos se for necessário capturar um novo tipo</li>
+</ul>
+<h3 id="72-checklist-para-adicionar-ativo">7.2) Checklist para adicionar ativo </h3>
+<ul>
+<li>
+<p>Atualizar <code>TransformarRetornosParquet.py</code> (mapeamento/colunas do <code>BBG - ECO DASH.xlsx</code>) para incluir o ativo no <code>df_inicial.parquet</code></p>
+</li>
+<li>
+<p>Atualizar <code>df_divone.parquet</code> (colunas) para incluir DV01 do novo ativo</p>
+</li>
+<li>
+<p>Garantir presença do ativo no parquet de preços/ajustes (B3/NTNB etc.)</p>
+</li>
+<li>
+<p>Se for derivativo B3 novo: revisar <code>ScrapB3_v2.py</code> (parse + mapeamento)</p>
+</li>
+</ul>
+<h3 id="73-checklist-para-remover-ativo">7.3) Checklist para remover ativo </h3>
+<ul>
+<li>
+<p>Remover coluna do <code>df_inicial.parquet</code> (ou deixar, mas não usar)</p>
+</li>
+<li>
+<p>Remover coluna do <code>df_divone.parquet</code> (se necessário)</p>
+</li>
+<li>
+<p>Se estiver sendo excluído do output B3: adicionar em <code>ASSETS_EXCLUIR</code> no <code>ScrapB3_v2.py</code></p>
+</li>
+</ul>
+<hr>
+<h2 id="8-manutenção-e-boas-práticas">8) Manutenção e boas práticas </h2>
+<hr>
+<h3 id="81-segurança-recomendado">8.1) Segurança (recomendado) </h3>
+<ul>
+<li>
+<p>Nunca deixar credenciais hardcoded em <code>ScrapAF3.py</code></p>
+</li>
+<li>
+<p>Nunca deixar <code>SUPABASE_KEY</code> sensível no <code>app4.py</code></p>
+</li>
+</ul>
+<p>Preferir:</p>
+<ul>
+<li>
+<p>variáveis de ambiente</p>
+</li>
+<li>
+<p><code>st.secrets</code> no Streamlit</p>
+</li>
+<li>
+<p><code>.env</code> (não commitado)</p>
+</li>
+</ul>
+<h3 id="82-evitar-hardcode-por-índice">8.2) Evitar hardcode por índice </h3>
+<ul>
+<li>
+<p><code>ScrapAF3.py</code>: <code>INDICES_TOTAL</code> depende da ordem da tabela/DF</p>
+</li>
+<li>
+<p>Ideal: calcular TOTAL por nome de fundo (lista de nomes) e não por índice</p>
+</li>
+</ul>
+<h3 id="83-logs-e-auditoria">8.3) Logs e auditoria </h3>
+<ul>
+<li>
+<p><code>ScrapB3_v2.py</code> já salva <code>atualizacao_b3_log.txt</code></p>
+</li>
+<li>
+<p>Considere criar também log para <code>ScrapAF3.py</code> (datas atualizadas, fundos faltantes etc.)</p>
+</li>
+</ul>
+<h3 id="84-versionamento-das-bases">8.4) Versionamento das bases </h3>
+<p>Parquets são ótimos, mas é importante:</p>
+<ul>
+<li>
+<p>manter backups (ex.: por data)</p>
+</li>
+<li>
+<p>versionar "dicionários" (lista de fundos, colunas do universo)</p>
+</li>
+</ul>
+<hr>
+<h2 id="9-checklist-de-verificação-sanity-check">9) Checklist de verificação (sanity check) </h2>
+<hr>
+<p>Após rodar todos os scripts:</p>
+<ul>
+<li>
+<p><code>Dados/pl_fundos_teste.parquet</code> atualizado com a(s) última(s) coluna(s) de data</p>
+</li>
+<li>
+<p><code>Dados/df_preco_de_ajuste_atual_completo.parquet</code> atualizado (colunas recentes e ativos chave)</p>
+</li>
+<li>
+<p><code>Dados/df_valor_ajuste_contrato.parquet</code> atualizado</p>
+</li>
+<li>
+<p><code>Dados/df_inicial.parquet</code> existe e contém as colunas/ativos esperados</p>
+</li>
+<li>
+<p><code>Dados/df_divone.parquet</code> existe e contém DV01 para os ativos do stress</p>
+</li>
+<li>
+<p><code>Dados/dados_lft.csv</code> atualizado (se a simulação de cota depende dele)</p>
+</li>
+</ul>
+<p>Abrir o app e validar:</p>
+<ul>
+<li>
+<p>login ok</p>
+</li>
+<li>
+<p>multiselect de ativos ok</p>
+</li>
+<li>
+<p>VaR/Stress não quebra por missing de colunas</p>
+</li>
+</ul>
+<hr>
+<h2 id="10-troubleshooting-problemas-comuns">10) Troubleshooting (problemas comuns) </h2>
+<hr>
+<h3 id="101-total-do-pl-está-errado">10.1) "TOTAL" do PL está errado </h3>
+<ul>
+<li>
+<p><strong>Causa comum:</strong> mudou ordem/quantidade de fundos e <code>INDICES_TOTAL</code> ficou desatualizado.</p>
+</li>
+<li>
+<p><strong>Solução:</strong> atualizar <code>INDICES_TOTAL</code> ou (recomendado) refatorar para somar por nomes.</p>
+</li>
+</ul>
+<h3 id="102-fundo-novo-não-aparece-no-histórico">10.2) Fundo novo não aparece no histórico </h3>
+<ul>
+<li>
+<p><strong>Causa:</strong> fundo não está em <code>fundos_base</code> no <code>ScrapAF3.py</code>.</p>
+</li>
+<li>
+<p><strong>Solução:</strong> adicionar o fundo na lista <code>fundos_base</code> e rodar novamente.</p>
+</li>
+</ul>
+<h3 id="103-ativo-do-csv-de-execuções-não-existe-no-universo">10.3) Ativo do CSV de execuções "não existe no universo" </h3>
+<ul>
+<li>
+<p><strong>Causa:</strong> o ativo não está como coluna no <code>Dados/df_inicial.parquet</code>.</p>
+</li>
+<li>
+<p><strong>Solução:</strong> atualizar <code>TransformarRetornosParquet.py</code> / <code>BBG - ECO DASH.xlsx</code> para incluir o ativo no <code>df_inicial</code>.</p>
+</li>
+</ul>
+<h3 id="104-scrapb3_v2py-parou-de-parsear">10.4) <code>ScrapB3_v2.py</code> parou de parsear </h3>
+<ul>
+<li>
+<p><strong>Causa:</strong> a B3 mudou a estrutura do CSV/colunas esperadas.</p>
+</li>
+<li>
+<p><strong>Solução:</strong> ajustar o <code>parse_consolidated_trades()</code> (mapeamento de colunas) e validar com <code>debug_b3_csv/</code>.</p>
+</li>
+</ul>
+<h3 id="105-simulação-de-cota-falha-por-lft">10.5) Simulação de cota falha por LFT </h3>
+<ul>
+<li>
+<p><strong>Causa:</strong> falta <code>Dados/dados_lft.csv</code> ou caminho <code>Z:\...</code> inacessível.</p>
+</li>
+<li>
+<p><strong>Solução:</strong> rodar <code>TransformarRetornosParquet.py</code> em ambiente com acesso ao drive, ou mover a base LFT para um caminho local.</p>
+</li>
+</ul>
+<h3 id="rodar-rápido-resumo---no-terminal">Rodar rápido (resumo) - No terminal </h3>
+<pre class="language-text">python ScrapAF3.py
+
+python ScrapB3_v2.py
+
+python TransformarRetornosParquet.py
+
+streamlit run app4.py
+</pre>
+
+      </div>
+      
+      
+    
+    
+    
+    
+    
+    
+  
+    </body></html>

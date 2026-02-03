@@ -15,6 +15,7 @@ from plotnine import (
     theme_minimal, theme,
     element_text, element_rect, element_line
 )
+
 # ── depois dos imports pandas/streamlit ────────────────────
 import functools, os, datetime as dt
 

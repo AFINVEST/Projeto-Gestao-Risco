@@ -24,8 +24,8 @@ import functools, os, datetime as dt
 # ==========================================================
 
 # Configuração do Supabase (substitua pelas suas credenciais)
-SUPABASE_URL = 'https://clyyhlibvmnavdpfsbtr.supabase.co'
-SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNseXlobGlidm1uYXZkcGZzYnRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMjk5NDQsImV4cCI6MjA4NTgwNTk0NH0.DR-E4rAaufY8NVOGIWKAqNscv5BczqKtYeC-dP7Kdnw'
+SUPABASE_URL = 'https://obgwfekirteetqzjydry.supabase.co'
+SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9iZ3dmZWtpcnRlZXRxemp5ZHJ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODk2MDc1MCwiZXhwIjoyMDU0NTM2NzUwfQ.k7-Haw1txbCEwb_MzkynOeEuRJpfgt3msePdvQavWAc'
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 

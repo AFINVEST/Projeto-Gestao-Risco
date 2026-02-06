@@ -221,3 +221,20 @@
 [2026-02-06 10:09:51] [dup-final] (valor) Duplicado 2026-02-05 -> 2026-02-06
 [2026-02-06 10:09:53] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (44, 276) | Dados/df_valor_ajuste_contrato.parquet (33, 276)
 [2026-02-06 10:09:53] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json
+[2026-02-06 10:17:00] [drop-dup] Removendo coluna duplicada 2026-02-06 (cópia de 2026-02-05)
+[2026-02-06 10:17:01] [drop-dup] Removendo coluna duplicada 2026-02-06 (cópia de 2026-02-05)
+[2026-02-06 10:17:02] Atualizando de 2026-02-05 até 2026-02-05 (DU B3: 1)
+[2026-02-06 10:17:03] [HTTP] ConsolidatedTradesDerivatives 2026-02-05 -> status=200 content-length=100664 t=1.17s
+[2026-02-06 10:17:03] [HTTP] md5=f86330632bb51f12190a7511f8b506d1 bytes=484984 (ConsolidatedTradesDerivatives 2026-02-05)
+[2026-02-06 10:17:04] 2026-02-05: base longa atualizada; total linhas = 6380.
+[2026-02-06 10:17:04] 2026-02-05: preços/valores atualizados.
+[2026-02-06 10:17:04] [today-check] Coleta EXATA do dia 2026-02-05 (sem backfill).
+[2026-02-06 10:17:04] [HTTP] ConsolidatedTradesDerivatives 2026-02-05 -> status=200 content-length=100664 t=0.34s
+[2026-02-06 10:17:04] [HTTP] md5=f86330632bb51f12190a7511f8b506d1 bytes=484984 (ConsolidatedTradesDerivatives 2026-02-05)
+[2026-02-06 10:17:05] [today-ok] Dados encontrados para 2026-02-05: 116 linhas.
+[2026-02-06 10:17:05] 2026-02-05: base longa atualizada (hoje); total linhas = 6380.
+[2026-02-06 10:17:05] 2026-02-05: preços/valores de HOJE adicionados.
+[2026-02-06 10:17:05] [dup-final] (preço) Duplicado 2026-02-05 -> 2026-02-06
+[2026-02-06 10:17:05] [dup-final] (valor) Duplicado 2026-02-05 -> 2026-02-06
+[2026-02-06 10:17:08] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (44, 276) | Dados/df_valor_ajuste_contrato.parquet (33, 276)
+[2026-02-06 10:17:08] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json

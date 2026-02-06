@@ -270,8 +270,8 @@ def main():
         # 3) Login
         driver.get("https://afinvest.com.br/login/interno")
         time.sleep(2)
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "atributo"))).send_keys("emanuel.cabral@afinvest.com.br")
-        driver.find_element(By.ID, "passwordLogin").send_keys("Afs@2024")
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "atributo"))).send_keys("marcos.freitas@afinvest.com.br")
+        driver.find_element(By.ID, "passwordLogin").send_keys("Marcos@2468")
         driver.find_element(By.ID, "loginInterno").click()
 
         # 4) Vai para o relatório e seleciona data custom

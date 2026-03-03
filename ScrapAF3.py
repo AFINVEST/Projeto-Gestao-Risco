@@ -23,7 +23,7 @@ TARGET_FUND = "AF DEB INCENTIVADAS"
 CUTOFF_DATE = datetime(2025, 9, 22).date()  # 01/09/2025
 ZERO_TXT = "R$ 0,00"
 
-TARGET_FUND = "JERA2026"
+TARGET_FUND_2 = "JERA2026"
 CUTOFF_DATE = datetime(2026, 2, 27).date()  # 27/02/2026
 ZERO_TXT = "R$ 0,00"
 
@@ -34,7 +34,7 @@ LOOKBACK_DAYS = 10  # ajuste se quiser
 INDICES_TOTAL = [0, 7, 10, 14, 15, 16, 17, 20, 25]
 
 # <<< IGNORAR FUNDOS EM DUP-CHECK >>>
-IGNORE_FUND_DUPES = {"BORDEAUX FIM", TARGET_FUND, "SANKALPA FIM", "SANTANA", "REAL FIM", "TOPAZIO FIM","AYA NMK FIM", "BH FIM"}
+IGNORE_FUND_DUPES = {"BORDEAUX FIM", TARGET_FUND, TARGET_FUND_2, "SANKALPA FIM", "SANTANA", "REAL FIM", "TOPAZIO FIM","AYA NMK FIM", "BH FIM"}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Feriados BR (nacionais): fixos + móveis (Carnaval, Sexta Santa, Corpus Christi)
@@ -265,7 +265,7 @@ def main():
             for col in date_cols_all:
                 dcol = _to_date(col)
                 if dcol and dcol >= CUTOFF_DATE:
-                    df_todos.loc[df_todos["Fundos/Carteiras Adm"] == TARGET_FUND, col] = ZERO_TXT
+                    df_todos.loc[df_todos["Fundos/Carteiras Adm"] == c(TARGET_FUND,TARGET_FUND_2), col] = ZERO_TXT
                     soma = df_todos.loc[INDICES_TOTAL, col].apply(_txt_to_float).sum()
                     df_todos.loc[df_todos["Fundos/Carteiras Adm"] == "TOTAL", col] = _float_to_txt(soma)
             _finalize_and_save(df_todos)
@@ -311,6 +311,10 @@ def main():
             if d >= CUTOFF_DATE:
                 new_data[TARGET_FUND] = ZERO_TXT
 
+             # Regra JERA2026 = 0 a partir do CUTOFF_DATE
+            if d >= CUTOFF_DATE:
+                new_data[TARGET_FUND_2] = ZERO_TXT
+
             # Garante coluna no DF e preenche
             col_name = d.strftime("%Y-%m-%d")
             if "Fundos/Carteiras Adm" not in df_todos.columns:
@@ -331,7 +335,7 @@ def main():
         for col in date_cols_all:
             dcol = _to_date(col)
             if dcol and dcol >= CUTOFF_DATE:
-                df_todos.loc[df_todos["Fundos/Carteiras Adm"] == TARGET_FUND, col] = ZERO_TXT
+                df_todos.loc[df_todos["Fundos/Carteiras Adm"] == c(TARGET_FUND, TARGET_FUND_2), col] = ZERO_TXT
                 soma = df_todos.loc[INDICES_TOTAL, col].apply(_txt_to_float).sum()
                 df_todos.loc[df_todos["Fundos/Carteiras Adm"] == "TOTAL", col] = _float_to_txt(soma)
 

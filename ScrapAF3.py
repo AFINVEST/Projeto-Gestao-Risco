@@ -24,7 +24,7 @@ CUTOFF_DATE = datetime(2025, 9, 22).date()  # 01/09/2025
 ZERO_TXT = "R$ 0,00"
 
 TARGET_FUND = "JERA2026"
-CUTOFF_DATE = datetime(2026, 2, 27).date()  # 01/09/2025
+CUTOFF_DATE = datetime(2026, 2, 27).date()  # 27/02/2026
 ZERO_TXT = "R$ 0,00"
 
 # Janela para caçar “repetidos” (e re-scrapar)

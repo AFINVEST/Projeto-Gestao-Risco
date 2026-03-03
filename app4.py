@@ -9390,7 +9390,7 @@ def main_page():
                 fundos_zero_auto.append("GLOBAL BONDS")
             #st.sidebar.info("Detectado CSV apenas com DAP → zerado: GLOBAL BONDS.")
     
-    for f in ("AF DEB INCENTIVADAS", "GLOBAL BONDS"):
+    for f in ("AF DEB INCENTIVADAS", "GLOBAL BONDS", "JERA2026"):
         if f in dict_pesos:
             dict_pesos[f] = 0.0
             fundos_zero_auto.append(f)

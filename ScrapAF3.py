@@ -18,14 +18,13 @@ import re  # ⇢ para tratar “R$”
 PARQUET_PATH = "Dados/pl_fundos_teste.parquet"
 # PARQUET_PATH = "pl_fundos.parquet"
 
-# Fundo que deve zerar a partir de CUTOFF_DATE
-TARGET_FUND = "AF DEB INCENTIVADAS"
-CUTOFF_DATE = datetime(2025, 9, 22).date()  # 01/09/2025
 ZERO_TXT = "R$ 0,00"
 
-TARGET_FUND_2 = "JERA2026"
-CUTOFF_DATE = datetime(2026, 2, 27).date()  # 27/02/2026
-ZERO_TXT = "R$ 0,00"
+# ✅ Regras de “zerar a partir do cutoff” (agora suporta mais de 1 fundo)
+ZERO_RULES = {
+    "AF DEB INCENTIVADAS": datetime(2025, 9, 22).date(),
+    "JERA2026": datetime(2026, 2, 27).date(),  # <-- NOVO FUNDO + CUT OFF DATE
+}
 
 # Janela para caçar “repetidos” (e re-scrapar)
 LOOKBACK_DAYS = 10  # ajuste se quiser
@@ -34,11 +33,23 @@ LOOKBACK_DAYS = 10  # ajuste se quiser
 INDICES_TOTAL = [0, 7, 10, 14, 15, 16, 17, 20, 25]
 
 # <<< IGNORAR FUNDOS EM DUP-CHECK >>>
-IGNORE_FUND_DUPES = {"BORDEAUX FIM", TARGET_FUND, TARGET_FUND_2, "SANKALPA FIM", "SANTANA", "REAL FIM", "TOPAZIO FIM","AYA NMK FIM", "BH FIM"}
+# (inclui automaticamente os fundos com regra de zero, para não acusar “repetido” por estar zerado)
+IGNORE_FUND_DUPES = {
+    "BORDEAUX FIM",
+    "SANKALPA FIM",
+    "SANTANA",
+    "REAL FIM",
+    "TOPAZIO FIM",
+    "AYA NMK FIM",
+    "BH FIM",
+    *set(ZERO_RULES.keys()),
+}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Feriados BR (nacionais): fixos + móveis (Carnaval, Sexta Santa, Corpus Christi)
 # ──────────────────────────────────────────────────────────────────────────────
+
+
 def _easter_sunday(year: int) -> date:
     """Computa Páscoa (Meeus/Jones/Butcher)."""
     a = year % 19
@@ -57,6 +68,7 @@ def _easter_sunday(year: int) -> date:
     day = ((h + l - 7 * m + 114) % 31) + 1
     return date(year, month, day)
 
+
 def _holidays_br_year(year: int) -> set[date]:
     """Feriados nacionais (civis + móveis)."""
     pascoa = _easter_sunday(year)
@@ -70,14 +82,15 @@ def _holidays_br_year(year: int) -> set[date]:
         date(year, 4, 21),  # Tiradentes
         date(year, 5, 1),   # Dia do Trabalhador
         date(year, 9, 7),   # Independência
-        date(year, 10, 12), # N. Sra. Aparecida
+        date(year, 10, 12),  # N. Sra. Aparecida
         date(year, 11, 2),  # Finados
-        date(year, 11, 15), # Procl. República
-        date(year, 12, 25), # Natal
-        date(year, 11, 20), # Consciência Negra (nacional desde 2024)
+        date(year, 11, 15),  # Procl. República
+        date(year, 12, 25),  # Natal
+        date(year, 11, 20),  # Consciência Negra (nacional desde 2024)
     }
     mobiles = {carnaval_seg, carnaval_ter, sexta_santa, corpus_christi}
     return fixed | mobiles
+
 
 def _is_business_day(d: date) -> bool:
     """Dia útil nacional (seg–sex) e não feriado nacional."""
@@ -90,6 +103,8 @@ def _is_business_day(d: date) -> bool:
 # ──────────────────────────────────────────────────────────────────────────────
 # Funções de apoio
 # ──────────────────────────────────────────────────────────────────────────────
+
+
 def get_last_value(row, date_columns):
     """Encontra o último valor não nulo/não vazio em uma linha."""
     for date_col in reversed(date_columns):
@@ -97,6 +112,7 @@ def get_last_value(row, date_columns):
         if pd.notna(value) and value != "--":
             return value
     return "--"
+
 
 def _txt_to_float(txt: str) -> float:
     """Converte 'R$ 1.234.567,89' → 1234567.89   e '--' → 0.0"""
@@ -108,22 +124,27 @@ def _txt_to_float(txt: str) -> float:
     except ValueError:
         return 0.0
 
+
 def _float_to_txt(val: float) -> str:
     """Converte 1234567.89 → 'R$ 1.234.567,89'"""
     inteiro, frac = f"{val:,.2f}".split(".")
     inteiro = inteiro.replace(",", ".")
     return f"R$ {inteiro},{frac}"
 
+
 def _list_date_columns(df: pd.DataFrame) -> list[str]:
     """Retorna colunas que são datas no formato YYYY-MM-DD, ordenadas."""
-    cols = [c for c in df.columns if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(c))]
+    cols = [c for c in df.columns if re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}", str(c))]
     return sorted(cols)
+
 
 def _to_date(s: str) -> date | None:
     try:
         return datetime.strptime(s, "%Y-%m-%d").date()
     except Exception:
         return None
+
 
 def _find_repeated_dates_for_rescrape(df: pd.DataFrame,
                                       lookback_days: int,
@@ -141,7 +162,8 @@ def _find_repeated_dates_for_rescrape(df: pd.DataFrame,
         return set()
 
     cutoff = datetime.today().date() - timedelta(days=lookback_days)
-    recent_cols = [c for c in all_date_cols if (_to_date(c) and _to_date(c) >= cutoff)]
+    recent_cols = [c for c in all_date_cols if (
+        _to_date(c) and _to_date(c) >= cutoff)]
     if len(recent_cols) < 2:
         return set()
 
@@ -152,13 +174,11 @@ def _find_repeated_dates_for_rescrape(df: pd.DataFrame,
 
     dates_to_refresh = set()
 
-    # Itera linhas exceto TOTAL
-    mask_not_total = df["Fundos/Carteiras Adm"].astype(str) != "TOTAL"
-    df_fundos = df.loc[mask_not_total, ["Fundos/Carteiras Adm"] + recent_biz_cols].copy()
-    mask_valid = ~df["Fundos/Carteiras Adm"].astype(str).isin(
-    ["TOTAL", *IGNORE_FUND_DUPES]
-    )
-    df_fundos = df.loc[mask_valid, ["Fundos/Carteiras Adm"] + recent_biz_cols].copy()
+    # Itera linhas exceto TOTAL e fundos ignorados
+    mask_valid = ~df["Fundos/Carteiras Adm"].astype(
+        str).isin(["TOTAL", *IGNORE_FUND_DUPES])
+    df_fundos = df.loc[mask_valid, [
+        "Fundos/Carteiras Adm"] + recent_biz_cols].copy()
 
     # Para cada fundo, compara com a coluna do dia ÚTIL anterior (ignora fds/feriado)
     for _, row in df_fundos.iterrows():
@@ -178,20 +198,29 @@ def _find_repeated_dates_for_rescrape(df: pd.DataFrame,
 
             # se PL repetiu em dias úteis consecutivos → marca essa data
             if str(v_curr) == str(v_prev):
-                # ignora fundos que não queremos considerar na regra
                 if fund_name in IGNORE_FUND_DUPES:
                     continue
                 d = _to_date(recent_biz_cols[j])
                 if d:
                     dates_to_refresh.add(d)
             else:
-                # primeira diferença encontrada andando pra trás:
-                # acabou a "pontinha" de PL repetido, não precisa ver datas mais antigas
                 break
 
     return dates_to_refresh
 
+
+def _apply_zero_rules_for_date(new_data: dict, d: date) -> dict:
+    """
+    Aplica as regras de zerar fundos a partir do cutoff.
+    """
+    for fund, cutoff in ZERO_RULES.items():
+        if d >= cutoff:
+            new_data[fund] = ZERO_TXT
+    return new_data
+
 # ──────────────────────────────────────────────────────────────────────────────
+
+
 def main():
     # Configurações iniciais do Selenium
     service = Service()
@@ -214,7 +243,7 @@ def main():
         ("FIRF GERAES 30", "R$ 277.327.187,86"),
         ("GLOBAL BONDS", "R$ 28.816.807,45"),
         ("HORIZONTE", "R$ 242.504.609,40"),
-        ("JERA2026", "--"),
+        ("JERA2026", "--"),  # <-- NOVO FUNDO (já está na base)
         ("MANACA INFRA FIRF", "--"),
         ("MINAS DIVIDENDOS", "--"),
         ("MINAS O.N.E. FIA", "R$ 1.902.353,24"),
@@ -234,13 +263,36 @@ def main():
             existing_dates = _list_date_columns(df_todos)
             last_date = (max(datetime.strptime(d, "%Y-%m-%d") for d in existing_dates)
                          if existing_dates else None)
+
+            # Garante que o fundo novo exista no DF (caso parquet antigo)
+            if "Fundos/Carteiras Adm" in df_todos.columns:
+                existing_funds = set(
+                    df_todos["Fundos/Carteiras Adm"].astype(str).str.strip())
+                base_funds = [f[0] for f in fundos_base]
+                missing = [f for f in base_funds if f not in existing_funds]
+                if missing:
+                    df_missing = pd.DataFrame(
+                        {"Fundos/Carteiras Adm": missing})
+                    # adiciona colunas de datas existentes com "--"
+                    for c in _list_date_columns(df_todos):
+                        df_missing[c] = "--"
+                    df_missing["Último Valor"] = "--" if "Último Valor" in df_todos.columns else None
+                    # concat e remove coluna extra se tiver None
+                    df_todos = pd.concat(
+                        [df_todos, df_missing], ignore_index=True)
+                    if "Último Valor" in df_todos.columns:
+                        df_todos["Último Valor"] = df_todos["Último Valor"].fillna(
+                            "--")
+
         else:
-            df_todos = pd.DataFrame(fundos_base, columns=["Fundos/Carteiras Adm", "Valor"])
+            df_todos = pd.DataFrame(fundos_base, columns=[
+                                    "Fundos/Carteiras Adm", "Valor"])
             df_todos = df_todos[["Fundos/Carteiras Adm"]]
             last_date = None
 
         # 2) Determina datas novas (mantém TODOS os dias) e datas que precisam re-scrape (apenas dias úteis)
-        start_date = last_date + timedelta(days=1) if last_date else datetime(2025, 1, 1)
+        start_date = last_date + \
+            timedelta(days=1) if last_date else datetime(2025, 1, 1)
         end_date = datetime.today()
 
         # conjunto com datas novas (todos os dias, inclusive fds/feriado)
@@ -253,28 +305,37 @@ def main():
 
         # conjunto com datas “repetidas” (para re-scrape) — APENAS DIAS ÚTEIS
         ignore_dupes = {"--", ZERO_TXT, "R$0,00", "R$0", "R$ 0,00"}
-        dates_repeated = _find_repeated_dates_for_rescrape(df_todos, LOOKBACK_DAYS, ignore_dupes)
+        dates_repeated = _find_repeated_dates_for_rescrape(
+            df_todos, LOOKBACK_DAYS, ignore_dupes)
 
         # calendário final de scrape: datas novas (todas) ∪ repetidas (úteis)
         dates_to_scrape = sorted(new_dates.union(dates_repeated))
 
         if not dates_to_scrape:
             print("Nenhuma data nova ou repetida (dia útil) para atualizar.")
-            # Ainda assim, reforça a regra de zerar AF DEB ≥ CUTOFF_DATE e salva
+            # Ainda assim, reforça as regras de zero e salva
             date_cols_all = _list_date_columns(df_todos)
             for col in date_cols_all:
                 dcol = _to_date(col)
-                if dcol and dcol >= CUTOFF_DATE:
-                    df_todos.loc[df_todos["Fundos/Carteiras Adm"] == c(TARGET_FUND,TARGET_FUND_2), col] = ZERO_TXT
-                    soma = df_todos.loc[INDICES_TOTAL, col].apply(_txt_to_float).sum()
-                    df_todos.loc[df_todos["Fundos/Carteiras Adm"] == "TOTAL", col] = _float_to_txt(soma)
+                if dcol:
+                    # aplica regras de zero em todas as colunas
+                    for fund, cutoff in ZERO_RULES.items():
+                        if dcol >= cutoff:
+                            df_todos.loc[df_todos["Fundos/Carteiras Adm"]
+                                         == fund, col] = ZERO_TXT
+                    # recalc TOTAL
+                    soma = df_todos.loc[INDICES_TOTAL,
+                                        col].apply(_txt_to_float).sum()
+                    df_todos.loc[df_todos["Fundos/Carteiras Adm"]
+                                 == "TOTAL", col] = _float_to_txt(soma)
             _finalize_and_save(df_todos)
             return
 
         # 3) Login
         driver.get("https://afinvest.com.br/login/interno")
         time.sleep(2)
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "atributo"))).send_keys("marcos.freitas@afinvest.com.br")
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located(
+            (By.ID, "atributo"))).send_keys("marcos.freitas@afinvest.com.br")
         driver.find_element(By.ID, "passwordLogin").send_keys("Marcos@2468")
         driver.find_element(By.ID, "loginInterno").click()
 
@@ -285,7 +346,8 @@ def main():
             (By.CSS_SELECTOR, "button.btn.btn-outline-primary[data-type='custom']"))).click()
         time.sleep(3)
         date_input = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "date_patrimony_table_fundo"))
+            EC.presence_of_element_located(
+                (By.ID, "date_patrimony_table_fundo"))
         )
 
         # 5) Loop nas datas (novas + repetidas)
@@ -295,49 +357,58 @@ def main():
             date_input.send_keys(formatted_date + Keys.RETURN)
             date_input.send_keys(formatted_date + Keys.RETURN)
             time.sleep(3)
-            WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "table_patrimony")))
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.ID, "table_patrimony")))
             time.sleep(2)
 
             # Coleta da tabela
             rows = WebDriverWait(driver, 10).until(
-                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "#table_patrimony tbody tr"))
+                EC.presence_of_all_elements_located(
+                    (By.CSS_SELECTOR, "#table_patrimony tbody tr"))
             )
             new_data = {
-                row.find_elements(By.TAG_NAME, "td")[0].text: row.find_elements(By.TAG_NAME, "td")[1].text
+                row.find_elements(By.TAG_NAME, "td")[
+                    0].text: row.find_elements(By.TAG_NAME, "td")[1].text
                 for row in rows if len(row.find_elements(By.TAG_NAME, "td")) > 1
             }
 
-            # Regra AF DEB = 0 a partir do CUTOFF_DATE
-            if d >= CUTOFF_DATE:
-                new_data[TARGET_FUND] = ZERO_TXT
-
-             # Regra JERA2026 = 0 a partir do CUTOFF_DATE
-            if d >= CUTOFF_DATE:
-                new_data[TARGET_FUND_2] = ZERO_TXT
+            # ✅ Aplica regras de zero (AF DEB + JERA2026)
+            new_data = _apply_zero_rules_for_date(new_data, d)
 
             # Garante coluna no DF e preenche
             col_name = d.strftime("%Y-%m-%d")
             if "Fundos/Carteiras Adm" not in df_todos.columns:
                 # Caso excepcional: se arquivo foi corrompido, recria col base
-                df_todos = pd.DataFrame(fundos_base, columns=["Fundos/Carteiras Adm", "Valor"])[["Fundos/Carteiras Adm"]]
+                df_todos = pd.DataFrame(fundos_base, columns=[
+                                        "Fundos/Carteiras Adm", "Valor"])[["Fundos/Carteiras Adm"]]
 
             if col_name not in df_todos.columns:
                 df_todos[col_name] = "--"
 
-            df_todos[col_name] = df_todos["Fundos/Carteiras Adm"].map(new_data).fillna("--")
+            df_todos[col_name] = df_todos["Fundos/Carteiras Adm"].map(
+                new_data).fillna("--")
 
             # Recalcula TOTAL da coluna
-            soma = df_todos.loc[INDICES_TOTAL, col_name].apply(_txt_to_float).sum()
-            df_todos.loc[df_todos["Fundos/Carteiras Adm"] == "TOTAL", col_name] = _float_to_txt(soma)
+            soma = df_todos.loc[INDICES_TOTAL,
+                                col_name].apply(_txt_to_float).sum()
+            df_todos.loc[df_todos["Fundos/Carteiras Adm"]
+                         == "TOTAL", col_name] = _float_to_txt(soma)
 
-        # 6) Reforço: zera AF DEB e recalc TOTAL em TODAS as colunas >= CUTOFF_DATE
+        # 6) Reforço: aplica regras de zero e recalc TOTAL em TODAS as colunas conforme cutoff
         date_cols_all = _list_date_columns(df_todos)
         for col in date_cols_all:
             dcol = _to_date(col)
-            if dcol and dcol >= CUTOFF_DATE:
-                df_todos.loc[df_todos["Fundos/Carteiras Adm"] == c(TARGET_FUND, TARGET_FUND_2), col] = ZERO_TXT
-                soma = df_todos.loc[INDICES_TOTAL, col].apply(_txt_to_float).sum()
-                df_todos.loc[df_todos["Fundos/Carteiras Adm"] == "TOTAL", col] = _float_to_txt(soma)
+            if not dcol:
+                continue
+
+            for fund, cutoff in ZERO_RULES.items():
+                if dcol >= cutoff:
+                    df_todos.loc[df_todos["Fundos/Carteiras Adm"]
+                                 == fund, col] = ZERO_TXT
+
+            soma = df_todos.loc[INDICES_TOTAL, col].apply(_txt_to_float).sum()
+            df_todos.loc[df_todos["Fundos/Carteiras Adm"]
+                         == "TOTAL", col] = _float_to_txt(soma)
 
         # 7) Finaliza (Último Valor, ordenar colunas, forward-fill de "--") e salva
         _finalize_and_save(df_todos)
@@ -350,17 +421,22 @@ def main():
     finally:
         driver.quit()
 
+
 def _finalize_and_save(df_todos: pd.DataFrame) -> None:
     """Atualiza 'Último Valor', ordena colunas, aplica forward-fill de '--' e salva parquet."""
     date_columns = _list_date_columns(df_todos)
+
     # Atualiza “Último Valor”
-    df_todos["Último Valor"] = df_todos.apply(lambda row: get_last_value(row, date_columns), axis=1)
+    df_todos["Último Valor"] = df_todos.apply(
+        lambda row: get_last_value(row, date_columns), axis=1)
+
     # Ordena colunas
     columns_order = ["Fundos/Carteiras Adm"] + date_columns + ["Último Valor"]
     df_todos = df_todos[columns_order]
 
     # Forward-fill apenas de "--" (mantém 0,00 quando for o caso)
-    for i in range(2, len(df_todos.columns) - 1):  # pula nome e 1ª data; evita "Último Valor"
+    # pula nome e 1ª data; evita "Último Valor"
+    for i in range(2, len(df_todos.columns) - 1):
         col_atual = df_todos.columns[i]
         col_prev = df_todos.columns[i - 1]
         if col_atual not in ("Fundos/Carteiras Adm",):
@@ -370,6 +446,7 @@ def _finalize_and_save(df_todos: pd.DataFrame) -> None:
 
     # Salvar parquet
     df_todos.to_parquet(PARQUET_PATH, index=False)
+
 
 if __name__ == "__main__":
     main()

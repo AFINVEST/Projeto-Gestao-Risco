@@ -10166,6 +10166,9 @@ def main_page():
             if key == True:
                 atualizar_parquet_fundos(
                     filtered_df, data_compra_todos, df_port, quantidade_nomes)
+                read_atual_contratos_cached.clear()
+                load_basefundos.clear()
+                st.session_state["df_precos_ajustados_base"] = None
             with cool3:
                 st.write("### Portfólio Atualizado")
                 st.table(filtered_df[columns])

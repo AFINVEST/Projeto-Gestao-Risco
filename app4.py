@@ -9390,7 +9390,7 @@ def main_page():
                 fundos_zero_auto.append("GLOBAL BONDS")
             #st.sidebar.info("Detectado CSV apenas com DAP → zerado: GLOBAL BONDS.")
     
-    for f in ("AF DEB INCENTIVADAS", "GLOBAL BONDS", "JERA2026"):
+    for f in ("AF DEB INCENTIVADAS", "GLOBAL BONDS"):
         if f in dict_pesos:
             dict_pesos[f] = 0.0
             fundos_zero_auto.append(f)
@@ -10166,9 +10166,6 @@ def main_page():
             if key == True:
                 atualizar_parquet_fundos(
                     filtered_df, data_compra_todos, df_port, quantidade_nomes)
-                read_atual_contratos_cached.clear()
-                load_basefundos.clear()
-                st.session_state["df_precos_ajustados_base"] = None
             with cool3:
                 st.write("### Portfólio Atualizado")
                 st.table(filtered_df[columns])

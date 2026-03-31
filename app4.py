@@ -3904,9 +3904,6 @@ def add_data(data):
 def att_parquet_supabase():
     df_supabase = load_data()
     if not df_supabase:
-        df = pd.DataFrame(columns=["Ativo", "Quantidade", "Dia de Compra",
-                          "Preço de Compra", "Preço de Ajuste Atual", "Rendimento"])
-        df.to_parquet("Dados/portifolio_posições.parquet", index=False)
         return
     df = pd.DataFrame(df_supabase)
     df.to_parquet("Dados/portifolio_posições.parquet", index=False)
@@ -5125,7 +5122,7 @@ def load_b3_prices() -> pd.DataFrame:
     return df
 
 # aproveita a função já existente, mas cacheia a saída
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl=60)
 def read_atual_contratos_cached():
     return read_atual_contratos()
 

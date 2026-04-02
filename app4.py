@@ -1430,13 +1430,13 @@ def calcular_metricas_de_fundo3(assets, df_contratos, fundos, op1=True, op2=True
     # ---------------- pós-loop: totais/relatórios ----------------
     #st.table(df_portfolio_final)
 
-    tabela_dados_fundos_p1 = tabela_dados_fundos.applymap(lambda x: x.replace('bps', '') if isinstance(x, str) else x)
-    tabela_dados_fundos_p1 = tabela_dados_fundos_p1.applymap(lambda x: x.split('/')[0] if isinstance(x, str) and '/' in x else x).astype(float)
+    tabela_dados_fundos_p1 = tabela_dados_fundos.map(lambda x: x.replace('bps', '') if isinstance(x, str) else x)
+    tabela_dados_fundos_p1 = tabela_dados_fundos_p1.map(lambda x: x.split('/')[0] if isinstance(x, str) and '/' in x else x).astype(float)
     tabela_dados_fundos_p1['Total'] = tabela_dados_fundos_p1.sum(axis=1).round(2)
 
-    tabela_dados_fundos_p2 = tabela_dados_fundos.applymap(lambda x: x.replace('bps', '') if isinstance(x, str) else x)
-    tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(lambda x: x.split('/')[1] if isinstance(x, str) and '/' in x else x)
-    tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(lambda x: float(x) if isinstance(x, str) and x != '0' else 0)
+    tabela_dados_fundos_p2 = tabela_dados_fundos.map(lambda x: x.replace('bps', '') if isinstance(x, str) else x)
+    tabela_dados_fundos_p2 = tabela_dados_fundos_p2.map(lambda x: x.split('/')[1] if isinstance(x, str) and '/' in x else x)
+    tabela_dados_fundos_p2 = tabela_dados_fundos_p2.map(lambda x: float(x) if isinstance(x, str) and x != '0' else 0)
     tabela_dados_fundos_p2['Total'] = tabela_dados_fundos_p2[['Juros Nominais Brasil', 'Juros Reais Brasil', 'Moedas', 'Juros US']].sum(axis=1).round(2)
 
     tabela_dados_fundos['Total'] = tabela_dados_fundos_p1['Total'].astype(str) + 'bps / ' + tabela_dados_fundos_p2['Total'].astype(str) + 'bps'
@@ -1959,9 +1959,9 @@ def calcular_metricas_de_fundo2(assets, df_contratos, fundos, op1 = True, op2 = 
         # Tirar bps e / de cada célula
         # Processar tabela_dados_fundos_p1 (valor antes de '/')
         tabela_dados_fundos_p1 = tabela_dados_fundos.copy()
-        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.applymap(
+        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.map(
             lambda x: x.replace('bps', '') if isinstance(x, str) else x)
-        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.applymap(
+        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.map(
             lambda x: x.split('/')[0] if isinstance(x, str) and '/' in x else x)
         # Converter os valores para float
         tabela_dados_fundos_p1 = tabela_dados_fundos_p1.astype(float)
@@ -1971,14 +1971,14 @@ def calcular_metricas_de_fundo2(assets, df_contratos, fundos, op1 = True, op2 = 
 
         # Processar tabela_dados_fundos_p2 (valor após '/')
         tabela_dados_fundos_p2 = tabela_dados_fundos.copy()
-        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(
+        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.map(
             lambda x: x.replace('bps', '') if isinstance(x, str) else x)
-        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(
+        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.map(
             lambda x: x.split('/')[1] if isinstance(x, str) and '/' in x else x)
 
         # Aqui, é necessário tratar os valores corretamente
         # Se o valor for '0', defina como 0, caso contrário converta para float
-        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(
+        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.map(
             lambda x: float(x) if isinstance(x, str) and x != '0' else 0)
 
         # Somar as colunas específicas para obter o total
@@ -2530,9 +2530,9 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos, op1, o
         # Tirar bps e / de cada célula
         # Processar tabela_dados_fundos_p1 (valor antes de '/')
         tabela_dados_fundos_p1 = tabela_dados_fundos.copy()
-        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.applymap(
+        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.map(
             lambda x: x.replace('bps', '') if isinstance(x, str) else x)
-        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.applymap(
+        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.map(
             lambda x: x.split('/')[0] if isinstance(x, str) and '/' in x else x)
         # Converter os valores para float
         tabela_dados_fundos_p1 = tabela_dados_fundos_p1.astype(float)
@@ -2542,14 +2542,14 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos, op1, o
 
         # Processar tabela_dados_fundos_p2 (valor após '/')
         tabela_dados_fundos_p2 = tabela_dados_fundos.copy()
-        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(
+        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.map(
             lambda x: x.replace('bps', '') if isinstance(x, str) else x)
-        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(
+        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.map(
             lambda x: x.split('/')[1] if isinstance(x, str) and '/' in x else x)
 
         # Aqui, é necessário tratar os valores corretamente
         # Se o valor for '0', defina como 0, caso contrário converta para float
-        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(
+        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.map(
             lambda x: float(x) if isinstance(x, str) and x != '0' else 0)
 
         # Somar as colunas específicas para obter o total
@@ -3102,9 +3102,9 @@ def calcular_metricas_de_fundo_analise(assets, quantidades, df_contratos, fundos
         # Tirar bps e / de cada célula
         # Processar tabela_dados_fundos_p1 (valor antes de '/')
         tabela_dados_fundos_p1 = tabela_dados_fundos.copy()
-        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.applymap(
+        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.map(
             lambda x: x.replace('bps', '') if isinstance(x, str) else x)
-        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.applymap(
+        tabela_dados_fundos_p1 = tabela_dados_fundos_p1.map(
             lambda x: x.split('/')[0] if isinstance(x, str) and '/' in x else x)
         # Converter os valores para float
         tabela_dados_fundos_p1 = tabela_dados_fundos_p1.astype(float)
@@ -3114,14 +3114,14 @@ def calcular_metricas_de_fundo_analise(assets, quantidades, df_contratos, fundos
 
         # Processar tabela_dados_fundos_p2 (valor após '/')
         tabela_dados_fundos_p2 = tabela_dados_fundos.copy()
-        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(
+        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.map(
             lambda x: x.replace('bps', '') if isinstance(x, str) else x)
-        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(
+        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.map(
             lambda x: x.split('/')[1] if isinstance(x, str) and '/' in x else x)
 
         # Aqui, é necessário tratar os valores corretamente
         # Se o valor for '0', defina como 0, caso contrário converta para float
-        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.applymap(
+        tabela_dados_fundos_p2 = tabela_dados_fundos_p2.map(
             lambda x: float(x) if isinstance(x, str) and x != '0' else 0)
 
         # Somar as colunas específicas para obter o total
@@ -11947,14 +11947,14 @@ def main_page():
                     df_mensal['Total'] = df_mensal.sum(axis=1)
                     df_mensal_pl['Total'] = df_mensal_pl.sum(axis=1)
 
-                    df_semanal_pl = df_final_pl.applymap(
+                    df_semanal_pl = df_final_pl.map(
                         lambda x: f"{x:.2f}bps")
-                    df_semanal = df_semanal.applymap(
+                    df_semanal = df_semanal.map(
                         lambda x: f"R${x:,.2f}")
 
-                    df_mensal_pl = df_mensal_pl.applymap(
+                    df_mensal_pl = df_mensal_pl.map(
                         lambda x: f"{x:.2f}bps")
-                    df_mensal = df_mensal.applymap(
+                    df_mensal = df_mensal.map(
                         lambda x: f"R${x:,.2f}")
 
                     df_final_semanal = df_semanal + " / " + df_semanal_pl

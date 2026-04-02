@@ -6139,13 +6139,13 @@ def build_positions_timeseries(
     next2 = pos.shift(-2)
 
     # v → 0 → v
-    m1 = pos.eq(0) & prev1.eq(next1) & prev1.ne(0)
+    m1 = (pos.eq(0) & prev1.eq(next1) & prev1.ne(0)).astype(bool)
 
     # v → 0 → 0 → v  (marca o 1º zero e o 2º zero)
-    m2_start  = pos.eq(0) & pos.shift(-1).eq(0) & prev1.eq(next2) & prev1.ne(0)
-    m2_second = m2_start.shift(1).fillna(False)
+    m2_start  = (pos.eq(0) & pos.shift(-1).eq(0) & prev1.eq(next2) & prev1.ne(0)).astype(bool)
+    m2_second = m2_start.shift(1).fillna(False).astype(bool)
 
-    mask = m1 | m2_start | m2_second
+    mask = (m1 | m2_start | m2_second).astype(bool)
     fill_vals = prev1.where(~m2_second, pos.shift(2))
     pos = pos.where(~mask, fill_vals)
 

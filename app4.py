@@ -8998,7 +8998,7 @@ def simulate_nav_cota() -> None:
                 existing_cols = [col for col in df_hist_dv.columns if col in ativos_para_estrategia]
                 df_hist_dv_filtrado = df_hist_dv[existing_cols]
                 mapper = {col: ativos_para_estrategia[col] for col in existing_cols}
-                df_hist_dv_estrategia = df_hist_dv_filtrado.groupby(by=mapper, axis=1).sum()
+                df_hist_dv_estrategia = df_hist_dv_filtrado.T.groupby(by=mapper).sum().T
 
                 # 2. Normalizar os dados agrupados
                 #df_hist_dv_normalized = df_hist_dv_estrategia.divide(df_hist_dv_estrategia.sum(axis=1), axis=0)
@@ -9035,7 +9035,7 @@ def simulate_nav_cota() -> None:
                 existing_cols = [col for col in df_hist_cv_positive.columns if col in ativos_para_estrategia]
                 df_hist_cv_filtrado = df_hist_cv_positive[existing_cols]
                 mapper = {col: ativos_para_estrategia[col] for col in existing_cols}
-                df_hist_cv_estrategia = df_hist_cv_filtrado.groupby(by=mapper, axis=1).sum()
+                df_hist_cv_estrategia = df_hist_cv_filtrado.T.groupby(by=mapper).sum().T
 
                 df_hist_cv_normalized = df_hist_cv_estrategia.copy()
                 # Se quiser manter o original, deixe assim:
@@ -9072,7 +9072,7 @@ def simulate_nav_cota() -> None:
                 df_filtrado = df_base[existing_cols]
 
                 mapper = {c: ativos_para_estrategia[c] for c in existing_cols}
-                df_cv_estrategia = df_filtrado.groupby(by=mapper, axis=1).sum()
+                df_cv_estrategia = df_filtrado.T.groupby(by=mapper).sum().T
 
                 # =========================
                 # 3) Definir DIREÇÃO-ÂNCORA (por dia)

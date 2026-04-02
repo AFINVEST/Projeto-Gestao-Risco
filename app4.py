@@ -6812,7 +6812,7 @@ def simulate_nav_cota() -> None:
     cdi_series = (
         load_cdi_series()                # já decimal diário
         .reindex(common)               # garante mesmo índice…
-        .fillna(method="ffill")        # …e preenche datas faltantes
+        .ffill()                       # …e preenche datas faltantes
     )
     desp_series = desp_series.reindex(common).fillna(0.0)
 
@@ -7415,7 +7415,7 @@ def simulate_nav_cota() -> None:
         ret_mensal_port = (1 + ret_total ).resample("M").prod().sub(1)
         ret_mensal_cdi  = (1 + cdi_series).resample("M").prod().sub(1)          \
                                         .reindex(ret_mensal_port.index)      \
-                                        .fillna(method="ffill")
+                                        .ffill()
 
         # rótulos sempre em ordem cronológica
         idx   = ret_mensal_port.index
@@ -7495,7 +7495,7 @@ def simulate_nav_cota() -> None:
 
         # 1) Séries mensais (carteira e CDI)
         ret_mensal_port = (1 + ret_total).resample("M").prod().sub(1)
-        ret_mensal_cdi  = (1 + cdi_series).resample("M").prod().sub(1).reindex(ret_mensal_port.index).fillna(method="ffill")
+        ret_mensal_cdi  = (1 + cdi_series).resample("M").prod().sub(1).reindex(ret_mensal_port.index).ffill()
 
         # 2) Helpers
         MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]

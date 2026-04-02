@@ -6843,16 +6843,16 @@ def simulate_nav_cota() -> None:
     next2 = pos.shift(-2)
 
     # 3) Buraco de 1 dia: v → 0 → v
-    m1 = pos.eq(0) & prev1.eq(next1) & prev1.ne(0)
+    m1 = (pos.eq(0) & prev1.eq(next1) & prev1.ne(0)).astype(bool)
 
     # 4) Buraco de 2 dias: v → 0 → 0 → v
     #    marca o 1º zero...
-    m2_start = pos.eq(0) & pos.shift(-1).eq(0) & prev1.eq(next2) & prev1.ne(0)
+    m2_start = (pos.eq(0) & pos.shift(-1).eq(0) & prev1.eq(next2) & prev1.ne(0)).astype(bool)
     #    ...e o 2º zero (dia seguinte ao start)
-    m2_second = m2_start.shift(1).fillna(False)
+    m2_second = m2_start.shift(1).fillna(False).astype(bool)
 
     # 5) Máscara total a preencher
-    mask = m1 | m2_start | m2_second
+    mask = (m1 | m2_start | m2_second).astype(bool)
 
     # 6) Valores de preenchimento:
     #    - para m1 e m2_start: usar prev1 (valor de v do dia anterior)

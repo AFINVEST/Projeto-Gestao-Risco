@@ -5107,19 +5107,21 @@ def switch_to_main():
 @st.cache_data(show_spinner=False, ttl=3600)        # 1 h de cache
 def load_b3_prices() -> pd.DataFrame:
     df = pd.read_parquet("Dados/df_preco_de_ajuste_atual_completo.parquet")
-    df.iloc[:, 1:] = (
-    df.iloc[:, 1:]
-      .replace(r"^\s*$", np.nan, regex=True)
-      .apply(
-          lambda col: pd.to_numeric(
-              col.astype(str)
-                 .str.strip()
-                 .str.replace(".", "", regex=False)
-                 .str.replace(",", ".", regex=False),
-              errors="coerce"
+    cols = df.columns[1:]
+    converted = (
+        df[cols]
+          .replace(r"^\s*$", np.nan, regex=True)
+          .apply(
+              lambda col: pd.to_numeric(
+                  col.astype(str)
+                     .str.strip()
+                     .str.replace(".", "", regex=False)
+                     .str.replace(",", ".", regex=False),
+                  errors="coerce"
+              )
           )
-      )
-)
+    )
+    df = pd.concat([df.iloc[:, :1], converted], axis=1)
     df.loc[df['Assets'] == 'TREASURY', df.columns != 'Assets'] *= 1000
     df.loc[df['Assets'] == 'WDO1',     df.columns != 'Assets'] *= 10
     return df

@@ -7368,8 +7368,8 @@ def simulate_nav_cota() -> None:
 
         # 1) retornos mensais (já em ordem cronológica)
         # ─── 1) dados mensais ------------------------------------------------
-        #ret_mensal_port = (1 + ret_total).resample("M").prod().sub(1)
-        #ret_mensal_cdi  = (1 + cdi_series).resample("M").prod().sub(1)
+        #ret_mensal_port = (1 + ret_total).resample("ME").prod().sub(1)
+        #ret_mensal_cdi  = (1 + cdi_series).resample("ME").prod().sub(1)
         #ret_mensal_cdi  = ret_mensal_cdi.reindex(ret_mensal_port.index)
     #
         #df_mensal = (pd.DataFrame({
@@ -7412,8 +7412,8 @@ def simulate_nav_cota() -> None:
 
         # ───────────────────── Retorno Mensal ───────────────────────
         #st.write("## Retorno Mensal da Carteira")
-        ret_mensal_port = (1 + ret_total ).resample("M").prod().sub(1)
-        ret_mensal_cdi  = (1 + cdi_series).resample("M").prod().sub(1)          \
+        ret_mensal_port = (1 + ret_total ).resample("ME").prod().sub(1)
+        ret_mensal_cdi  = (1 + cdi_series).resample("ME").prod().sub(1)          \
                                         .reindex(ret_mensal_port.index)      \
                                         .ffill()
 
@@ -7494,8 +7494,8 @@ def simulate_nav_cota() -> None:
         import plotly.graph_objects as go
 
         # 1) Séries mensais (carteira e CDI)
-        ret_mensal_port = (1 + ret_total).resample("M").prod().sub(1)
-        ret_mensal_cdi  = (1 + cdi_series).resample("M").prod().sub(1).reindex(ret_mensal_port.index).ffill()
+        ret_mensal_port = (1 + ret_total).resample("ME").prod().sub(1)
+        ret_mensal_cdi  = (1 + cdi_series).resample("ME").prod().sub(1).reindex(ret_mensal_port.index).ffill()
 
         # 2) Helpers
         MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]

@@ -5143,8 +5143,9 @@ def load_ajustes() -> pd.DataFrame:
 
     # Converte todas as colunas de data (tudo menos 'Assets') de pt-BR -> float
     # e transforma strings vazias em NaN (que depois viram null no JSON)
-    df.iloc[:, 1:] = (
-        df.iloc[:, 1:]
+    cols = df.columns[1:]
+    converted = (
+        df[cols]
         .replace(r"^\s*$", np.nan, regex=True)   # "" ou só espaços -> NaN
         .apply(
             lambda col: pd.to_numeric(
@@ -5156,6 +5157,7 @@ def load_ajustes() -> pd.DataFrame:
             )
         )
     )
+    df = pd.concat([df.iloc[:, :1], converted], axis=1)
 
     return df
 

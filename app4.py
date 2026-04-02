@@ -10576,6 +10576,9 @@ def main_page():
 
                 # ===== 3) atualizar a linha Total no df original, apenas nas colunas de contratos =====
                 if total_label is not None:
+                    for _c in contract_cols:
+                        if _c in filtered_df.columns:
+                            filtered_df[_c] = filtered_df[_c].astype(object)
                     filtered_df.loc[total_label, contract_cols] = sum_by_col.round().astype(int)
 
                 # ===== 4) montar visão para tela: manter não-contratos + contratos com soma != 0 =====
@@ -10783,7 +10786,7 @@ def main_page():
                     df_final_T.index = pd.to_datetime(
                         df_final_T.index)  # Convertendo para datetime
                     # Agrupando por mês, somando rendimentos
-                    df_mensal = df_final_T.resample('M').sum()
+                    df_mensal = df_final_T.resample('ME').sum()
                     df_mensal = df_mensal.T  # Transpomos de volta
                     df_final = df_mensal
                     # Removendo o horário das colunas
@@ -10794,7 +10797,7 @@ def main_page():
                     df_final_pl_T.index = pd.to_datetime(
                         df_final_pl_T.index)  # Convertendo para datetime
                     # Agrupando por mês, somando rendimentos
-                    df_mensal_pl = df_final_pl_T.resample('M').sum()
+                    df_mensal_pl = df_final_pl_T.resample('ME').sum()
                     df_mensal_pl = df_mensal_pl.T  # Transpomos de volta
                     df_final_pl = df_mensal_pl
                     # Removendo o horário das colunas
@@ -11917,7 +11920,7 @@ def main_page():
                         df_final_T.index)  # Convertendo para datetime
 
                     # Agrupando por mês, somando rendimentos
-                    df_mensal = df_final_T.resample('M').sum()
+                    df_mensal = df_final_T.resample('ME').sum()
                     df_mensal = df_mensal.T  # Transpomos de volta
                     df_final = df_mensal
                     # Removendo o horário das colunas
@@ -11928,7 +11931,7 @@ def main_page():
                     df_final_pl_T.index = pd.to_datetime(
                         df_final_pl_T.index)  # Convertendo para datetime
                     # Agrupando por mês, somando rendimentos
-                    df_mensal_pl = df_final_pl_T.resample('M').sum()
+                    df_mensal_pl = df_final_pl_T.resample('ME').sum()
                     df_mensal_pl = df_mensal_pl.T  # Transpomos de volta
                     df_final_pl = df_mensal_pl
                     # Removendo o horário das colunas

@@ -968,3 +968,19 @@
 [2026-04-02 15:35:57] [dup-final] (valor) Duplicado 2026-04-01 -> 2026-04-02
 [2026-04-02 15:35:59] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (44, 313) | Dados/df_valor_ajuste_contrato.parquet (33, 313)
 [2026-04-02 15:36:00] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json
+[2026-04-06 11:41:45] [drop-dup] Removendo coluna duplicada 2026-04-02 (cópia de 2026-04-01)
+[2026-04-06 11:41:46] [drop-dup] Removendo coluna duplicada 2026-04-02 (cópia de 2026-04-01)
+[2026-04-06 11:41:46] Atualizando de 2026-04-01 até 2026-04-02 (DU B3: 2)
+[2026-04-06 11:41:48] [HTTP] ConsolidatedTradesDerivatives 2026-04-01 -> status=200 content-length=124998 t=1.75s
+[2026-04-06 11:41:48] [HTTP] md5=64b18f4a296cde443ac2eb3f1a52f90b bytes=631322 (ConsolidatedTradesDerivatives 2026-04-01)
+[2026-04-06 11:41:49] 2026-04-01: base longa atualizada; total linhas = 10836.
+[2026-04-06 11:41:49] 2026-04-01: preços/valores atualizados.
+[2026-04-06 11:41:50] [HTTP] ConsolidatedTradesDerivatives 2026-04-02 -> status=200 content-length=119681 t=1.17s
+[2026-04-06 11:41:50] [HTTP] md5=71ce4a6af25fc2315c0682ea573effdb bytes=607414 (ConsolidatedTradesDerivatives 2026-04-02)
+[2026-04-06 11:41:51] 2026-04-02: base longa atualizada; total linhas = 10955.
+[2026-04-06 11:41:51] 2026-04-02: preços/valores atualizados.
+[2026-04-06 11:41:51] 2026-04-05: não é dia útil B3 — não tenta hoje.
+[2026-04-06 11:41:51] [dup-final] (preço) Duplicado 2026-04-02 -> 2026-04-06
+[2026-04-06 11:41:51] [dup-final] (valor) Duplicado 2026-04-02 -> 2026-04-06
+[2026-04-06 11:41:55] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (44, 314) | Dados/df_valor_ajuste_contrato.parquet (33, 314)
+[2026-04-06 11:41:55] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json

@@ -615,6 +615,9 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
         df_teste = df_teste.sort_values('Dia de Compra')
 
         def agrupar_por_ativo(subdf):
+            # Em pandas 3.0 com groupby, a coluna chave não está mais no subdf
+            # quando as_index=False; usar subdf.name para obter o valor do grupo
+            _ativo = subdf.name if 'Ativo' not in subdf.columns else subdf['Ativo'].iloc[0]
             # Quantidade total
             qtd_total = subdf['Quantidade'].sum()
 
@@ -634,7 +637,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
             # Rendimento recalculado:
             # (Preço Ajuste Atual - Preço Compra Médio) * Quantidade total
             # Rendimento por ativo DAP
-            if 'DAP' in subdf['Ativo'].iloc[0]:
+            if 'DAP' in _ativo:
                 df_ajuste = pd.read_parquet(
                     'Dados/df_valor_ajuste_contrato.parquet')
                 # Ver se a ultima coluna é igual a penultima
@@ -643,7 +646,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                 # Corrigir formatação
                 colunas_datas = df_ajuste.columns[1:]
                 df_ajuste[colunas_datas] = df_ajuste[colunas_datas].replace(
-                    '\.', '', regex=True).replace(',', '.', regex=True)
+                    r'\.', '', regex=True).replace(',', '.', regex=True)
                 df_ajuste[colunas_datas] = df_ajuste[colunas_datas].astype(
                     float)
 
@@ -657,7 +660,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                 df_ajuste = df_ajuste[['Assets'] + colunas_datas_validas]
 
                 # Pegar o nome do ativo (assumindo que todas as linhas do subdf têm o mesmo ativo)
-                ativo = subdf['Ativo'].iloc[0]
+                ativo = _ativo
 
                 # DataFrame de ajustes do ativo
                 linha_ajuste = df_ajuste[df_ajuste['Assets'] == ativo].drop(
@@ -684,7 +687,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                 subdf['Rendimento'] = rendimentos
                 rendimento_final = sum(rendimentos)
 
-            elif 'DI' in subdf['Ativo'].iloc[0]:
+            elif 'DI' in _ativo:
                 df_ajuste = pd.read_parquet('Dados/df_valor_ajuste_contrato.parquet')
 
                 # Se a última coluna é igual à penúltima, remove a última (cópia)
@@ -695,7 +698,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                 colunas_datas = df_ajuste.columns[1:]
                 df_ajuste[colunas_datas] = (
                     df_ajuste[colunas_datas]
-                    .replace('\.', '', regex=True)
+                    .replace(r'\.', '', regex=True)
                     .replace(',', '.', regex=True)
                     .astype(float)
                 )
@@ -708,7 +711,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
                 df_ajuste = df_ajuste[['Assets'] + colunas_datas_validas]
 
                 # Linha de ajuste do ativo
-                ativo = subdf['Ativo'].iloc[0]
+                ativo = _ativo
                 linha_ajuste = df_ajuste[df_ajuste['Assets'] == ativo].drop(columns='Assets')
                 datas_ajuste = pd.to_datetime(linha_ajuste.columns) if not linha_ajuste.empty else pd.to_datetime([])
 

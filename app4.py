@@ -921,15 +921,20 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
 
             # garantir que a coluna seja inteira, se quiser
             df_teste['Id'] = df_teste['Id'].astype(int)
-            # df_compilado contém a versão agrupara por (Ativo, Dia de Compra)
-            df_teste.to_parquet(nome_arquivo_portifolio, index=False)
 
-            # Caso você deseje salvar a versão "bruta" também,
-            # troque "df_compilado" por "df_teste" ou junte ambos.
-            add_data(df_teste.to_dict(orient="records"))
+            # Salvar parquet local (pode falhar no Streamlit Cloud — ignorar)
+            try:
+                df_teste.to_parquet(nome_arquivo_portifolio, index=False)
+            except Exception as e_parquet:
+                st.warning(f"Não foi possível salvar parquet local: {e_parquet}")
 
-            st.success("Novo portfólio compilado salvo com sucesso!")
-            st.dataframe(df_teste)
+            # Salvar no Supabase
+            result = add_data(df_teste.to_dict(orient="records"))
+            if result is None:
+                st.error("Erro ao salvar no Supabase. Verifique os logs do servidor.")
+            else:
+                st.success("Novo portfólio compilado salvo com sucesso!")
+                st.dataframe(df_teste)
             key = True
         else:
             key = False
@@ -3899,7 +3904,8 @@ def add_data(data):
         return response.data
 
     except Exception as e:
-        print(f"Erro detalhado: {e}")
+        print(f"Erro detalhado add_data: {e}")
+        st.error(f"Erro ao salvar no Supabase: {e}")
         return None
 
 

@@ -1133,7 +1133,7 @@ def calcular_metricas_de_fundo3(assets, df_contratos, fundos, op1=True, op2=True
     df_tira = df_contratos.copy()
     df_tira.reset_index(inplace=True)
     df_tira = df_tira[df_tira.columns.drop(list(df_tira.filter(regex='Max|Adm')))]
-    df_tira.rename(columns={'index': 'Fundo'}, inplace=True)
+    df_tira.rename(columns={'index': 'Fundo', 'Fundos/Carteiras Adm': 'Fundo'}, inplace=True)
 
     lista_remove = []
     for fundo2 in fundos[:]:
@@ -1498,7 +1498,7 @@ def calcular_metricas_de_fundo2(assets, df_contratos, fundos, op1 = True, op2 = 
     # Tirar colunas que contenham o nome 'Max' ou 'Adm'
     df_tira = df_tira[df_tira.columns.drop(
         list(df_tira.filter(regex='Max')))]
-    df_tira.rename(columns={'index': 'Fundo'}, inplace=True)
+    df_tira.rename(columns={'index': 'Fundo', 'Fundos/Carteiras Adm': 'Fundo'}, inplace=True)
     lista_remove = []
     for fundo2 in fundos[:]:
         # Filtrar a linha do fundo
@@ -2075,7 +2075,7 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos, op1, o
     # Tirar colunas que contenham o nome 'Max' ou 'Adm'
     df_tira = df_tira[df_tira.columns.drop(
         list(df_tira.filter(regex='Max')))]
-    df_tira.rename(columns={'index': 'Fundo'}, inplace=True)
+    df_tira.rename(columns={'index': 'Fundo', 'Fundos/Carteiras Adm': 'Fundo'}, inplace=True)
     lista_remove = []
     for fundo2 in fundos[:]:
         # Filtrar a linha do fundo
@@ -2654,7 +2654,7 @@ def calcular_metricas_de_fundo_analise(assets, quantidades, df_contratos, fundos
     # Tirar colunas que contenham o nome 'Max' ou 'Adm'
     df_tira = df_tira[df_tira.columns.drop(
         list(df_tira.filter(regex='Max')))]
-    df_tira.rename(columns={'index': 'Fundo'}, inplace=True)
+    df_tira.rename(columns={'index': 'Fundo', 'Fundos/Carteiras Adm': 'Fundo'}, inplace=True)
     lista_remove = []
     for fundo2 in fundos[:]:
         # Filtrar a linha do fundo

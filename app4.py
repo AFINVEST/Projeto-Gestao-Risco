@@ -314,7 +314,12 @@ def processar_b3_portifolio():
 
 ################ DEIXAR ESSA FUNÇÃO ATUALIZADA COM A LISTA DE ASSETS DEFAUTL DO PORTIFÓLIO E SUAS QUANTIDADES ################
 def processar_dados_port():
-    df_assets = pd.read_parquet("Dados/portifolio_posições.parquet")
+    # Tenta ler do Supabase (fonte de verdade); fallback para parquet local
+    _supa = load_data()
+    if _supa:
+        df_assets = pd.DataFrame(_supa)
+    else:
+        df_assets = pd.read_parquet("Dados/portifolio_posições.parquet")
     df_assets.rename(columns={'Unnamed: 0': 'Ativo'}, inplace=True)
     df_portifolio_default = df_assets.copy()
     # Agrupar por ativo e somar as quantidades

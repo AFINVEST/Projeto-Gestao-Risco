@@ -3977,10 +3977,12 @@ def atualizar_parquet_fundos(
     # 1) Ler df_fechamento_b3 e tratar
     df_fechamento_b3 = pd.read_parquet(
         "Dados/df_preco_de_ajuste_atual_completo.parquet")
-    df_fechamento_b3 = df_fechamento_b3.replace('\.', '', regex=True)
+    df_fechamento_b3 = df_fechamento_b3.replace(r'\.', '', regex=True)
     df_fechamento_b3 = df_fechamento_b3.replace({',': '.'}, regex=True)
-    # Converter para float todas as colunas menos a primeira
-    df_fechamento_b3.iloc[:, 2:] = df_fechamento_b3.iloc[:, 2:].astype(float)
+    # Converter para float todas as colunas menos as primeiras duas
+    _cols_num = df_fechamento_b3.columns[2:]
+    _converted = df_fechamento_b3[_cols_num].astype(float)
+    df_fechamento_b3 = pd.concat([df_fechamento_b3.iloc[:, :2], _converted], axis=1)
 
     # Multiplicar a linha que tem o Ativo TREASURY por 1000 e WDO1 por 10
     df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'TREASURY',

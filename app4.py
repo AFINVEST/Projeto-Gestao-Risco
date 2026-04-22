@@ -10560,7 +10560,12 @@ def main_page():
                 col_contratos = [
                     col for col in filtered_df.columns if col.startswith('Contratos')]
                 for col in col_contratos:
-                    filtered_df[col] = df_contratos[col.replace('Contratos ', '')]
+                    asset_name = col.replace('Contratos ', '')
+                    # Só sobrescreve com dados do BaseFundos se o ativo existir lá.
+                    # Ativos novos (ainda não nos arquivos BaseFundos) mantêm a
+                    # distribuição calculada pelo peso de PL dos fundos.
+                    if asset_name in df_contratos.columns:
+                        filtered_df[col] = df_contratos[asset_name]
                 #if columns:
                     # Formatação
                 for c in columns:

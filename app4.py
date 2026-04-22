@@ -362,8 +362,11 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
     # <-- Sua função existente para pegar dados B3
     df_b3_fechamento = processar_b3_portifolio()
 
-    # Carregar (ou criar) o portfólio existente
-    if os.path.exists(nome_arquivo_portifolio):
+    # Carregar (ou criar) o portfólio existente — Supabase tem prioridade sobre parquet local
+    _supa = load_data()
+    if _supa:
+        df_portifolio_salvo = pd.DataFrame(_supa)
+    elif os.path.exists(nome_arquivo_portifolio):
         df_portifolio_salvo = pd.read_parquet(nome_arquivo_portifolio)
     else:
         df_portifolio_salvo = pd.DataFrame(columns=[
@@ -1013,7 +1016,11 @@ def att_portifosições():
     dolar = df_fechamento_b3.loc[df_fechamento_b3['Assets']
                                  == 'WDO1', df_fechamento_b3.columns[-1]].values[0]
 
-    df_portifolio = pd.read_parquet('Dados/portifolio_posições.parquet')
+    _supa = load_data()
+    if _supa:
+        df_portifolio = pd.DataFrame(_supa)
+    else:
+        df_portifolio = pd.read_parquet('Dados/portifolio_posições.parquet')
 
     # Criar dicionário com os preços de fechamento por ativo
     fechamento_dict = df_fechamento_b3.set_index(
@@ -3917,10 +3924,9 @@ def add_data(data):
 # Função para atualizar o registro local com o Supabase
 def att_parquet_supabase():
     df_supabase = load_data()
+    # Só sobrescreve o parquet se o Supabase retornou dados reais.
+    # Se retornou vazio pode ser erro de conexão — preserva o parquet local.
     if not df_supabase:
-        df = pd.DataFrame(columns=["Ativo", "Quantidade", "Dia de Compra",
-                          "Preço de Compra", "Preço de Ajuste Atual", "Rendimento"])
-        df.to_parquet("Dados/portifolio_posições.parquet", index=False)
         return
     df = pd.DataFrame(df_supabase)
     df.to_parquet("Dados/portifolio_posições.parquet", index=False)

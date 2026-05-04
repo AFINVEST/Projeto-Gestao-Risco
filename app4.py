@@ -132,8 +132,8 @@ def load_and_process_divone2(file_bbg, df_excel):
     dap = dap[['Nome', 'DV01']]
 
     # --- 3) Monta a série de atualização (DI + DAP) ---
-    s_di  = di.set_index('Nome')['DV01'].astype(float)
-    s_dap = dap.set_index('Nome')['DV01'].astype(float)
+    s_di  = pd.to_numeric(di.set_index('Nome')['DV01'], errors='coerce')
+    s_dap = pd.to_numeric(dap.set_index('Nome')['DV01'], errors='coerce')
     s_upd = pd.concat([s_di, s_dap])  # índice = nomes dos ativos, valores = DV01
 
     # Filtra apenas os ativos que existem no df_divone

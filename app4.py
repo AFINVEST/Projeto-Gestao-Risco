@@ -3888,6 +3888,13 @@ def update_base_fundos(ativo_escolhido, dia_compra_escolhido):
                         if conn.closed == 0:
                             conn.close()
 
+        # Espelha o delete na tabela posicoes_por_fundo
+        try:
+            delete_posicao_por_fundo(ativo_escolhido, dia_compra_escolhido)
+            invalidar_caches_posicoes()
+        except Exception as _e_ppf:
+            print(f"[posicoes_por_fundo] erro espelhando delete: {_e_ppf}")
+
         return resultados
 
     except Exception as e:
@@ -3902,6 +3909,211 @@ def load_data():
     except Exception as e:
         return []
 
+
+# =====================================================================
+# Helpers da tabela posicoes_por_fundo (espelha BaseFundos no Supabase)
+# =====================================================================
+import math as _ppf_math
+
+_TABELA_PPF = "posicoes_por_fundo"
+
+
+def _ppf_safe_float(v):
+    """Converte para float ou None (NaN/Inf -> None)."""
+    if v is None:
+        return None
+    try:
+        if pd.isna(v):
+            return None
+    except Exception:
+        pass
+    try:
+        f = float(v)
+        if _ppf_math.isnan(f) or _ppf_math.isinf(f):
+            return None
+        return f
+    except Exception:
+        return None
+
+
+def load_posicoes_por_fundo() -> pd.DataFrame:
+    """Lê toda a tabela posicoes_por_fundo do Supabase."""
+    try:
+        rows = []
+        offset = 0
+        page = 1000
+        while True:
+            resp = (
+                supabase.table(_TABELA_PPF)
+                .select("*")
+                .range(offset, offset + page - 1)
+                .execute()
+            )
+            data = resp.data or []
+            if not data:
+                break
+            rows.extend(data)
+            if len(data) < page:
+                break
+            offset += page
+        if not rows:
+            return pd.DataFrame(
+                columns=["Fundo", "Ativo", "Data", "Quantidade",
+                         "Preco_Compra", "Preco_Fechamento", "PL", "Rendimento"]
+            )
+        df = pd.DataFrame(rows)
+        df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
+        for col in ("Quantidade", "Preco_Compra", "Preco_Fechamento", "PL", "Rendimento"):
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df
+    except Exception as e:
+        print(f"[posicoes_por_fundo] erro de leitura: {e}")
+        return pd.DataFrame()
+
+
+def upsert_posicoes_por_fundo(registros) -> bool:
+    """Upsert idempotente em lotes; chave única (Fundo, Ativo, Data)."""
+    if not registros:
+        return True
+    payload = []
+    for r in registros:
+        try:
+            data_v = r["Data"]
+            if isinstance(data_v, pd.Timestamp):
+                data_iso = data_v.date().isoformat()
+            else:
+                data_iso = pd.to_datetime(data_v).date().isoformat()
+        except Exception:
+            continue
+        q = _ppf_safe_float(r.get("Quantidade"))
+        payload.append({
+            "Fundo": str(r["Fundo"]),
+            "Ativo": str(r["Ativo"]),
+            "Data":  data_iso,
+            "Quantidade":       q if q is not None else 0.0,
+            "Preco_Compra":     _ppf_safe_float(r.get("Preco_Compra")),
+            "Preco_Fechamento": _ppf_safe_float(r.get("Preco_Fechamento")),
+            "PL":               _ppf_safe_float(r.get("PL")),
+            "Rendimento":       _ppf_safe_float(r.get("Rendimento")),
+        })
+    try:
+        BATCH = 500
+        for i in range(0, len(payload), BATCH):
+            lote = payload[i: i + BATCH]
+            (supabase.table(_TABELA_PPF)
+                     .upsert(lote, on_conflict="Fundo,Ativo,Data")
+                     .execute())
+        invalidar_caches_posicoes()
+        return True
+    except Exception as e:
+        print(f"[posicoes_por_fundo] erro de upsert: {e}")
+        try:
+            st.error(f"Erro ao gravar posicoes_por_fundo: {e}")
+        except Exception:
+            pass
+        return False
+
+
+def delete_posicao_por_fundo(ativo, data, fundo=None) -> bool:
+    """Apaga linhas (Ativo, Data) -- e Fundo se fornecido -- da tabela."""
+    try:
+        data_iso = pd.to_datetime(data).date().isoformat()
+        q = supabase.table(_TABELA_PPF).delete().eq("Ativo", ativo).eq("Data", data_iso)
+        if fundo is not None:
+            q = q.eq("Fundo", fundo)
+        q.execute()
+        invalidar_caches_posicoes()
+        return True
+    except Exception as e:
+        print(f"[posicoes_por_fundo] erro de delete: {e}")
+        return False
+
+
+def read_atual_contratos_supabase() -> pd.DataFrame:
+    """Pivot Fundo (linhas) x Ativo (colunas) com soma de Quantidade.
+    Fallback para leitura local se Supabase estiver vazio."""
+    df = load_posicoes_por_fundo()
+    if df is None or df.empty:
+        try:
+            return read_atual_contratos()
+        except Exception:
+            return pd.DataFrame()
+    agrupado = (df.groupby(["Fundo", "Ativo"], as_index=False)["Quantidade"].sum())
+    pivot = agrupado.pivot(index="Fundo", columns="Ativo", values="Quantidade").fillna(0)
+    return pivot
+
+
+def load_basefundos_supabase() -> dict:
+    """Equivalente do antigo load_basefundos(), formato wide reconstruído."""
+    df = load_posicoes_por_fundo()
+    if df is None or df.empty:
+        try:
+            return _load_basefundos_local()
+        except Exception:
+            return {}
+    out = {}
+    df["Data"] = pd.to_datetime(df["Data"]).dt.strftime("%Y-%m-%d")
+    for fundo, sub in df.groupby("Fundo"):
+        sub = sub.copy()
+        partes = []
+        for metrica in ("PL", "Preco_Fechamento", "Preco_Compra", "Quantidade", "Rendimento"):
+            if metrica not in sub.columns:
+                continue
+            piv = sub.pivot_table(
+                index="Ativo", columns="Data", values=metrica, aggfunc="last"
+            )
+            piv.columns = [f"{c} - {metrica}" for c in piv.columns]
+            partes.append(piv)
+        if not partes:
+            continue
+        wide = pd.concat(partes, axis=1).sort_index(axis=1)
+        wide = wide.reset_index()
+        out[fundo] = wide
+    return out
+
+
+def invalidar_caches_posicoes() -> None:
+    """Limpa caches do Streamlit que dependem das posições."""
+    try:
+        st.cache_data.clear()
+    except Exception:
+        pass
+    try:
+        st.cache_resource.clear()
+    except Exception:
+        pass
+    try:
+        st.session_state.pop("_risk_bundle", None)
+        st.session_state.pop("df_precos_ajustados_base", None)
+    except Exception:
+        pass
+
+
+def _ppf_signature() -> tuple:
+    """Assinatura da carteira (max Id + total) para invalidar cache do bundle."""
+    try:
+        resp = (supabase.table('portfolio_posicoes')
+                        .select('"Id"')
+                        .order('"Id"', desc=True)
+                        .limit(1)
+                        .execute())
+        max_id = resp.data[0]["Id"] if resp.data else 0
+        cnt = (supabase.table('portfolio_posicoes')
+                       .select("Id", count="exact")
+                       .limit(1)
+                       .execute())
+        total = cnt.count or 0
+        return (int(max_id), int(total))
+    except Exception:
+        return (int(pd.Timestamp.utcnow().value // 60_000_000_000), 0)
+
+
+# =====================================================================
+# Fim dos helpers de posicoes_por_fundo
+# =====================================================================
+
+
 # Adicionar um novo registro no Supabase
 
 
@@ -3913,6 +4125,7 @@ def add_data(data):
         # 2. Insere os dados novos
         response = supabase.table('portfolio_posicoes').insert(data).execute()
         print("Resposta do Supabase:", response)
+        invalidar_caches_posicoes()
         return response.data
 
     except Exception as e:
@@ -3960,6 +4173,7 @@ def update_data(data):
 
         print("Resposta do Supabase:", response)
         att_parquet_supabase()
+        invalidar_caches_posicoes()
         return response.data
 
     except Exception as e:
@@ -3972,6 +4186,7 @@ def delete_data(ativo, dia_compra):
         response = supabase.table("portfolio_posicoes").delete().match(
             {"Ativo": ativo, "Dia de Compra": dia_compra}).execute()
         print("Registro removido:", response)
+        invalidar_caches_posicoes()
     except Exception as e:
         print("Erro ao remover ativo:", e)
 
@@ -4289,6 +4504,45 @@ def atualizar_parquet_fundos(
         status_container.markdown(" | ".join(mensagens))
         add_data_2(df_fundo, table_name)  # permanece a mesma chamada
         print(f"[{fundo}] -> parquet atualizado: {nome_arquivo_parquet}")
+
+    # ---------- Espelho no Supabase (posicoes_por_fundo) ----------
+    try:
+        registros_ppf = []
+        for arquivo_ppf in os.listdir("BaseFundos"):
+            if not arquivo_ppf.endswith(".parquet"):
+                continue
+            nome_fundo_ppf = arquivo_ppf.rsplit(".", 1)[0]
+            if nome_fundo_ppf.upper() == "TOTAL":
+                continue
+            df_f_ppf = pd.read_parquet(os.path.join("BaseFundos", arquivo_ppf))
+            if "Ativo" not in df_f_ppf.columns:
+                if df_f_ppf.index.name == "Ativo":
+                    df_f_ppf = df_f_ppf.reset_index()
+                else:
+                    continue
+            col_PL_ppf = f"{dia_operacao} - PL"
+            col_Pf_ppf = f"{dia_operacao} - Preco_Fechamento"
+            col_Pc_ppf = f"{dia_operacao} - Preco_Compra"
+            col_Q_ppf  = f"{dia_operacao} - Quantidade"
+            col_R_ppf  = f"{dia_operacao} - Rendimento"
+            for _, row_ppf in df_f_ppf.iterrows():
+                ativo_ppf = row_ppf.get("Ativo")
+                if pd.isna(ativo_ppf):
+                    continue
+                registros_ppf.append({
+                    "Fundo": nome_fundo_ppf,
+                    "Ativo": str(ativo_ppf),
+                    "Data":  dia_operacao,
+                    "Quantidade":       row_ppf.get(col_Q_ppf),
+                    "Preco_Compra":     row_ppf.get(col_Pc_ppf),
+                    "Preco_Fechamento": row_ppf.get(col_Pf_ppf),
+                    "PL":               row_ppf.get(col_PL_ppf),
+                    "Rendimento":       row_ppf.get(col_R_ppf),
+                })
+        if registros_ppf:
+            upsert_posicoes_por_fundo(registros_ppf)
+    except Exception as _e_ppf_outer:
+        print(f"[posicoes_por_fundo] erro espelhando upsert: {_e_ppf_outer}")
 
 
 def analisar_performance_fundos(
@@ -5149,9 +5403,11 @@ def load_b3_prices() -> pd.DataFrame:
     return df
 
 # aproveita a função já existente, mas cacheia a saída
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl=120)
 def read_atual_contratos_cached():
-    return read_atual_contratos()
+    # Fonte primária: tabela posicoes_por_fundo no Supabase
+    # (read_atual_contratos antigo continua sendo fallback)
+    return read_atual_contratos_supabase()
 
 
 @st.cache_data(show_spinner=False)
@@ -5183,15 +5439,29 @@ def load_ajustes() -> pd.DataFrame:
 
     return df
 
-@st.cache_data(show_spinner=False)
-def load_basefundos() -> dict[str, pd.DataFrame]:
-    """Lê todos os arquivos de BaseFundos apenas 1x por sessão."""
+def _load_basefundos_local() -> dict[str, pd.DataFrame]:
+    """Versão antiga: lê BaseFundos do disco. Usada como fallback."""
     out = {}
     for f in os.listdir("BaseFundos"):
         nome = f.rsplit(".", 1)[0]
         df   = pd.read_parquet(f"BaseFundos/{f}").set_index("Ativo")
         out[nome] = df
     return out
+
+
+@st.cache_data(show_spinner=False, ttl=120)
+def load_basefundos() -> dict[str, pd.DataFrame]:
+    """Lê o estado dos fundos primariamente do Supabase (fallback local)."""
+    out = load_basefundos_supabase()
+    if not out:
+        out = _load_basefundos_local()
+    fixed = {}
+    for nome, df in out.items():
+        if "Ativo" in df.columns:
+            fixed[nome] = df.set_index("Ativo")
+        else:
+            fixed[nome] = df
+    return fixed
 
 
 @st.cache_data(show_spinner="Lendo PL…", ttl=3600)      # 1 h de validade
@@ -6543,15 +6813,13 @@ def process_returns_with_b3(df_b3_fechamento, assets):
 
 # Atualizando a função `get_risk_static_bundle` para refletir o uso correto do `df_b3_fechamento`
 @st.cache_resource(show_spinner=False)
-def get_risk_static_bundle(pl_signature: tuple, interpret_quantities: str = "delta"):
+def get_risk_static_bundle(pl_signature: tuple,
+                           interpret_quantities: str = "delta",
+                           positions_signature: tuple = ()):
     """
-    Atualiza a função para garantir o uso correto dos dados de fechamento e correção das posições.
+    Bundle de risco. A chave de cache passa a depender também das posições
+    (positions_signature) para invalidar quando a carteira muda.
     """
-    # Verificar se o bundle já está no session_state
-    if '_risk_bundle' in st.session_state:
-        return st.session_state['_risk_bundle']  # Se já estiver no session_state, apenas retorna
-
-    # Caso não esteja no session_state, cria o bundle
     b = {}
 
     # Processar dados do portfólio
@@ -6618,8 +6886,6 @@ def get_risk_static_bundle(pl_signature: tuple, interpret_quantities: str = "del
         "signature": bundle_signature,
         "dv01_pc": dv01_per_contract,  # Incluindo 'dv01_pc' no bundle
     }
-
-    st.session_state['_risk_bundle'] = b  # Armazenar no session_state para evitar recalculo
 
     return b
 
@@ -6840,7 +7106,7 @@ def simulate_nav_cota() -> None:
 
     # 1) Bundle estático e “ponte” no session_state
     pl_sig = (int(pl_series.index[0].value), int(pl_series.index[-1].value), len(pl_series))
-    bundle = get_risk_static_bundle(pl_sig, interpret_quantities="delta")
+    bundle = get_risk_static_bundle(pl_sig, interpret_quantities="delta", positions_signature=_ppf_signature())
 
     #Printar a parte de positions_ts
     #st.write(bundle["positions_ts"])

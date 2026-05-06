@@ -4061,7 +4061,7 @@ def load_basefundos_supabase() -> dict:
             if metrica not in sub.columns:
                 continue
             piv = sub.pivot_table(
-                index="Ativo", columns="Data", values=metrica, aggfunc="last"
+                index="Ativo", columns="Data", values=metrica, aggfunc="last", dropna=False
             )
             piv.columns = [f"{c} - {metrica}" for c in piv.columns]
             partes.append(piv)

@@ -11150,7 +11150,8 @@ def main_page():
                     # Extrai os nomes dos fundos
                     lista_fundos = [i.split(' - ')[1] for i in lista_fundos]
                     lista_fundos = list(set(lista_fundos))  # Remove duplicatas
-                    lista_fundos.remove('Total')
+                    if 'Total' in lista_fundos:
+                        lista_fundos.remove('Total')
                     lista_ativos = df_final.index
                     lista_ativos = lista_ativos.tolist()
                     lista_ativos = [i.split(' - ')[0] for i in lista_ativos]

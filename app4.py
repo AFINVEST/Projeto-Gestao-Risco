@@ -4032,6 +4032,7 @@ def delete_posicao_por_fundo(ativo, data, fundo=None) -> bool:
 
 def read_atual_contratos_supabase() -> pd.DataFrame:
     """Pivot Fundo (linhas) x Ativo (colunas) com soma de Quantidade.
+    Inclui linha 'Total' agregada (compatível com BaseFundos legado).
     Fallback para leitura local se Supabase estiver vazio."""
     df = load_posicoes_por_fundo()
     if df is None or df.empty:
@@ -4041,6 +4042,9 @@ def read_atual_contratos_supabase() -> pd.DataFrame:
             return pd.DataFrame()
     agrupado = (df.groupby(["Fundo", "Ativo"], as_index=False)["Quantidade"].sum())
     pivot = agrupado.pivot(index="Fundo", columns="Ativo", values="Quantidade").fillna(0)
+    # Linha agregada 'Total' (o BaseFundos antigo tinha Total.parquet — código abaixo espera)
+    if 'Total' not in pivot.index:
+        pivot.loc['Total'] = pivot.sum(axis=0)
     return pivot
 
 

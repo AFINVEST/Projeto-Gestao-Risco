@@ -769,7 +769,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
     # --------------------------------------------------------------------
     # Lógica para df_contratos etc.
     # --------------------------------------------------------------------
-    df_contratos_2 = read_atual_contratos()
+    df_contratos_2 = read_atual_contratos_cached()
     for col in df_contratos_2.columns:
         df_contratos_2.rename(columns={col: f'Contratos {col}'}, inplace=True)
 
@@ -10021,7 +10021,7 @@ def main_page():
 
             df_precos_ajustados_copy = df_precos_ajustados.copy()
 
-            df_contratos_2 = read_atual_contratos()
+            df_contratos_2 = read_atual_contratos_cached()
             # Adicionar os contratos já existentes df_precos_ajustados
             for col in df_contratos_2.columns:
                 if col in df_precos_ajustados_copy.index:

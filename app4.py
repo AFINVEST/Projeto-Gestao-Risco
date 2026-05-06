@@ -4529,14 +4529,21 @@ def atualizar_parquet_fundos(
                 ativo_ppf = row_ppf.get("Ativo")
                 if pd.isna(ativo_ppf):
                     continue
+                qtd_v = row_ppf.get(col_Q_ppf)
+                pc_v  = row_ppf.get(col_Pc_ppf)
+                pl_v  = row_ppf.get(col_PL_ppf)
+                # Só registra se a operação realmente existe nesse parquet pra esse dia
+                qtd_zero = pd.isna(qtd_v) or float(qtd_v) == 0
+                if qtd_zero and pd.isna(pc_v) and pd.isna(pl_v):
+                    continue
                 registros_ppf.append({
                     "Fundo": nome_fundo_ppf,
                     "Ativo": str(ativo_ppf),
                     "Data":  dia_operacao,
-                    "Quantidade":       row_ppf.get(col_Q_ppf),
-                    "Preco_Compra":     row_ppf.get(col_Pc_ppf),
+                    "Quantidade":       qtd_v,
+                    "Preco_Compra":     pc_v,
                     "Preco_Fechamento": row_ppf.get(col_Pf_ppf),
-                    "PL":               row_ppf.get(col_PL_ppf),
+                    "PL":               pl_v,
                     "Rendimento":       row_ppf.get(col_R_ppf),
                 })
         if registros_ppf:

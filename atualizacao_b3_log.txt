@@ -1542,3 +1542,24 @@
 [2026-05-20 13:08:13] [dup-final] (valor) Duplicado 2026-05-19 -> 2026-05-20
 [2026-05-20 13:08:18] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (44, 344) | Dados/df_valor_ajuste_contrato.parquet (33, 344)
 [2026-05-20 13:08:18] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json
+[2026-05-21 14:28:40] [drop-dup] Removendo coluna duplicada 2026-05-20 (cópia de 2026-05-19)
+[2026-05-21 14:28:40] [drop-dup] Removendo coluna duplicada 2026-05-20 (cópia de 2026-05-19)
+[2026-05-21 14:28:41] Atualizando de 2026-05-19 até 2026-05-20 (DU B3: 2)
+[2026-05-21 14:28:42] [HTTP] ConsolidatedTradesDerivatives 2026-05-19 -> status=200 content-length=126079 t=0.86s
+[2026-05-21 14:28:42] [HTTP] md5=80d796b178d8bedf3603c1176cb215ba bytes=633267 (ConsolidatedTradesDerivatives 2026-05-19)
+[2026-05-21 14:28:42] 2026-05-19: base longa atualizada; total linhas = 14520.
+[2026-05-21 14:28:42] 2026-05-19: preços/valores atualizados.
+[2026-05-21 14:28:43] [HTTP] ConsolidatedTradesDerivatives 2026-05-20 -> status=200 content-length=127053 t=0.42s
+[2026-05-21 14:28:43] [HTTP] md5=3ee39d220ecc1bf5e24d3e8fa2c6f5ad bytes=639425 (ConsolidatedTradesDerivatives 2026-05-20)
+[2026-05-21 14:28:43] 2026-05-20: base longa atualizada; total linhas = 14638.
+[2026-05-21 14:28:43] 2026-05-20: preços/valores atualizados.
+[2026-05-21 14:28:43] [today-check] Coleta EXATA do dia 2026-05-20 (sem backfill).
+[2026-05-21 14:28:44] [HTTP] ConsolidatedTradesDerivatives 2026-05-20 -> status=200 content-length=127053 t=0.42s
+[2026-05-21 14:28:44] [HTTP] md5=3ee39d220ecc1bf5e24d3e8fa2c6f5ad bytes=639425 (ConsolidatedTradesDerivatives 2026-05-20)
+[2026-05-21 14:28:44] [today-ok] Dados encontrados para 2026-05-20: 118 linhas.
+[2026-05-21 14:28:44] 2026-05-20: base longa atualizada (hoje); total linhas = 14638.
+[2026-05-21 14:28:44] 2026-05-20: preços/valores de HOJE adicionados.
+[2026-05-21 14:28:44] [dup-final] (preço) Duplicado 2026-05-20 -> 2026-05-21
+[2026-05-21 14:28:44] [dup-final] (valor) Duplicado 2026-05-20 -> 2026-05-21
+[2026-05-21 14:28:47] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (44, 345) | Dados/df_valor_ajuste_contrato.parquet (33, 345)
+[2026-05-21 14:28:47] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json

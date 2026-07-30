@@ -2033,3 +2033,28 @@
 [2026-07-28 10:35:58] [dup-final] (valor) Duplicado 2026-07-27 -> 2026-07-28
 [2026-07-28 10:36:02] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (44, 392) | Dados/df_valor_ajuste_contrato.parquet (33, 392)
 [2026-07-28 10:36:02] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json
+[2026-07-30 10:27:10] [drop-dup] Removendo coluna duplicada 2026-07-28 (cópia de 2026-07-27)
+[2026-07-30 10:27:12] [drop-dup] Removendo coluna duplicada 2026-07-28 (cópia de 2026-07-27)
+[2026-07-30 10:27:14] Atualizando de 2026-07-27 até 2026-07-29 (DU B3: 3)
+[2026-07-30 10:27:19] [HTTP] ConsolidatedTradesDerivatives 2026-07-27 -> status=200 content-length=86373 t=3.94s
+[2026-07-30 10:27:19] [HTTP] md5=f452c71ec812746a011d8e820d9dd0cb bytes=580173 (ConsolidatedTradesDerivatives 2026-07-27)
+[2026-07-30 10:27:20] 2026-07-27: base longa atualizada; total linhas = 20236.
+[2026-07-30 10:27:20] 2026-07-27: preços/valores atualizados.
+[2026-07-30 10:27:22] [HTTP] ConsolidatedTradesDerivatives 2026-07-28 -> status=200 content-length=124559 t=0.98s
+[2026-07-30 10:27:22] [HTTP] md5=cb992ed1038c1dca851fe858cbca39b2 bytes=615415 (ConsolidatedTradesDerivatives 2026-07-28)
+[2026-07-30 10:27:22] 2026-07-28: base longa atualizada; total linhas = 20355.
+[2026-07-30 10:27:23] 2026-07-28: preços/valores atualizados.
+[2026-07-30 10:27:24] [HTTP] ConsolidatedTradesDerivatives 2026-07-29 -> status=200 content-length=123925 t=1.17s
+[2026-07-30 10:27:24] [HTTP] md5=87402edc17c301f801f67074a738be95 bytes=616120 (ConsolidatedTradesDerivatives 2026-07-29)
+[2026-07-30 10:27:25] 2026-07-29: base longa atualizada; total linhas = 20474.
+[2026-07-30 10:27:25] 2026-07-29: preços/valores atualizados.
+[2026-07-30 10:27:26] [today-check] Coleta EXATA do dia 2026-07-29 (sem backfill).
+[2026-07-30 10:27:26] [HTTP] ConsolidatedTradesDerivatives 2026-07-29 -> status=200 content-length=123925 t=0.89s
+[2026-07-30 10:27:27] [HTTP] md5=87402edc17c301f801f67074a738be95 bytes=616120 (ConsolidatedTradesDerivatives 2026-07-29)
+[2026-07-30 10:27:27] [today-ok] Dados encontrados para 2026-07-29: 119 linhas.
+[2026-07-30 10:27:27] 2026-07-29: base longa atualizada (hoje); total linhas = 20474.
+[2026-07-30 10:27:27] 2026-07-29: preços/valores de HOJE adicionados.
+[2026-07-30 10:27:27] [dup-final] (preço) Duplicado 2026-07-29 -> 2026-07-30
+[2026-07-30 10:27:27] [dup-final] (valor) Duplicado 2026-07-29 -> 2026-07-30
+[2026-07-30 10:27:29] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (44, 394) | Dados/df_valor_ajuste_contrato.parquet (33, 394)
+[2026-07-30 10:27:29] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json

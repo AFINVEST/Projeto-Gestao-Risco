@@ -5460,31 +5460,9 @@ def _load_basefundos_local() -> dict[str, pd.DataFrame]:
     return out
 
 
-# ── alias antigo -> novo (idempotente) — patch fase2c ───────────────────────
-import re as _re_bf
-_RE_DAP_NOVO_BF   = _re_bf.compile(r"^DAP_[KQ]\d{2}$")
-_RE_DAP_ANTIGO_BF = _re_bf.compile(r"^DAP(\d{2})$")
-_RE_DI_NOVO_BF    = _re_bf.compile(r"^DI_[FJNV]\d{2}$")
-_RE_DI_ANTIGO_BF  = _re_bf.compile(r"^DI_(\d{2})$")
-
-def _alias_ativo_novo_bf(a) -> str:
-    s = str(a).strip()
-    if _RE_DAP_NOVO_BF.match(s) or _RE_DI_NOVO_BF.match(s):
-        return s
-    m = _RE_DAP_ANTIGO_BF.match(s)
-    if m:
-        yy = int(m.group(1))
-        return f"DAP_{'Q' if yy % 2 == 0 else 'K'}{yy:02d}"
-    m = _RE_DI_ANTIGO_BF.match(s)
-    if m:
-        return f"DI_F{m.group(1)}"
-    return s
-# ────────────────────────────────────────────────────────────────────────────
-
 @st.cache_data(show_spinner=False, ttl=120)
 def load_basefundos() -> dict[str, pd.DataFrame]:
-    """Lê o estado dos fundos primariamente do Supabase (fallback local).
-    Aplica alias antigo->novo (fase2c) — idempotente."""
+    """Lê o estado dos fundos primariamente do Supabase (fallback local)."""
     out = load_basefundos_supabase()
     if not out:
         out = _load_basefundos_local()
@@ -5494,11 +5472,6 @@ def load_basefundos() -> dict[str, pd.DataFrame]:
             fixed[nome] = df.set_index("Ativo")
         else:
             fixed[nome] = df
-        # alias in-memory (blindagem contra naming antigo em qualquer fonte)
-        try:
-            fixed[nome].index = fixed[nome].index.map(_alias_ativo_novo_bf)
-        except Exception:
-            pass
     return fixed
 
 

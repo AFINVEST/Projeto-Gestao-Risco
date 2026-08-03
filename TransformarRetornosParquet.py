@@ -1,12 +1,15 @@
 """
-TransformarRetornosParquet.py  (v2 — aplica alias de naming antigo -> novo)
+TransformarRetornosParquet.py  (v3 — naming NOVO em df_inicial + df_divone)
 ============================================================================
 
 MUDANÇAS EM RELAÇÃO AO ORIGINAL:
-  - Ao converter BaseFundos/*.csv -> BaseFundos/*.parquet, aplica alias
-    antigo -> novo na coluna 'Ativo' (DAP30 -> DAP_Q30, DI_27 -> DI_F27, etc).
-  - Idempotente: nomes que já estão no naming novo passam direto.
-  - Restante do ETL (BBG excel, df_divone, LFT) permanece IDÊNTICO ao original.
+  - CSV -> parquet em BaseFundos/ aplica alias antigo -> novo na coluna 'Ativo'.
+  - df_inicial.parquet e df_divone.parquet gravados com naming NOVO
+    (DI_F26, DAP_Q30 etc.). Elimina divergência entre load_basefundos
+    (naming novo, patchado) e load_and_process_excel (que consome df_inicial).
+  - Restante do ETL (BBG excel, LFT) permanece IDÊNTICO ao original.
+
+Idempotente: se o CSV/planilha já vier com naming novo, alias é no-op.
 """
 import pandas as pd
 import numpy as np
@@ -16,7 +19,7 @@ import glob
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Alias antigo -> novo (mesma lógica de cota_portfolio_core e migrar_basefundos)
+# Alias antigo -> novo (idempotente)
 # ─────────────────────────────────────────────────────────────────────────────
 _RE_DAP_NOVO   = re.compile(r"^DAP_[KQ]\d{2}$")
 _RE_DAP_ANTIGO = re.compile(r"^DAP(\d{2})$")
@@ -39,6 +42,11 @@ def _alias_ativo_novo(ativo) -> str:
     return s
 
 
+def _alias_columns(cols):
+    """Aplica alias a uma lista/Index de nomes de colunas."""
+    return [_alias_ativo_novo(c) for c in cols]
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 1) CSVs top-level -> parquet (comportamento original)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -52,13 +60,12 @@ print('Conversão finalizada (top-level)')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2) CSVs de BaseFundos/ -> parquet — COM APLICAÇÃO DE ALIAS
+# 2) CSVs de BaseFundos/ -> parquet — APLICA ALIAS NA COLUNA Ativo
 # ─────────────────────────────────────────────────────────────────────────────
 files = glob.glob('BaseFundos/*.csv')
 for file in files:
     df = pd.read_csv(file)
 
-    # Aplica alias na coluna 'Ativo' (se existir)
     col_ativo = None
     for cand in ("Ativo", "ativo", "ATIVO"):
         if cand in df.columns:
@@ -70,8 +77,7 @@ for file in files:
         renames = [(a, b) for a, b in zip(antigos, novos) if a != b]
         if renames:
             df[col_ativo] = novos
-            renames_unicos = sorted(set(renames))
-            print(f'[alias] {os.path.basename(file)}: {len(renames)} renames — {renames_unicos}')
+            print(f'[alias] {os.path.basename(file)}: {len(renames)} renames — {sorted(set(renames))}')
 
     df.to_parquet(file.replace('.csv', '.parquet'), index=False)
     os.remove(file)
@@ -90,7 +96,7 @@ df3 = pd.read_parquet('Dados/pl_fundos_teste.parquet')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4) BBG (ECO DASH) — DI/DAP/WDO/TREASURY/IBOV/NTNB (comportamento original)
+# 4) BBG (ECO DASH) -> df_inicial.parquet — NOMES COM NAMING NOVO
 # ─────────────────────────────────────────────────────────────────────────────
 file_bbg = 'Dados/BBG - ECO DASH.xlsx'
 df = pd.read_excel(file_bbg, sheet_name='BZ RATES',
@@ -103,37 +109,45 @@ df = df.drop([0])
 df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y')
 df.drop(['WSP1 Index'], axis=1, inplace=True)
 
+# NAMING NOVO (era: DI_26, DI_27, ..., DAP26, DAP27, ...)
 df.columns = [
-    'Date', 'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
-    'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP26', 'DAP27',
-    'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY', 'IBOV',
-    'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40', 'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'
+    'Date',
+    'DI_F26', 'DI_F27', 'DI_F28', 'DI_F29', 'DI_F30',
+    'DI_F31', 'DI_F32', 'DI_F33', 'DI_F35',
+    'DAP_Q26', 'DAP_K27', 'DAP_Q28', 'DAP_Q30', 'DAP_Q32', 'DAP_K35', 'DAP_Q40',
+    'WDO1', 'TREASURY', 'IBOV',
+    'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40',
+    'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'
 ]
 
 df.to_parquet('Dados/df_inicial.parquet')
+print(f'df_inicial.parquet salvo com naming novo ({df.shape[1]-1} cols)')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5) DIV01 — comportamento original
+# 5) DIV01 -> df_divone.parquet — NOMES COM NAMING NOVO
 # ─────────────────────────────────────────────────────────────────────────────
 df_divone = pd.read_excel(file_bbg, sheet_name='DIV01',
                           skiprows=1, usecols='E:F', nrows=31)
 df_divone = df_divone.T
 
-columns = [
-    'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
-    'DI_31', 'DI_32', 'DI_33', 'DI_35', 'DAP26', 'DAP27',
-    'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'WDO1', 'TREASURY', 'IBOV', 'S&P',
-    'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40', 'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'
+columns_novo = [
+    'DI_F26', 'DI_F27', 'DI_F28', 'DI_F29', 'DI_F30',
+    'DI_F31', 'DI_F32', 'DI_F33', 'DI_F35',
+    'DAP_Q26', 'DAP_K27', 'DAP_Q28', 'DAP_Q30', 'DAP_Q32', 'DAP_K35', 'DAP_Q40',
+    'WDO1', 'TREASURY', 'IBOV', 'S&P',
+    'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40',
+    'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'
 ]
 
-df_divone.columns = columns
+df_divone.columns = columns_novo
 df_divone = df_divone.drop(df_divone.index[0])
 df_divone.to_parquet('Dados/df_divone.parquet')
+print(f'df_divone.parquet salvo com naming novo ({df_divone.shape[1]} cols)')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6) NTNB — comportamento original
+# 6) NTNB (comportamento original)
 # ─────────────────────────────────────────────────────────────────────────────
 df_ntnb = pd.read_excel('Dados/FechamentoNTNBs.xlsx')
 df_ntnb.columns = df_ntnb.iloc[0]
@@ -164,7 +178,7 @@ df_precos.to_parquet('Dados/df_preco_de_ajuste_atual_completo.parquet')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 7) LFT — comportamento original
+# 7) LFT (comportamento original)
 # ─────────────────────────────────────────────────────────────────────────────
 dados = pd.read_excel(r'Z:\Asset Management\FUNDOS e CLUBES\Gerencial\dashboard LFT.xlsx', sheet_name='Historico preços')
 dados.rename(columns={'Unnamed: 0': 'Data'}, inplace=True)
@@ -172,3 +186,6 @@ dados.drop(index=[0, 1], inplace=True)
 dados = dados[['Data', 'BLFT 0 06/01/30']]
 dados.rename(columns={'BLFT 0 06/01/30': 'RetornoLFT'}, inplace=True)
 dados.to_csv('Dados/dados_lft.csv', index=False)
+print('LFT salvo.')
+
+print('\n[OK] TransformarRetornosParquet v3 finalizado.')

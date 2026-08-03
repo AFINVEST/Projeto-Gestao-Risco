@@ -1,0 +1,9 @@
+{
+  "auth": { "session_timeout_min": 360 },
+  "users": {
+    "admin" : "$2b$12$SkkR12ELDoZEz.fyRXju5ONQPkD1jSFqoAdPYP2mDtbFqmI2pLtEm",
+    "ana"   : "$2b$12$SkkR12ELDoZEz.fyRXju5ONQPkD1jSFqoAdPYP2mDtbFqmI2pLtEm",
+    "paulo" : "$2b$12$SkkR12ELDoZEz.fyRXju5ONQPkD1jSFqoAdPYP2mDtbFqmI2pLtEm",
+    "marcos": "$2b$12$SkkR12ELDoZEz.fyRXju5ONQPkD1jSFqoAdPYP2mDtbFqmI2pLtEm"
+  }
+}

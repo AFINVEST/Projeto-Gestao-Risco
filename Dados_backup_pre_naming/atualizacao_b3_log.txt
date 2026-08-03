@@ -1,0 +1,68 @@
+[2026-01-15 14:21:10] [BOOT] BASE_DIR=\\10.4.1.7\usogeral\Asset Management\Equipe\Emanuel\21.0-Risco\DashRisco
+[2026-01-15 14:21:10] [BOOT] DADOS_DIR=\\10.4.1.7\usogeral\Asset Management\Equipe\Emanuel\21.0-Risco\DashRisco\Dados
+[2026-01-15 14:21:10] [drop-dup] Removendo coluna duplicada 2026-01-14 (cópia de 2026-01-13)
+[2026-01-15 14:21:11] [drop-dup] Removendo coluna duplicada 2026-01-14 (cópia de 2026-01-13)
+[2026-01-15 14:21:11] Atualizando de 2026-01-13 até 2026-01-14 (DU B3: 2)
+[2026-01-15 14:21:13] [HTTP] ConsolidatedTradesDerivatives 2026-01-13 -> status=200 content-length=101588 t=1.80s
+[2026-01-15 14:21:13] [HTTP] md5=bd55314cfd3365bccc8fd0eab4869a61 bytes=484778 (ConsolidatedTradesDerivatives 2026-01-13)
+[2026-01-15 14:21:13] 2026-01-13: base longa atualizada; total linhas = 4393.
+[2026-01-15 14:21:13] 2026-01-13: preços/valores atualizados.
+[2026-01-15 14:21:14] [HTTP] ConsolidatedTradesDerivatives 2026-01-14 -> status=200 content-length=102873 t=0.78s
+[2026-01-15 14:21:14] [HTTP] md5=24fef3b25fc2e4cd8b6a06626b824aa3 bytes=488789 (ConsolidatedTradesDerivatives 2026-01-14)
+[2026-01-15 14:21:14] 2026-01-14: base longa atualizada; total linhas = 4508.
+[2026-01-15 14:21:14] 2026-01-14: preços/valores atualizados.
+[2026-01-15 14:21:14] [today-check] Coleta EXATA do dia 2026-01-14 (sem backfill).
+[2026-01-15 14:21:15] [HTTP] ConsolidatedTradesDerivatives 2026-01-14 -> status=200 content-length=102873 t=0.58s
+[2026-01-15 14:21:15] [HTTP] md5=24fef3b25fc2e4cd8b6a06626b824aa3 bytes=488789 (ConsolidatedTradesDerivatives 2026-01-14)
+[2026-01-15 14:21:15] [today-ok] Dados encontrados para 2026-01-14: 115 linhas.
+[2026-01-15 14:21:15] 2026-01-14: base longa atualizada (hoje); total linhas = 4508.
+[2026-01-15 14:21:15] 2026-01-14: preços/valores de HOJE adicionados.
+[2026-01-15 14:21:15] [dup-final] (preço) Duplicado 2026-01-14 -> 2026-01-15
+[2026-01-15 14:21:15] [dup-final] (valor) Duplicado 2026-01-14 -> 2026-01-15
+[2026-01-15 14:21:16] [SAVE] \\10.4.1.7\usogeral\Asset Management\Equipe\Emanuel\21.0-Risco\DashRisco\Dados\df_preco_de_ajuste_atual_completo.parquet shape=(42, 260)
+[2026-01-15 14:21:16] [SAVE] \\10.4.1.7\usogeral\Asset Management\Equipe\Emanuel\21.0-Risco\DashRisco\Dados\df_valor_ajuste_contrato.parquet shape=(31, 260)
+[2026-01-15 14:21:16] [DONE] atualização concluída.
+[2026-01-15 14:41:50] [BOOT] BASE_DIR=\\10.4.1.7\usogeral\Asset Management\Equipe\Emanuel\21.0-Risco\DashRisco
+[2026-01-15 14:41:50] [BOOT] DADOS_DIR=\\10.4.1.7\usogeral\Asset Management\Equipe\Emanuel\21.0-Risco\DashRisco\Dados
+[2026-01-15 14:41:50] [drop-dup] Removendo coluna duplicada 2026-01-15 (cópia de 2026-01-14)
+[2026-01-15 14:41:51] [drop-dup] Removendo coluna duplicada 2026-01-15 (cópia de 2026-01-14)
+[2026-01-15 14:41:52] Atualizando de 2026-01-14 até 2026-01-14 (DU B3: 1)
+[2026-01-15 14:41:53] [HTTP] ConsolidatedTradesDerivatives 2026-01-14 -> status=200 content-length=102873 t=1.47s
+[2026-01-15 14:41:53] [HTTP] md5=24fef3b25fc2e4cd8b6a06626b824aa3 bytes=488789 (ConsolidatedTradesDerivatives 2026-01-14)
+[2026-01-15 14:41:54] 2026-01-14: base longa atualizada; total linhas = 4508.
+[2026-01-15 14:41:54] 2026-01-14: preços/valores atualizados.
+[2026-01-15 14:41:54] [today-check] Coleta EXATA do dia 2026-01-14 (sem backfill).
+[2026-01-15 14:41:55] [HTTP] ConsolidatedTradesDerivatives 2026-01-14 -> status=200 content-length=102873 t=0.61s
+[2026-01-15 14:41:55] [HTTP] md5=24fef3b25fc2e4cd8b6a06626b824aa3 bytes=488789 (ConsolidatedTradesDerivatives 2026-01-14)
+[2026-01-15 14:41:55] [today-ok] Dados encontrados para 2026-01-14: 115 linhas.
+[2026-01-15 14:41:55] 2026-01-14: base longa atualizada (hoje); total linhas = 4508.
+[2026-01-15 14:41:55] 2026-01-14: preços/valores de HOJE adicionados.
+[2026-01-15 14:41:55] [dup-final] (preço) Duplicado 2026-01-14 -> 2026-01-15
+[2026-01-15 14:41:55] [dup-final] (valor) Duplicado 2026-01-14 -> 2026-01-15
+[2026-01-15 14:41:57] [SAVE] \\10.4.1.7\usogeral\Asset Management\Equipe\Emanuel\21.0-Risco\DashRisco\Dados\df_preco_de_ajuste_atual_completo.parquet shape=(42, 260)
+[2026-01-15 14:41:57] [SAVE] \\10.4.1.7\usogeral\Asset Management\Equipe\Emanuel\21.0-Risco\DashRisco\Dados\df_valor_ajuste_contrato.parquet shape=(31, 260)
+[2026-01-15 14:41:57] [DONE] atualização concluída.
+[2026-01-15 14:46:55] [BOOT] BASE_DIR=\\10.4.1.7\usogeral\Asset Management\Equipe\Emanuel\21.0-Risco\DashRisco
+[2026-01-15 14:46:55] [BOOT] DADOS_DIR=\\10.4.1.7\usogeral\Asset Management\Equipe\Emanuel\21.0-Risco\DashRisco\Dados
+[2026-01-15 14:46:55] [drop-dup] Removendo coluna duplicada 2026-01-14 (cópia de 2026-01-13)
+[2026-01-15 14:46:55] [drop-dup] Removendo coluna duplicada 2026-01-14 (cópia de 2026-01-13)
+[2026-01-15 14:46:56] Atualizando de 2026-01-13 até 2026-01-14 (DU B3: 2)
+[2026-01-15 14:46:57] [HTTP] ConsolidatedTradesDerivatives 2026-01-13 -> status=200 content-length=101588 t=0.53s
+[2026-01-15 14:46:57] [HTTP] md5=bd55314cfd3365bccc8fd0eab4869a61 bytes=484778 (ConsolidatedTradesDerivatives 2026-01-13)
+[2026-01-15 14:46:57] 2026-01-13: base longa atualizada; total linhas = 4508.
+[2026-01-15 14:46:57] 2026-01-13: preços/valores atualizados.
+[2026-01-15 14:46:57] [HTTP] ConsolidatedTradesDerivatives 2026-01-14 -> status=200 content-length=102873 t=0.38s
+[2026-01-15 14:46:57] [HTTP] md5=24fef3b25fc2e4cd8b6a06626b824aa3 bytes=488789 (ConsolidatedTradesDerivatives 2026-01-14)
+[2026-01-15 14:46:58] 2026-01-14: base longa atualizada; total linhas = 4508.
+[2026-01-15 14:46:58] 2026-01-14: preços/valores atualizados.
+[2026-01-15 14:46:58] [today-check] Coleta EXATA do dia 2026-01-14 (sem backfill).
+[2026-01-15 14:46:58] [HTTP] ConsolidatedTradesDerivatives 2026-01-14 -> status=200 content-length=102873 t=0.42s
+[2026-01-15 14:46:58] [HTTP] md5=24fef3b25fc2e4cd8b6a06626b824aa3 bytes=488789 (ConsolidatedTradesDerivatives 2026-01-14)
+[2026-01-15 14:46:58] [today-ok] Dados encontrados para 2026-01-14: 115 linhas.
+[2026-01-15 14:46:59] 2026-01-14: base longa atualizada (hoje); total linhas = 4508.
+[2026-01-15 14:46:59] 2026-01-14: preços/valores de HOJE adicionados.
+[2026-01-15 14:46:59] [dup-final] (preço) Duplicado 2026-01-14 -> 2026-01-15
+[2026-01-15 14:46:59] [dup-final] (valor) Duplicado 2026-01-14 -> 2026-01-15
+[2026-01-15 14:47:00] [SAVE] \\10.4.1.7\usogeral\Asset Management\Equipe\Emanuel\21.0-Risco\DashRisco\Dados\df_preco_de_ajuste_atual_completo.parquet shape=(42, 260)
+[2026-01-15 14:47:00] [SAVE] \\10.4.1.7\usogeral\Asset Management\Equipe\Emanuel\21.0-Risco\DashRisco\Dados\df_valor_ajuste_contrato.parquet shape=(31, 260)
+[2026-01-15 14:47:01] [DONE] atualização concluída.

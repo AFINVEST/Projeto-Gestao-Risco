@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+body { font-family: Segoe UI, Arial, sans-serif; color: #222; font-size: 14px; }
+h1 { color: #1a3a6c; border-bottom: 2px solid #1a3a6c; padding-bottom: 8px; }
+h2 { color: #1a3a6c; margin-top: 24px; font-size: 16px; }
+.metric-grid { display: table; width: 100%; border-collapse: collapse; margin: 12px 0; }
+.metric { display: table-cell; padding: 10px 14px; border: 1px solid #ddd; background: #f8f9fa; }
+.metric-label { font-size: 11px; color: #666; text-transform: uppercase; margin-bottom: 4px; }
+.metric-value { font-size: 20px; font-weight: bold; }
+.metric-sub { font-size: 11px; color: #666; margin-top: 4px; }
+table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+th, td { padding: 6px 10px; border: 1px solid #ddd; text-align: left; font-size: 13px; }
+th { background: #1a3a6c; color: white; }
+tr:nth-child(even) td { background: #f8f9fa; }
+</style></head><body>
+
+<h1>Dash Risco — 30/07/2026</h1>
+
+
+
+<h2>📊 Fundo (dados oficiais)</h2>
+<div class="metric-grid">
+  <div class="metric">
+    <div class="metric-label">PL Total</div>
+    <div class="metric-value">R$ 655.082.859</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">PL Risco (1%)</div>
+    <div class="metric-value">R$ 6.550.829</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Cota synth (alpha)</div>
+    <div class="metric-value">1320.2693</div>
+    <div class="metric-sub">≠ cota do fundo</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Alpha DTD</div>
+    <div class="metric-value" style="color:#28a745">+0.00 bps</div>
+    <div class="metric-sub">sobre PL Risco</div>
+  </div>
+</div>
+
+<div style="background:#fff3cd;border:1px solid #ffc107;padding:10px;border-radius:4px;font-size:12px;margin:10px 0;color:#856404;"><b>Nota:</b> A <i>cota synth</i> mede apenas o alpha ativo (PnL das posições / PL Risco). Não corresponde à cota oficial do fundo (que inclui carry CDI + custos + taxa adm). Serve para monitoramento de risco (vol, VaR, DD) — para performance oficial, consulte o administrador.</div>
+
+<h2>⚠ VaR do dia</h2>
+<div class="metric-grid">
+  <div class="metric">
+    <div class="metric-label">VaR (BRW λ=0.99)</div>
+    <div class="metric-value" style="color:#28a745">R$ 15.544</div>
+    <div class="metric-sub">23.73 bps sobre PL Risco</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">CVaR</div>
+    <div class="metric-value">R$ 24.588</div>
+    <div class="metric-sub">37.53 bps sobre PL Risco</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Limite efetivo</div>
+    <div class="metric-value">R$ 65.508</div>
+    <div class="metric-sub">1.00 bps sobre PL Total</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Consumo VaR</div>
+    <div class="metric-value" style="color:#28a745">23.7%</div>
+    <div class="metric-sub">VaR / Limite (em R$)</div>
+  </div>
+</div>
+
+<h2>📉 Vol e Drawdown</h2>
+<div class="metric-grid">
+  <div class="metric">
+    <div class="metric-label">Vol 20d (anual)</div>
+    <div class="metric-value">2.48%</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Vol 60d (anual)</div>
+    <div class="metric-value">2.93%</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Drawdown atual</div>
+    <div class="metric-value" style="color:#28a745">0.00%</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Max DD histórico</div>
+    <div class="metric-value">-1.32%</div>
+  </div>
+</div>
+
+<h2>📈 Alpha acumulado (sobre PL Risco)</h2>
+<div class="metric-grid">
+  <div class="metric">
+    <div class="metric-label">Alpha MTD</div>
+    <div class="metric-value" style="color:#28a745">
+      +164.95 bps
+    </div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Alpha YTD</div>
+    <div class="metric-value" style="color:#28a745">
+      +329.89 bps
+    </div>
+  </div>
+</div>
+<h2>📅 Últimos 5 dias</h2><table><tr><th>Data</th><th>Cota synth</th><th>Alpha DTD</th><th>VaR (R$)</th><th>Vol 60d</th><th>DD</th></tr><tr><td>30/07/2026</td><td>1320.2693</td><td>+0.00 bps</td><td>R$ 15.544</td><td>2.93%</td><td>0.00%</td></tr><tr><td>29/07/2026</td><td>1320.2693</td><td>+6.92 bps</td><td>R$ 15.544</td><td>2.94%</td><td>0.00%</td></tr><tr><td>28/07/2026</td><td>1319.3563</td><td>+16.37 bps</td><td>R$ 15.544</td><td>2.94%</td><td>0.00%</td></tr><tr><td>27/07/2026</td><td>1317.1998</td><td>+22.37 bps</td><td>R$ 15.542</td><td>2.94%</td><td>0.00%</td></tr><tr><td>24/07/2026</td><td>1314.2597</td><td>+35.07 bps</td><td>R$ 15.541</td><td>2.93%</td><td>0.00%</td></tr></table><h2>🔔 Eventos recentes</h2><ul><li><span style="color:#17a2b8;font-weight:bold">[INFO]</span> 2026-07-30 — Projeção IPCA ANBIMA atualizada: 0.05%</li></ul>
+<p style="margin-top:32px;color:#888;font-size:11px;border-top:1px solid #ddd;padding-top:12px;">
+Gerado automaticamente pelo Dash Risco em 03/08/2026 14:13.
+Escalas: <b>PL Risco</b> = 1% do PL Total. <b>Cota synth</b> = alpha ativo apenas (não CDI, não custos).
+</p>
+</body></html>

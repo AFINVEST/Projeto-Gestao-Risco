@@ -8460,8 +8460,18 @@ def simulate_nav_cota() -> None:
             return (1.0 + s_aa)**(1.0/252.0) - 1.0
 
         def _rate_col_for_di_F(cols, di_code: str) -> str | None:
-            yy = str(di_code).split("_")[-1]
-            col = f"ODF{yy} Comdty"
+            # v2b: aceita naming novo (DI_F29, DI_J29, DI_N29, DI_V29)
+            # e legado (DI_29 = janeiro). Extrai letra do mês e yy corretamente.
+            parts = str(di_code).split("_")
+            if len(parts) < 2:
+                return None
+            tail = parts[-1]
+            if len(tail) >= 3 and tail[0].isalpha() and tail[1:].isdigit():
+                letter, yy = tail[0], tail[1:3]
+            else:
+                yy = ''.join(c for c in tail if c.isdigit())[:2]
+                letter = 'F'
+            col = f"OD{letter}{yy} Comdty"
             return col if col in cols else None
 
         # -------------------- dados de entrada já existentes --------------------

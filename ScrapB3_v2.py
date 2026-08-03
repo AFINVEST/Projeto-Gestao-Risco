@@ -347,17 +347,23 @@ def mapear_asset(name: str, venc: str) -> str | None:
             if letra != "K":
                 return None
 
-        return f"DAP{ano_str}"
+        return f"DAP_{letra}{ano_str}"    # v2b naming: DAP_Q26, DAP_K27, ...
 
     if name == "DI1Day":
-        sufixo = venc[-2:]
+        if len(venc) < 3:
+            return None
+        letra_di = venc[0]
+        sufixo   = venc[-2:]
         try:
             ano = int(sufixo)
         except ValueError:
             return None
         if not (26 <= ano):
             return None
-        return f"DI_{sufixo}"
+        # v2b: aceita F, J, N, V (jan, abr, jul, out) e nomeia com letra
+        if letra_di not in ("F", "J", "N", "V"):
+            return None
+        return f"DI_{letra_di}{sufixo}"
 
     if name in ("BusinessDollar", "WDOMiniFuture"):
         return "WDO1"
@@ -486,9 +492,12 @@ def selecionar_vertices(df_day: pd.DataFrame, data_ref: dt.date) -> pd.DataFrame
 
     df = df_day.copy()
 
-    # DI: keep apenas mês "F" (Jan)
+    # v2b: DI aceita F, J, N, V (jan, abr, jul, out)
     di_mask = df["Name"].eq("DI1Day")
-    df = df[~di_mask | df["Vencimento"].astype(str).str.startswith("F", na=False)].copy()
+    def _di_letra_ok(v):
+        v = str(v)
+        return len(v) >= 3 and v[0] in ("F", "J", "N", "V")
+    df = df[~di_mask | df["Vencimento"].map(_di_letra_ok)].copy()
 
     # Mapeia Asset
     df["Asset"] = [mapear_asset(n, v) for n, v in zip(df["Name"], df["Vencimento"])]
@@ -922,6 +931,13 @@ def main():
     salvar_wide(wide_valor, PATH_VALOR, PATH_VALOR_CSV, csv_ptbr_text=True)
     _append_log(f"Salvos: {PATH_PRECO} {wide_preco.shape} | {PATH_VALOR} {wide_valor.shape}")
 
+
+    # =====  Envio para Supabase (precos_diarios) — v2b  =====
+    try:
+        _enviar_para_supabase(wide_preco, wide_valor)
+    except Exception as _e_supa:
+        _append_log(f"[warn] envio Supabase falhou: {_e_supa}")
+
     # 7) JSON pt-BR (texto garantido) — missing vira ""
     try:
         json_text = wide_to_ptbr_json_text(wide_preco)
@@ -933,3 +949,93 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# =============================================================
+# v2b: espelho no Supabase da tabela precos_diarios
+# =============================================================
+def _enviar_para_supabase(wide_preco, wide_valor):
+    """Faz upsert em precos_diarios das colunas de data recentes.
+    Não falha se supabase-py não estiver instalado ou env não configurada."""
+    import math
+    import os as _os
+    try:
+        from supabase import create_client
+    except ImportError:
+        _append_log("[supabase] pacote supabase não instalado — pulando upsert.")
+        return
+
+    url = _os.environ.get("SUPABASE_URL")
+    key = _os.environ.get("SUPABASE_KEY") or _os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if not url or not key:
+        _append_log("[supabase] SUPABASE_URL/KEY não configuradas — pulando upsert.")
+        return
+
+    NOMINAL = 100_000.0
+    DIAS_ANO = 252
+
+    # Carrega tabela de vencimentos padrão pra derivar DU/taxa dos DIs/DAPs
+    try:
+        import sys as _sys
+        from pathlib import Path as _Path
+        _sys.path.insert(0, str(_Path("dash_risco_v2")))
+        import dv01_dinamico as _dv
+        _feriados = _dv.load_feriados()
+    except Exception as _e:
+        _append_log(f"[supabase] dv01_dinamico indisponível ({_e}) — usando PU só (sem Taxa derivada).")
+        _dv = None
+        _feriados = None
+
+    sb = create_client(url, key)
+
+    # Só envia as últimas ~30 colunas (backfill inicial já foi feito por script à parte)
+    def _colunas_recentes(df, n=30):
+        if df is None or df.empty:
+            return []
+        cols = sorted(df.columns, key=lambda c: pd.to_datetime(c))
+        return cols[-n:]
+
+    registros = []
+    for col_data in _colunas_recentes(wide_preco, n=30):
+        data_iso = pd.to_datetime(col_data).date().isoformat()
+        for ativo, pu in wide_preco[col_data].items():
+            if pd.isna(pu):
+                continue
+            try:
+                pu_f = float(pu)
+            except Exception:
+                continue
+            if pu_f <= 0 or math.isnan(pu_f) or math.isinf(pu_f):
+                continue
+
+            taxa = None
+            if _dv is not None and str(ativo).startswith(("DI_", "DAP_")):
+                try:
+                    venc = _dv.vencimento(str(ativo), _feriados)
+                    du   = _dv.networkdays(pd.Timestamp(data_iso), venc, _feriados)
+                    if du > 0:
+                        taxa = ((NOMINAL / pu_f) ** (DIAS_ANO / du) - 1) * 100
+                except Exception:
+                    taxa = None
+
+            registros.append({
+                "Data":      data_iso,
+                "Ativo":     str(ativo),
+                "PU_ajuste": pu_f,
+                "Taxa":      taxa,
+                "Fonte":     "b3",
+            })
+
+    if not registros:
+        _append_log("[supabase] nenhum registro para enviar.")
+        return
+
+    BATCH = 500
+    total = 0
+    for i in range(0, len(registros), BATCH):
+        lote = registros[i:i + BATCH]
+        (sb.table("precos_diarios")
+           .upsert(lote, on_conflict="Data,Ativo")
+           .execute())
+        total += len(lote)
+    _append_log(f"[supabase] enviados {total} registros em precos_diarios.")
+

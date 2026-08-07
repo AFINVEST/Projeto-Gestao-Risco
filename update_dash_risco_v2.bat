@@ -26,6 +26,22 @@ if exist .env (
 )
 
 REM ============================================
+REM  ETAPA 0 - CDI (obrigatorio, fail-fast)
+REM ============================================
+echo.
+echo [0] atualizar_cdi_lft.py (CDI do BCB — CRITICO, aborta se falhar)...
+python atualizar_cdi_lft.py
+if errorlevel 1 (
+    echo.
+    echo ============================================
+    echo   ERRO: CDI nao pode ser atualizado.
+    echo   Pipeline abortado para evitar dados incorretos.
+    echo ============================================
+    pause
+    exit /b 1
+)
+
+REM ============================================
 REM  ETAPA A - Atualizacao dos dados de mercado
 REM ============================================
 
@@ -45,7 +61,7 @@ python TransformarRetornosParquet.py
 if errorlevel 1 goto :error
 
 REM ============================================
-REM  ETAPA B - Alinhamento de naming (defesa)
+REM  ETAPA B - Alinhamento de naming e base de retornos
 REM ============================================
 
 echo.
@@ -53,6 +69,17 @@ echo [B1] migrar_basefundos_naming.py --apply (safety net)...
 python migrar_basefundos_naming.py --apply
 if errorlevel 1 (
     echo [warn] migracao de naming falhou, mas seguindo o pipeline...
+)
+
+echo.
+echo [B2] atualizar_retornos_diarios.py (base para VaR de carteira)...
+if "%SUPABASE_URL%"=="" (
+    echo [B2-skip] SUPABASE_URL nao definido, pulando.
+) else (
+    python atualizar_retornos_diarios.py
+    if errorlevel 1 (
+        echo [warn] falha ao atualizar retornos diarios, mas seguindo...
+    )
 )
 
 REM ============================================

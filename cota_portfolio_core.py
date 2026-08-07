@@ -211,8 +211,12 @@ def _load_basefundos_local() -> dict[str, pd.DataFrame]:
     return out
 
 
-def load_basefundos() -> dict[str, pd.DataFrame]:
-    """Supabase primeiro, fallback local. Espelha o app4."""
+_LOAD_BF_COUNT = 0
+
+def load_basefundos(verbose: bool = True) -> dict[str, pd.DataFrame]:
+    """Supabase primeiro, fallback local. Espelha o app4.
+    Log so na primeira chamada (evita spam em loops)."""
+    global _LOAD_BF_COUNT
     out = load_basefundos_supabase()
     fonte = "supabase"
     if not out:
@@ -224,7 +228,9 @@ def load_basefundos() -> dict[str, pd.DataFrame]:
             fixed[nome] = df.set_index("Ativo")
         else:
             fixed[nome] = df
-    print(f"[core] load_basefundos: {len(fixed)} fundos (fonte={fonte})")
+    _LOAD_BF_COUNT += 1
+    if verbose and _LOAD_BF_COUNT == 1:
+        print(f"[core] load_basefundos: {len(fixed)} fundos (fonte={fonte})")
     return fixed
 
 
@@ -324,13 +330,18 @@ def load_lft_series() -> pd.Series:
 
 
 def load_cdi_series(cache_csv: str = "Dados/cdi_cached.csv") -> pd.Series:
+    """Le o CDI cacheado. SEM FALLBACK: se csv nao existir ou vazio, erro."""
     p = Path(cache_csv)
     if not p.exists():
-        return load_lft_series().rename("cdi_proxy")
+        raise FileNotFoundError(
+            f"{cache_csv} nao existe. Rode 'atualizar_cdi_lft.py' primeiro."
+        )
     s = (pd.read_csv(cache_csv, parse_dates=["Data"])
             .set_index("Data")["cdi"]
             .astype(float)
             .sort_index())
+    if s.empty:
+        raise ValueError(f"{cache_csv} esta vazio.")
     return s
 
 
@@ -545,7 +556,13 @@ def computar_cota_serie(
         pl_series_c  = pl_series.loc[common]
         lft_series_c = lft_series.loc[common]
         taxa_adm_off_c = taxa_adm_off.reindex(common).fillna(0.0)
-        cdi_series_c = load_cdi_series().reindex(common).ffill().fillna(0.0)
+        # SEM ffill: se CDI faltar para alguma data, mantem NaN — sinaliza falha visivel
+        cdi_full = load_cdi_series()
+        cdi_series_c = cdi_full.reindex(common)
+        n_missing = cdi_series_c.isna().sum()
+        if n_missing > 0:
+            faltantes = cdi_series_c[cdi_series_c.isna()].index[:5].tolist()
+            print(f"[core] AVISO: CDI FALTANDO em {n_missing} dias. Primeiros: {faltantes}. Rode atualizar_cdi_lft.py.")
         desp_series_c = desp_series.reindex(common).fillna(0.0) if len(desp_series) else pd.Series(0.0, index=common)
 
         rate_adm_dia  = (1.02 ** (1 / 252) - 1) if taxa_adm_on else 0.0

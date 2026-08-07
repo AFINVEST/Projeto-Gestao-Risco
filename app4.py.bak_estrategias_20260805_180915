@@ -9310,20 +9310,8 @@ def simulate_nav_cota() -> None:
       
         # Mapeamento de ativos para estratégias
         estrategias = {
-            "Juros nominais": [
-                # naming novo (F=jan)
-                'DI_F26', 'DI_F27', 'DI_F28', 'DI_F29', 'DI_F30', 'DI_F31', 'DI_F32', 'DI_F33', 'DI_F35',
-                # naming antigo (retrocompat)
-                'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30', 'DI_31', 'DI_32', 'DI_33', 'DI_35',
-            ],
-            "Juros reais": [
-                # DAP naming novo — par -> Q, impar -> K
-                'DAP_Q26', 'DAP_K27', 'DAP_Q28', 'DAP_K29', 'DAP_Q30', 'DAP_K31', 'DAP_Q32', 'DAP_K33', 'DAP_K35', 'DAP_Q40',
-                # DAP naming antigo (retrocompat)
-                'DAP26', 'DAP27', 'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40',
-                # NTNB (naming inalterado)
-                'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40', 'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60',
-            ],
+            "Juros nominais": ['DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30', 'DI_31', 'DI_32', 'DI_33', 'DI_35'],
+            "Juros reais": ['DAP26', 'DAP27', 'DAP28', 'DAP30', 'DAP32', 'DAP35', 'DAP40', 'NTNB26', 'NTNB27', 'NTNB28', 'NTNB30', 'NTNB32', 'NTNB35', 'NTNB40', 'NTNB45', 'NTNB50', 'NTNB55', 'NTNB60'],
             "Moeda": ['WDO1'],
             "Juros US": ['TREASURY']
         }

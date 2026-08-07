@@ -2145,3 +2145,20 @@
 [2026-08-03 17:03:08] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (90, 396) | Dados/df_valor_ajuste_contrato.parquet (79, 396)
 [2026-08-03 17:03:08] [warn] envio Supabase falhou: name '_enviar_para_supabase' is not defined
 [2026-08-03 17:03:10] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json
+[2026-08-07 17:51:04] [drop-dup] Removendo coluna duplicada 2026-08-03 (cópia de 2026-07-31)
+[2026-08-07 17:51:05] Atualizando de 2026-08-06 até 2026-08-06 (DU B3: 1)
+[2026-08-07 17:51:07] [HTTP] ConsolidatedTradesDerivatives 2026-08-06 -> status=200 content-length=117570 t=2.11s
+[2026-08-07 17:51:07] [HTTP] md5=db6bda5bb4325f8202d423c2f48d17d4 bytes=601694 (ConsolidatedTradesDerivatives 2026-08-06)
+[2026-08-07 17:51:08] 2026-08-06: base longa atualizada; total linhas = 20828.
+[2026-08-07 17:51:08] 2026-08-06: preços/valores atualizados.
+[2026-08-07 17:51:08] [today-check] Coleta EXATA do dia 2026-08-06 (sem backfill).
+[2026-08-07 17:51:09] [HTTP] ConsolidatedTradesDerivatives 2026-08-06 -> status=200 content-length=117570 t=1.06s
+[2026-08-07 17:51:09] [HTTP] md5=db6bda5bb4325f8202d423c2f48d17d4 bytes=601694 (ConsolidatedTradesDerivatives 2026-08-06)
+[2026-08-07 17:51:10] [today-ok] Dados encontrados para 2026-08-06: 116 linhas.
+[2026-08-07 17:51:10] 2026-08-06: base longa atualizada (hoje); total linhas = 20828.
+[2026-08-07 17:51:10] 2026-08-06: preços/valores de HOJE adicionados.
+[2026-08-07 17:51:10] [dup-final] (preço) Duplicado 2026-08-06 -> 2026-08-07
+[2026-08-07 17:51:10] [dup-final] (valor) Duplicado 2026-08-06 -> 2026-08-07
+[2026-08-07 17:51:13] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (90, 402) | Dados/df_valor_ajuste_contrato.parquet (79, 397)
+[2026-08-07 17:51:13] [warn] envio Supabase falhou: name '_enviar_para_supabase' is not defined
+[2026-08-07 17:51:13] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json

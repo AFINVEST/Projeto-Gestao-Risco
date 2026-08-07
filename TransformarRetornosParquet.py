@@ -178,14 +178,23 @@ df_precos.to_parquet('Dados/df_preco_de_ajuste_atual_completo.parquet')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 7) LFT (comportamento original)
+# 7) LFT — DESATIVADO (agora atualizado por atualizar_cdi_lft.py via BCB SELIC)
 # ─────────────────────────────────────────────────────────────────────────────
-dados = pd.read_excel(r'Z:\Asset Management\FUNDOS e CLUBES\Gerencial\dashboard LFT.xlsx', sheet_name='Historico preços')
-dados.rename(columns={'Unnamed: 0': 'Data'}, inplace=True)
-dados.drop(index=[0, 1], inplace=True)
-dados = dados[['Data', 'BLFT 0 06/01/30']]
-dados.rename(columns={'BLFT 0 06/01/30': 'RetornoLFT'}, inplace=True)
-dados.to_csv('Dados/dados_lft.csv', index=False)
-print('LFT salvo.')
+# Historico da planilha 'dashboard LFT.xlsx' permanece em dados_lft.csv.
+# Novos dias sao extrapolados via CDI+0.10% pelo script atualizar_cdi_lft.py
+# no fluxo do .bat v2. A planilha manual/BBG NAO e mais lida.
+#
+# Se voce quiser reativar a leitura da planilha (por exemplo para atualizar
+# retroativamente o historico com dados reais da LFT), rode:
+#
+#   import pandas as pd
+#   dados = pd.read_excel(r'Z:\Asset Management\FUNDOS e CLUBES\Gerencial\dashboard LFT.xlsx',
+#                         sheet_name='Historico preços')
+#   dados.rename(columns={'Unnamed: 0': 'Data'}, inplace=True)
+#   dados.drop(index=[0, 1], inplace=True)
+#   dados = dados[['Data', 'BLFT 0 06/01/30']]
+#   dados.rename(columns={'BLFT 0 06/01/30': 'RetornoLFT'}, inplace=True)
+#   dados.to_csv('Dados/dados_lft.csv', index=False)
+print('LFT: leitura de planilha desativada (usar atualizar_cdi_lft.py via BCB).')
 
 print('\n[OK] TransformarRetornosParquet v3 finalizado.')

@@ -262,13 +262,22 @@ def _svg_line_chart(datas, series_dict, largura=560, altura=180, titulo="",
                    f'text-anchor="end">{_fmt_y(yv)}</text>')
         yv += step
 
-    # Eixo X — labels em 5 pontos
+    # Eixo X — formato depende da duracao do periodo
+    # Se serie <= 45 dias, mostra "DD/MM"; senao "Mmm/YY"
+    try:
+        d0 = datetime.fromisoformat(datas[0])
+        dN = datetime.fromisoformat(datas[-1])
+        span_dias = (dN - d0).days
+        fmt_x = "%d/%b" if span_dias <= 45 else "%b/%y"
+    except Exception:
+        fmt_x = "%b/%y"
+
     for i in range(5):
         idx = int(i / 4 * (n - 1))
         x = _x(idx)
         d = datas[idx]
         try:
-            label = datetime.fromisoformat(d).strftime("%b/%y")
+            label = datetime.fromisoformat(d).strftime(fmt_x)
         except Exception:
             label = str(d)[:7]
         svg.append(f'<text x="{x:.1f}" y="{altura - 8}" font-size="9" fill="#666" '
@@ -586,18 +595,26 @@ def montar_html(snapshots_all, governance, eventos, pct_capital=0.01):
         acc *= (1 + r)
         cdi_acum.append(acc)
 
-    # Cota vs CDI no mes (ultimos ~21 dias)
-    mes_i = max(0, len(datas) - 21)
-    datas_mes = datas[mes_i:]
-    cotas_mes_raw = cotas_raw[mes_i:]
-    cdi_diario_mes = ret_cdi_diario[mes_i:]
-    base_cota_mes = next((c for c in cotas_mes_raw if c is not None), 1.0)
-    cota_mes_norm = [(c / base_cota_mes) if c is not None else None for c in cotas_mes_raw]
-    cdi_mes_acum = []
-    acc = 1.0
-    for r in cdi_diario_mes:
-        acc *= (1 + r)
-        cdi_mes_acum.append(acc)
+    # Cota vs CDI no mes CORRENTE (dia 1 do mes ate hoje)
+    # Usa retorno_dtd cumulado (bate exato com metricas do resumo)
+    from datetime import datetime as _dt
+    _ultima_dt = _dt.fromisoformat(datas[-1])
+    _inicio_mes = _ultima_dt.replace(day=1)
+    idxs_mes_atual = [i for i, d in enumerate(datas) if _dt.fromisoformat(d) >= _inicio_mes]
+    if not idxs_mes_atual:
+        # fallback: ultimos 21 se por acaso nao tiver mes corrente
+        idxs_mes_atual = list(range(max(0, len(datas) - 21), len(datas)))
+
+    datas_mes = [datas[i] for i in idxs_mes_atual]
+    ret_dtd_mes = [float(snapshots_all[i].get("retorno_dtd") or 0) for i in idxs_mes_atual]
+    cdi_dtd_mes = [float(snapshots_all[i].get("cdi_dtd") or 0) for i in idxs_mes_atual]
+
+    cota_mes_norm = []; acc = 1.0
+    for r in ret_dtd_mes:
+        acc *= (1 + r); cota_mes_norm.append(acc - 1)
+    cdi_mes_acum = []; acc = 1.0
+    for r in cdi_dtd_mes:
+        acc *= (1 + r); cdi_mes_acum.append(acc - 1)
 
     # Vol 20d anualizada
     vol20_hist = [s.get("vol_20d") for s in snapshots_all]
@@ -616,10 +633,11 @@ def montar_html(snapshots_all, governance, eventos, pct_capital=0.01):
     dv01_ntnb_serie  = [s.get("dv01_ntnb") or 0 for s in snapshots_all]
 
     # ─── Graficos ───────────────────────────────────────────────────────
+    _mes_label = _ultima_dt.strftime("%b/%Y")
     chart_cota_mes = _svg_line_chart(datas_mes,
         {"Cota": cota_mes_norm, "CDI": cdi_mes_acum},
-        largura=560, altura=180, titulo="Cota vs CDI - Mes",
-        cores=["#1565c0", "#7f7f7f"], y_fmt="num")
+        largura=560, altura=180, titulo=f"Cota vs CDI - {_mes_label} (retorno acumulado)",
+        cores=["#1565c0", "#7f7f7f"], y_fmt="pct")
 
     chart_cota_hist = _svg_line_chart(datas,
         {"Cota": cota_norm, "CDI": cdi_acum},
@@ -888,7 +906,63 @@ Stop-loss aciona apenas por DD; VaR e alerta para reducao prospectiva de posicoe
 # Envio via Outlook
 # =============================================================================
 
-def enviar_via_outlook(destinatarios, assunto, html_body):
+REPORTS_DIR = Path("Reports")   # pasta local onde o HTML completo e salvo
+
+
+def _salvar_relatorio_completo(html_body: str, data_iso: str) -> Path:
+    """Salva HTML completo em Reports/diario_YYYYMMDD.html e retorna o path."""
+    REPORTS_DIR.mkdir(exist_ok=True)
+    fname = f"diario_{data_iso.replace('-', '')}.html"
+    path = REPORTS_DIR / fname
+    path.write_text(html_body, encoding="utf-8")
+    return path
+
+
+def _resumo_email_texto(dados: dict, link_html: str) -> str:
+    """Gera resumo simples pra ser corpo do email (funciona em qualquer cliente)."""
+    def _fmt_R(v): return _fmt_reais(v) if v is not None else "-"
+    def _fmt_p(v): return f"{v*100:.2f}%" if v is not None else "-"
+    def _fmt_c(v): return f"{v*100:.0f}%" if v is not None else "-"
+
+    data_br = datetime.fromisoformat(dados["data"]).strftime("%d/%m/%Y")
+    return f"""<html><body style="font-family:Segoe UI,Arial,sans-serif;color:#222;font-size:14px;">
+<h2 style="color:#1a3a6c;border-bottom:2px solid #1a3a6c;padding-bottom:6px;">Dash Risco — {data_br}</h2>
+
+<h3 style="color:#1a3a6c;">Resumo</h3>
+<table style="border-collapse:collapse;">
+<tr><td style="padding:4px 12px;"><b>Cota:</b></td><td>{dados.get('cota'):.4f}</td></tr>
+<tr><td style="padding:4px 12px;"><b>Retorno DTD:</b></td><td>{dados.get('ret_bps'):+.2f} bps</td></tr>
+<tr><td style="padding:4px 12px;"><b>PL Total:</b></td><td>{_fmt_R(dados.get('pl_total'))}</td></tr>
+<tr><td style="padding:4px 12px;"><b>% CDI YTD:</b></td><td>{_fmt_c(dados.get('pct_cdi_ytd'))}</td></tr>
+</table>
+
+<h3 style="color:#1a3a6c;">Risco</h3>
+<table style="border-collapse:collapse;">
+<tr><td style="padding:4px 12px;"><b>VaR HIST 3y:</b></td><td>{_fmt_R(dados.get('var_cart_hist_R'))} ({_fmt_c(dados.get('consumo_hist'))} do limite)</td></tr>
+<tr><td style="padding:4px 12px;"><b>VaR EWMA:</b></td><td>{_fmt_R(dados.get('var_cart_ewma_R'))} ({_fmt_c(dados.get('consumo_ewma'))} do limite)</td></tr>
+<tr><td style="padding:4px 12px;"><b>Limite:</b></td><td>{_fmt_R(dados.get('limite_R'))}</td></tr>
+<tr><td style="padding:4px 12px;"><b>DV01 total:</b></td><td>{_fmt_R(dados.get('dv01_total'))}/bp</td></tr>
+<tr><td style="padding:4px 12px;"><b>Drawdown atual:</b></td><td>{_fmt_p(dados.get('dd_atual'))}</td></tr>
+<tr><td style="padding:4px 12px;"><b>Sharpe:</b></td><td>{f"{dados.get('sharpe'):.2f}" if dados.get('sharpe') is not None else '-'}</td></tr>
+</table>
+
+<p style="margin-top:20px;padding:12px;background:#eef;border-radius:6px;">
+<b>Relatorio completo com graficos:</b><br>
+<a href="file:///{link_html}" style="color:#1a3a6c;font-weight:bold;">
+  Abrir {Path(link_html).name}
+</a><br>
+<span style="font-size:11px;color:#666;">
+Ou copie o caminho: <code>{link_html}</code>
+</span>
+</p>
+
+<p style="margin-top:32px;color:#888;font-size:11px;border-top:1px solid #ddd;padding-top:12px;">
+Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')}.
+</p>
+</body></html>"""
+
+
+def enviar_via_outlook(destinatarios, assunto, html_body, html_completo_path: Path | None = None):
     try:
         import win32com.client
     except ImportError:
@@ -898,6 +972,9 @@ def enviar_via_outlook(destinatarios, assunto, html_body):
     mail.To = "; ".join(destinatarios)
     mail.Subject = assunto
     mail.HTMLBody = html_body
+    # Anexa o relatorio completo (HTML com graficos)
+    if html_completo_path and html_completo_path.exists():
+        mail.Attachments.Add(str(html_completo_path.absolute()))
     mail.Send()
     return True
 
@@ -926,18 +1003,24 @@ def run(dry_run=False, override_to=None):
     print(f"[email] VaR CARTEIRA EWMA : R$ {(dados.get('var_cart_ewma_R') or 0):,.0f} = {(dados.get('consumo_ewma') or 0)*100:.1f}%")
     print(f"[email] DV01 total: R$ {(dados.get('dv01_total') or 0):,.0f}/bp | Sharpe: {dados.get('sharpe')}")
 
+    # Sempre salva HTML completo em Reports/ (para historico e link)
+    path_completo = _salvar_relatorio_completo(html, dados["data"])
+    print(f"[email] relatorio completo salvo em: {path_completo.absolute()}")
+
+    # Corpo do email = resumo simples (renderiza OK em qualquer Outlook)
+    corpo_email = _resumo_email_texto(dados, str(path_completo.absolute()))
+
     if dry_run:
         out = Path("email_diario_preview.html")
-        out.write_text(html, encoding="utf-8")
-        print(f"[email] dry-run - HTML em {out.resolve()}")
+        out.write_text(corpo_email, encoding="utf-8")
+        print(f"[email] dry-run - corpo simples em {out.resolve()}")
+        print(f"[email] dry-run - completo em {path_completo.resolve()}")
         return
     try:
-        enviar_via_outlook(destinatarios, assunto, html)
-        print(f"[email] OK enviado")
+        enviar_via_outlook(destinatarios, assunto, corpo_email, html_completo_path=path_completo)
+        print(f"[email] OK enviado (corpo simples + anexo completo)")
     except Exception as e:
         print(f"[email] ERRO ao enviar: {e}")
-        out = Path("email_diario_ERRO.html")
-        out.write_text(html, encoding="utf-8")
         raise
 
 

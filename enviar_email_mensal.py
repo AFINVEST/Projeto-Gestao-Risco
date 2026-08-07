@@ -524,11 +524,11 @@ def montar_html(snapshots_mes, snapshots_all, atrib_items, rent_hist, ind_hist,
 
     # ─── Charts ────────────────────────────
     datas_mes = [s["Data"] for s in snapshots_mes]
-    # Chart em RETORNO acumulado (%): mais intuitivo que index base=1
-    base_cota_mes = cota_ini if cota_ini > 0 else 1.0
-    cota_mes_ret = [((float(s.get("cota") or 0) / base_cota_mes) - 1)
-                     if (s.get("cota") and 0.5 < float(s.get("cota")) < 10) else None
-                     for s in snapshots_mes]
+    # Chart em RETORNO acumulado — USA MESMA CONVENCAO do resumo:
+    # (1+r1)*(1+r2)*... - 1 sobre retornos_dtd. Ponto final bate EXATO com ret_mes.
+    cota_mes_ret = []; acc = 1.0
+    for r in retornos_dia:
+        acc *= (1 + r); cota_mes_ret.append(acc - 1)
     cdi_mes_ret = []; acc = 1.0
     for r in cdis_dia:
         acc *= (1 + r); cdi_mes_ret.append(acc - 1)
@@ -549,8 +549,11 @@ def montar_html(snapshots_mes, snapshots_all, atrib_items, rent_hist, ind_hist,
         if c is None: cotas_h_raw.append(None); continue
         cf = float(c)
         cotas_h_raw.append(cf if 0.5 < cf < 10 else None)
-    base_h = next((c for c in cotas_h_raw if c is not None), 1.0)
-    cota_h_ret = [((c / base_h) - 1) if c is not None else None for c in cotas_h_raw]
+    # Chart historico usa MESMA convencao: cumulativo de retorno_dtd (evita drift vs cota-based)
+    ret_h_diario = [float(s.get("retorno_dtd") or 0) for s in snapshots_all]
+    cota_h_ret = []; acc = 1.0
+    for r in ret_h_diario:
+        acc *= (1 + r); cota_h_ret.append(acc - 1)
     cdi_h_diario = [float(s.get("cdi_dtd") or 0) for s in snapshots_all]
     cdi_h_ret = []; acc = 1.0
     for r in cdi_h_diario:
@@ -797,7 +800,59 @@ PL médio do mês: {_fmt_reais(pl_medio)}.
 # Envio
 # =============================================================================
 
-def enviar_via_outlook(destinatarios, assunto, html_body):
+REPORTS_DIR = Path("Reports")
+
+
+def _salvar_relatorio_mensal(html_body: str, label_mes: str) -> Path:
+    """Salva HTML completo em Reports/mensal_YYYY_MM.html."""
+    REPORTS_DIR.mkdir(exist_ok=True)
+    # label_mes vem como 'Jul/2026' -> 'Jul_2026'
+    fname = f"mensal_{label_mes.replace('/', '_')}.html"
+    path = REPORTS_DIR / fname
+    path.write_text(html_body, encoding="utf-8")
+    return path
+
+
+def _resumo_email_texto_mensal(dados: dict, link_html: str) -> str:
+    def _fmt_p(v): return f"{v*100:+.2f}%" if v is not None else "-"
+    def _fmt_c(v): return f"{v*100:.0f}%" if v is not None else "-"
+
+    return f"""<html><body style="font-family:Segoe UI,Arial,sans-serif;color:#222;font-size:14px;">
+<h2 style="color:#1a3a6c;border-bottom:2px solid #1a3a6c;padding-bottom:6px;">
+Dash Risco — Consolidado {dados['label']}
+</h2>
+
+<h3 style="color:#1a3a6c;">Resumo do mês</h3>
+<table style="border-collapse:collapse;">
+<tr><td style="padding:4px 12px;"><b>Retorno mês:</b></td>
+    <td>{_fmt_p(dados['ret_mes'])} vs CDI {_fmt_p(dados['cdi_mes'])} ({_fmt_c(dados['ret_mes']/dados['cdi_mes'] if dados['cdi_mes'] else 0)} do CDI)</td></tr>
+<tr><td style="padding:4px 12px;"><b>Alpha:</b></td>
+    <td>{dados['alpha_mes']*10_000:+.0f} bps</td></tr>
+<tr><td style="padding:4px 12px;"><b>Cota:</b></td>
+    <td>{dados['cota_fim']:.4f} (de {dados['cota_ini']:.4f})</td></tr>
+<tr><td style="padding:4px 12px;"><b>Vol 20d anualizada:</b></td>
+    <td>{_fmt_p(dados.get('vol_20d_media', 0))}</td></tr>
+<tr><td style="padding:4px 12px;"><b>Max Drawdown:</b></td>
+    <td style="color:#dc3545;">{_fmt_p(dados['dd_max'])}</td></tr>
+</table>
+
+<p style="margin-top:20px;padding:12px;background:#eef;border-radius:6px;">
+<b>Relatorio completo com atribuicao, rentabilidade historica e indices:</b><br>
+<a href="file:///{link_html}" style="color:#1a3a6c;font-weight:bold;">
+  Abrir {Path(link_html).name}
+</a><br>
+<span style="font-size:11px;color:#666;">
+Ou copie o caminho: <code>{link_html}</code>
+</span>
+</p>
+
+<p style="margin-top:32px;color:#888;font-size:11px;border-top:1px solid #ddd;padding-top:12px;">
+Consolidado gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')}.
+</p>
+</body></html>"""
+
+
+def enviar_via_outlook(destinatarios, assunto, html_body, html_completo_path: Path | None = None):
     try:
         import win32com.client
     except ImportError:
@@ -807,11 +862,14 @@ def enviar_via_outlook(destinatarios, assunto, html_body):
     mail.To = "; ".join(destinatarios)
     mail.Subject = assunto
     mail.HTMLBody = html_body
+    if html_completo_path and html_completo_path.exists():
+        mail.Attachments.Add(str(html_completo_path.absolute()))
     mail.Send()
     return True
 
 
-def run(dry_run=False, override_to=None, ref: str | None = None, dashboard_dir=None):
+def run(dry_run=False, override_to=None, ref: str | None = None, dashboard_dir=None,
+        forcar_parcial: bool = False):
     client = _get_client()
     config = _get_config(client)
     pct_capital = float(config.get("pct_capital_risco", 0.01))
@@ -823,6 +881,14 @@ def run(dry_run=False, override_to=None, ref: str | None = None, dashboard_dir=N
         ini, fim, label = _mes_from_ref(ref)
     else:
         ini, fim, label = _mes_referencia()
+
+    # VALIDACAO: mes deve estar TOTALMENTE fechado. Nao aceita corrente ou futuro.
+    hoje = date.today()
+    if fim >= date(hoje.year, hoje.month, 1) and not forcar_parcial:
+        print(f"[ERRO] Mes {label} nao esta fechado. Data fim {fim} >= inicio do mes atual ({hoje}).")
+        print(f"[ERRO] Consolidado mensal SO roda para meses fechados. Rode com --ref YYYY-MM de um mes anterior.")
+        print(f"[ERRO] Use --forcar-parcial se realmente quiser um snapshot parcial (nao recomendado).")
+        sys.exit(2)
 
     print(f"[email-mensal] periodo: {ini} -> {fim}  ({label})")
 
@@ -852,26 +918,35 @@ def run(dry_run=False, override_to=None, ref: str | None = None, dashboard_dir=N
     print(f"[email-mensal] {dados['n_dias']} dias | ret {dados['ret_mes']*100:+.2f}% vs CDI {dados['cdi_mes']*100:.2f}%")
     print(f"[email-mensal] alpha {dados['alpha_mes']*10_000:+.0f} bps | vol_20d_med {dados['vol_20d_media']*100:.2f}% | DD {dados['dd_max']*100:.2f}%")
 
+    # Sempre salva completo em Reports/
+    path_completo = _salvar_relatorio_mensal(html, dados["label"])
+    print(f"[email-mensal] relatorio completo salvo em: {path_completo.absolute()}")
+
+    corpo_email = _resumo_email_texto_mensal(dados, str(path_completo.absolute()))
+
     if dry_run:
         out = Path(f"email_mensal_{label.replace('/', '_')}_preview.html")
-        out.write_text(html, encoding="utf-8")
-        print(f"[email-mensal] dry-run - HTML em {out.resolve()}")
+        out.write_text(corpo_email, encoding="utf-8")
+        print(f"[email-mensal] dry-run - corpo simples em {out.resolve()}")
+        print(f"[email-mensal] dry-run - completo em {path_completo.resolve()}")
         return
     try:
-        enviar_via_outlook(destinatarios, assunto, html)
-        print(f"[email-mensal] OK enviado")
+        enviar_via_outlook(destinatarios, assunto, corpo_email, html_completo_path=path_completo)
+        print(f"[email-mensal] OK enviado (corpo simples + anexo completo)")
     except Exception as e:
         print(f"[email-mensal] ERRO ao enviar: {e}")
-        out = Path("email_mensal_ERRO.html")
-        out.write_text(html, encoding="utf-8")
         raise
 
 
 if __name__ == "__main__":
+    import sys
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--to", default=None)
     ap.add_argument("--ref", default=None, help="Mês ref YYYY-MM (default = mês anterior)")
     ap.add_argument("--dashboard-dir", default=None)
+    ap.add_argument("--forcar-parcial", action="store_true",
+                    help="Permite gerar consolidado de mes ainda aberto (nao recomendado)")
     args = ap.parse_args()
-    run(dry_run=args.dry_run, override_to=args.to, ref=args.ref, dashboard_dir=args.dashboard_dir)
+    run(dry_run=args.dry_run, override_to=args.to, ref=args.ref,
+        dashboard_dir=args.dashboard_dir, forcar_parcial=args.forcar_parcial)

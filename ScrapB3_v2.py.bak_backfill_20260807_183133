@@ -842,7 +842,7 @@ def main():
         start_dt = dt.date(2025, 1, 2)
     else:
         candidates = [d for d in [last_preco, last_valor] if d is not None]
-        start_dt = min(candidates)   # patched: min garante backfill quando parquets desalinhadas
+        start_dt = max(candidates)
 
     end_dt_hist = ultimo_dia_util_ANTES_de_hoje()
     dias_util = b3_valid_days(start_dt, end_dt_hist)

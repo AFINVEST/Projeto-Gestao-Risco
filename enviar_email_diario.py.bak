@@ -1,4 +1,4 @@
-﻿"""
+"""
 enviar_email_diario.py  (v1.6 - com graficos SVG e layout redesenhado)
 ========================================================================
 
@@ -146,8 +146,9 @@ def _cor_var(pct):
 
 
 def _cor_dd(dd):
-    """DD negativo = vermelho. Sem DD (0 ou None) = sem cor (inherit)."""
-    if dd is None or dd >= 0: return "inherit"
+    if dd is None or dd >= 0: return "#28a745"
+    if dd > -0.02: return "#28a745"
+    if dd > -0.04: return "#ffc107"
     return "#dc3545"
 
 
@@ -261,7 +262,7 @@ def _svg_line_chart(datas, series_dict, largura=560, altura=180, titulo="",
                    f'text-anchor="end">{_fmt_y(yv)}</text>')
         yv += step
 
-    # Eixo X â€” formato depende da duracao do periodo
+    # Eixo X — formato depende da duracao do periodo
     # Se serie <= 45 dias, mostra "DD/MM"; senao "Mmm/YY"
     try:
         d0 = datetime.fromisoformat(datas[0])
@@ -310,16 +311,16 @@ def _svg_line_chart(datas, series_dict, largura=560, altura=180, titulo="",
 
 def _svg_area_stacked(datas, series_dict, largura=560, altura=180, titulo="",
                        cores=None, y_fmt="reais"):
-    """SVG de Ã¡rea empilhada."""
+    """SVG de área empilhada."""
     if not datas or not series_dict:
         return f'<div style="color:#999;padding:10px;text-align:center;">Sem dados</div>'
     if cores is None:
         cores = ["#1565c0", "#c62828", "#2e7d32", "#f57c00", "#6a1b9a"]
 
     n = len(datas)
-    # Todas as sÃ©ries tÃªm mesmo comprimento?
+    # Todas as séries têm mesmo comprimento?
     nomes = list(series_dict.keys())
-    # Calcula sÃ©rie cumulativa por linha
+    # Calcula série cumulativa por linha
     zeros = [0.0] * n
     stacks = [zeros[:]]  # base
     for nome in nomes:
@@ -536,7 +537,7 @@ def montar_html(snapshots_all, governance, eventos, pct_capital=0.01):
 
     sharpe = _sharpe_robusto(snapshots_all, vol252)
 
-    # â”€â”€ Stress DV01 por estrategia (bps configurados) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Stress DV01 por estrategia (bps configurados) ─────────────
     # NTNB agrupado como Juros Reais. Treasury nao entra no stress.
     STRESS_BPS = {
         "juros_nom":  100,   # DI: choque de 100 bps
@@ -561,10 +562,10 @@ def montar_html(snapshots_all, governance, eventos, pct_capital=0.01):
     stress_real_bps_risco  = _bps_do_risco(stress_real_R)
     stress_total_bps_risco = _bps_do_risco(stress_total_R)
 
-    # â”€â”€â”€ Construcao das series historicas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ─── Construcao das series historicas ────────────────────────────────
     datas = [s["Data"] for s in snapshots_all]
 
-    # Cota vs CDI â€” filtra valores None/0 na cota E cotas fora do range razoavel
+    # Cota vs CDI — filtra valores None/0 na cota E cotas fora do range razoavel
     # (0.5 < c < 10): elimina residuos de v1.4 (base 1000) misturados com v2.x (base 1)
     cotas_raw = []
     for s in snapshots_all:
@@ -631,7 +632,7 @@ def montar_html(snapshots_all, governance, eventos, pct_capital=0.01):
     dv01_treas_serie = [s.get("dv01_treasury") or 0 for s in snapshots_all]
     dv01_ntnb_serie  = [s.get("dv01_ntnb") or 0 for s in snapshots_all]
 
-    # â”€â”€â”€ Graficos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ─── Graficos ───────────────────────────────────────────────────────
     _mes_label = _ultima_dt.strftime("%b/%Y")
     chart_cota_mes = _svg_line_chart(datas_mes,
         {"Cota": cota_mes_norm, "CDI": cdi_mes_acum},
@@ -658,24 +659,24 @@ def montar_html(snapshots_all, governance, eventos, pct_capital=0.01):
         largura=800, altura=180, titulo="Utilizacao do risco (VaR / limite)",
         cores=["#1565c0", "#fd7e14"], y_fmt="pct")
 
-    # (chart DV01 histÃ³rico removido â€” sem backfill de DV01 nao vale plotar)
+    # (chart DV01 histórico removido — sem backfill de DV01 nao vale plotar)
 
-    # â”€â”€â”€ Donut do consumo VaR (usa EWMA) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ─── Donut do consumo VaR (usa EWMA) ─────────────────────────────────
     donut_ewma = _svg_donut(consumo_ewma)
     donut_hist = _svg_donut(consumo_hist)
 
-    # â”€â”€â”€ Banners â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ─── Banners ────────────────────────────────────────────────────────
     banner = ""
     if stop_ativo:
         banner += (f'<div style="background:#dc3545;color:white;padding:14px;'
                    f'font-weight:bold;text-align:center;border-radius:6px;margin:10px 0;">'
-                   f'STOP-LOSS ATIVO (por DD) â€” VaR reduzido para {var_limite_efet_bps:.2f} bps '
+                   f'STOP-LOSS ATIVO (por DD) — VaR reduzido para {var_limite_efet_bps:.2f} bps '
                    f'({fator_gov*100:.0f}% do orcamento base {var_base:.2f} bps)'
                    f'</div>')
     if consumo_hist > 1.0:
         banner += (f'<div style="background:#fd7e14;color:white;padding:12px;'
                    f'font-weight:bold;text-align:center;border-radius:6px;margin:8px 0;">'
-                   f'ALERTA: VaR HIST de carteira EXCEDEU limite ({consumo_hist*100:.1f}%) â€” sinalizar reducao de posicoes'
+                   f'ALERTA: VaR HIST de carteira EXCEDEU limite ({consumo_hist*100:.1f}%) — sinalizar reducao de posicoes'
                    f'</div>')
     if consumo_ewma > 1.0:
         banner += (f'<div style="background:#fd7e14;color:white;padding:12px;'
@@ -683,7 +684,7 @@ def montar_html(snapshots_all, governance, eventos, pct_capital=0.01):
                    f'ALERTA: VaR EWMA de carteira EXCEDEU limite ({consumo_ewma*100:.1f}%)'
                    f'</div>')
 
-    # â”€â”€â”€ HTML â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ─── HTML ───────────────────────────────────────────────────────────
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 body {{ font-family: Segoe UI, Arial, sans-serif; color: #222; font-size: 14px; max-width: 900px; margin: 0 auto; padding: 10px; }}
@@ -925,7 +926,7 @@ def _resumo_email_texto(dados: dict, link_html: str) -> str:
 
     data_br = datetime.fromisoformat(dados["data"]).strftime("%d/%m/%Y")
     return f"""<html><body style="font-family:Segoe UI,Arial,sans-serif;color:#222;font-size:14px;">
-<h2 style="color:#1a3a6c;border-bottom:2px solid #1a3a6c;padding-bottom:6px;">Dash Risco â€” {data_br}</h2>
+<h2 style="color:#1a3a6c;border-bottom:2px solid #1a3a6c;padding-bottom:6px;">Dash Risco — {data_br}</h2>
 
 <h3 style="color:#1a3a6c;">Resumo</h3>
 <table style="border-collapse:collapse;">
@@ -1029,4 +1030,3 @@ if __name__ == "__main__":
     ap.add_argument("--to", default=None)
     args = ap.parse_args()
     run(dry_run=args.dry_run, override_to=args.to)
-

@@ -917,10 +917,8 @@ def main():
     wide_preco = _order(wide_preco)
     wide_valor = _order(wide_valor)
 
-    # 5) DESLIGADO: adicionar_coluna_duplicada_final criava coluna fake pro proximo DU,
-    #    o que quebrava snapshot/cota downstream (retorno=0, email do dia errado).
-    #    Se B3 nao tem dado real, a coluna simplesmente nao existe.
-    # wide_preco, wide_valor = adicionar_coluna_duplicada_final(wide_preco, wide_valor)
+    # 5) cria a coluna do próximo DU como cópia da última real, se ainda não existir
+    wide_preco, wide_valor = adicionar_coluna_duplicada_final(wide_preco, wide_valor)
 
     # 6) normalize missing e remove assets indesejados no output FINAL
     wide_preco = remover_assets_indesejados(_normalize_missing_values_df(wide_preco))

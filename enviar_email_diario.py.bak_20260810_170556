@@ -39,7 +39,7 @@ except ImportError:
     sys.exit(1)
 
 
-DEFAULT_ASSUNTO = "Cota {data_br} - Book Juros AF - {cota:.4f}"
+DEFAULT_ASSUNTO = "Dash Risco - {data_br} - Cota {cota:.4f} ({sinal}{ret_bps:.2f}bps) - VaR carteira EWMA {consumo_ewma:.0f}%"
 
 
 # =============================================================================
@@ -883,19 +883,19 @@ Stop-loss aciona apenas por DD; VaR e alerta para reducao prospectiva de posicoe
 
     ret_bps = ret_dtd * 10_000
     sinal = "+" if ret_bps >= 0 else ""
-    assunto = DEFAULT_ASSUNTO.format(data_br=data_br, cota=cota)
+    assunto = DEFAULT_ASSUNTO.format(
+        data_br=data_br, cota=cota, sinal=sinal, ret_bps=ret_bps,
+        consumo_ewma=(consumo_ewma * 100 if consumo_ewma else 0)
+    )
     dados = {
         "data": data_iso, "cota": cota, "ret_bps": ret_bps,
-        "ret_dtd": ret_dtd, "ret_mtd": ret_mtd, "ret_ytd": ret_ytd,
-        "cdi_dtd": cdi_dtd, "cdi_mtd": cdi_mtd, "cdi_ytd": cdi_ytd,
-        "pct_cdi_dtd": pct_cdi_dtd, "pct_cdi_mtd": pct_cdi_mtd, "pct_cdi_ytd": pct_cdi_ytd,
         "pl_total": pl_total,
         "var_cart_hist_R": var_cart_hist_R, "consumo_hist": consumo_hist,
         "var_cart_ewma_R": var_cart_ewma_R, "consumo_ewma": consumo_ewma,
         "var_cota_ew_R": var_hist_ew_R,
         "limite_R": limite_R,
         "dd_atual": dd_atual, "stop_ativo": stop_ativo,
-        "sharpe": sharpe,
+        "sharpe": sharpe, "pct_cdi_ytd": pct_cdi_ytd,
         "dv01_total": dv01_total,
     }
     return assunto, html, dados
@@ -922,28 +922,17 @@ def _resumo_email_texto(dados: dict, link_html: str) -> str:
     def _fmt_R(v): return _fmt_reais(v) if v is not None else "-"
     def _fmt_p(v): return f"{v*100:.2f}%" if v is not None else "-"
     def _fmt_c(v): return f"{v*100:.0f}%" if v is not None else "-"
-    def _fmt_b(v): return f"{v*10_000:+.2f} bps" if v is not None else "-"
 
     data_br = datetime.fromisoformat(dados["data"]).strftime("%d/%m/%Y")
-    ret_dtd = dados.get("ret_dtd")
-    ret_mtd = dados.get("ret_mtd")
-    ret_ytd = dados.get("ret_ytd")
-    pct_dtd = dados.get("pct_cdi_dtd")
-    pct_mtd = dados.get("pct_cdi_mtd")
-    pct_ytd = dados.get("pct_cdi_ytd")
-
-    return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
-<body style="font-family:Segoe UI,Arial,sans-serif;color:#222;font-size:14px;">
-<h2 style="color:#1a3a6c;border-bottom:2px solid #1a3a6c;padding-bottom:6px;">Dash Risco - {data_br}</h2>
+    return f"""<html><body style="font-family:Segoe UI,Arial,sans-serif;color:#222;font-size:14px;">
+<h2 style="color:#1a3a6c;border-bottom:2px solid #1a3a6c;padding-bottom:6px;">Dash Risco â€” {data_br}</h2>
 
 <h3 style="color:#1a3a6c;">Resumo</h3>
 <table style="border-collapse:collapse;">
 <tr><td style="padding:4px 12px;"><b>Cota:</b></td><td>{dados.get('cota'):.4f}</td></tr>
-<tr><td style="padding:4px 12px;"><b>Retorno DIA:</b></td><td>{_fmt_b(ret_dtd)} &nbsp;({_fmt_c(pct_dtd)} do CDI)</td></tr>
-<tr><td style="padding:4px 12px;"><b>Retorno MES:</b></td><td>{_fmt_p(ret_mtd)} &nbsp;({_fmt_c(pct_mtd)} do CDI)</td></tr>
-<tr><td style="padding:4px 12px;"><b>Retorno ANO:</b></td><td>{_fmt_p(ret_ytd)} &nbsp;({_fmt_c(pct_ytd)} do CDI)</td></tr>
+<tr><td style="padding:4px 12px;"><b>Retorno DTD:</b></td><td>{dados.get('ret_bps'):+.2f} bps</td></tr>
 <tr><td style="padding:4px 12px;"><b>PL Total:</b></td><td>{_fmt_R(dados.get('pl_total'))}</td></tr>
+<tr><td style="padding:4px 12px;"><b>% CDI YTD:</b></td><td>{_fmt_c(dados.get('pct_cdi_ytd'))}</td></tr>
 </table>
 
 <h3 style="color:#1a3a6c;">Risco</h3>

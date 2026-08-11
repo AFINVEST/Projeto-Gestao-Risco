@@ -181,7 +181,7 @@ def _nice_step(rng: float) -> float:
 
 def _svg_line_chart(datas, series_dict, largura=560, altura=180, titulo="",
                      cores=None, y_fmt="pct", y_zero_center=False,
-                     margin_left=55, margin_right=15, margin_top=40, margin_bottom=25):
+                     margin_left=55, margin_right=15, margin_top=25, margin_bottom=25):
     """Gera SVG line chart simples.
 
     datas: list of date strings (YYYY-MM-DD)
@@ -295,9 +295,9 @@ def _svg_line_chart(datas, series_dict, largura=560, altura=180, titulo="",
         path = "M " + " L ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
         svg.append(f'<path d="{path}" fill="none" stroke="{cor}" stroke-width="1.5"/>')
 
-    # Legenda (abaixo do titulo, acima do plot)
+    # Legenda
     lx = margin_left + 10
-    ly = margin_top - 10
+    ly = margin_top - 5
     for idx_s, nome in enumerate(series_dict.keys()):
         cor = cores[idx_s % len(cores)]
         svg.append(f'<rect x="{lx}" y="{ly-8}" width="10" height="3" fill="{cor}"/>')

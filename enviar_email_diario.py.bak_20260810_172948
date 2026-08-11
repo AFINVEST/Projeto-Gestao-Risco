@@ -39,7 +39,7 @@ except ImportError:
     sys.exit(1)
 
 
-DEFAULT_ASSUNTO = "Book Juros - {data_br}"
+DEFAULT_ASSUNTO = "Cota {data_br} - Book Juros AF - {cota:.4f}"
 
 
 # =============================================================================
@@ -181,7 +181,7 @@ def _nice_step(rng: float) -> float:
 
 def _svg_line_chart(datas, series_dict, largura=560, altura=180, titulo="",
                      cores=None, y_fmt="pct", y_zero_center=False,
-                     margin_left=55, margin_right=15, margin_top=40, margin_bottom=25):
+                     margin_left=55, margin_right=15, margin_top=25, margin_bottom=25):
     """Gera SVG line chart simples.
 
     datas: list of date strings (YYYY-MM-DD)
@@ -295,9 +295,9 @@ def _svg_line_chart(datas, series_dict, largura=560, altura=180, titulo="",
         path = "M " + " L ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
         svg.append(f'<path d="{path}" fill="none" stroke="{cor}" stroke-width="1.5"/>')
 
-    # Legenda (abaixo do titulo, acima do plot)
+    # Legenda
     lx = margin_left + 10
-    ly = margin_top - 10
+    ly = margin_top - 5
     for idx_s, nome in enumerate(series_dict.keys()):
         cor = cores[idx_s % len(cores)]
         svg.append(f'<rect x="{lx}" y="{ly-8}" width="10" height="3" fill="{cor}"/>')
@@ -703,7 +703,7 @@ tr:nth-child(even) td {{ background: #f8f9fa; }}
 .section-intro {{ background:#eef; padding:10px; border-radius:6px; font-size:12px; color:#333; margin:6px 0 16px 0; }}
 </style></head><body>
 
-<h1>Book Juros - {data_br}</h1>
+<h1>Dash Risco - {data_br}</h1>
 {banner}
 
 <!-- ==================== SECAO 1: RESUMO DO DIA ==================== -->
@@ -798,7 +798,48 @@ tr:nth-child(even) td {{ background: #f8f9fa; }}
 </div>
 
 
-<h3>Últimos 5 dias</h3>
+<!-- ==================== SECAO 2: METRICAS HISTORICAS ==================== -->
+<h2>2. Metricas historicas de performance e risco</h2>
+
+<div class="chart-container">
+  {chart_cota_hist}
+</div>
+
+<div class="chart-container">
+  {chart_vol_hist}
+</div>
+
+<div class="chart-container">
+  {chart_dd_hist}
+</div>
+
+<div class="chart-container">
+  {chart_consumo_var}
+</div>
+
+<!-- Metricas historicas da cota -->
+<h3>Metricas historicas da cota</h3>
+<div class="metric-grid">
+  <div class="metric" style="width:25%;">
+    <div class="metric-label">Sharpe</div>
+    <div class="metric-value" style="color:{_cor_ret(sharpe)}">{f'{sharpe:.2f}' if sharpe is not None else '-'}</div>
+    <div class="metric-value-secondary" style="font-size:11px;color:#666;font-weight:normal;">(ret-CDI) / vol252</div>
+  </div>
+  <div class="metric" style="width:25%;">
+    <div class="metric-label">Vol realizada</div>
+    <div class="metric-value">{_fmt_pct(vol_total_anual)}</div>
+  </div>
+  <div class="metric" style="width:25%;">
+    <div class="metric-label">VaR (95%)</div>
+    <div class="metric-value">{_fmt_reais(var_hist_ew_R)} / {abs(var_hist_ew_bps) if var_hist_ew_bps else 0:.2f} bps</div>
+  </div>
+  <div class="metric" style="width:25%;">
+    <div class="metric-label">Drawdown</div>
+    <div class="metric-value">{_fmt_pct(dd_max)}</div>
+  </div>
+</div>
+
+<h3>Ultimos 5 dias</h3>
 """
 
     # Tabela ultimos 5 dias
@@ -842,7 +883,7 @@ Stop-loss aciona apenas por DD; VaR e alerta para reducao prospectiva de posicoe
 
     ret_bps = ret_dtd * 10_000
     sinal = "+" if ret_bps >= 0 else ""
-    assunto = DEFAULT_ASSUNTO.format(data_br=data_br)
+    assunto = DEFAULT_ASSUNTO.format(data_br=data_br, cota=cota)
     dados = {
         "data": data_iso, "cota": cota, "ret_bps": ret_bps,
         "ret_dtd": ret_dtd, "ret_mtd": ret_mtd, "ret_ytd": ret_ytd,
@@ -877,7 +918,7 @@ def _salvar_relatorio_completo(html_body: str, data_iso: str) -> Path:
 
 
 def _resumo_email_texto(dados: dict, link_html: str) -> str:
-    """Corpo do email: apenas Resumo. Sem Risco."""
+    """Gera resumo simples pra ser corpo do email (funciona em qualquer cliente)."""
     def _fmt_R(v): return _fmt_reais(v) if v is not None else "-"
     def _fmt_p(v): return f"{v*100:.2f}%" if v is not None else "-"
     def _fmt_c(v): return f"{v*100:.0f}%" if v is not None else "-"
@@ -894,21 +935,35 @@ def _resumo_email_texto(dados: dict, link_html: str) -> str:
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="font-family:Segoe UI,Arial,sans-serif;color:#222;font-size:14px;">
-<h2 style="color:#1a3a6c;border-bottom:2px solid #1a3a6c;padding-bottom:6px;">Book Juros - {data_br}</h2>
+<h2 style="color:#1a3a6c;border-bottom:2px solid #1a3a6c;padding-bottom:6px;">Dash Risco - {data_br}</h2>
 
 <h3 style="color:#1a3a6c;">Resumo</h3>
 <table style="border-collapse:collapse;">
 <tr><td style="padding:4px 12px;"><b>Cota:</b></td><td>{dados.get('cota'):.4f}</td></tr>
 <tr><td style="padding:4px 12px;"><b>Retorno DIA:</b></td><td>{_fmt_b(ret_dtd)} &nbsp;({_fmt_c(pct_dtd)} do CDI)</td></tr>
-<tr><td style="padding:4px 12px;"><b>Retorno MÊS:</b></td><td>{_fmt_p(ret_mtd)} &nbsp;({_fmt_c(pct_mtd)} do CDI)</td></tr>
+<tr><td style="padding:4px 12px;"><b>Retorno MES:</b></td><td>{_fmt_p(ret_mtd)} &nbsp;({_fmt_c(pct_mtd)} do CDI)</td></tr>
 <tr><td style="padding:4px 12px;"><b>Retorno ANO:</b></td><td>{_fmt_p(ret_ytd)} &nbsp;({_fmt_c(pct_ytd)} do CDI)</td></tr>
 <tr><td style="padding:4px 12px;"><b>PL Total:</b></td><td>{_fmt_R(dados.get('pl_total'))}</td></tr>
 </table>
 
+<h3 style="color:#1a3a6c;">Risco</h3>
+<table style="border-collapse:collapse;">
+<tr><td style="padding:4px 12px;"><b>VaR HIST 3y:</b></td><td>{_fmt_R(dados.get('var_cart_hist_R'))} ({_fmt_c(dados.get('consumo_hist'))} do limite)</td></tr>
+<tr><td style="padding:4px 12px;"><b>VaR EWMA:</b></td><td>{_fmt_R(dados.get('var_cart_ewma_R'))} ({_fmt_c(dados.get('consumo_ewma'))} do limite)</td></tr>
+<tr><td style="padding:4px 12px;"><b>Limite:</b></td><td>{_fmt_R(dados.get('limite_R'))}</td></tr>
+<tr><td style="padding:4px 12px;"><b>DV01 total:</b></td><td>{_fmt_R(dados.get('dv01_total'))}/bp</td></tr>
+<tr><td style="padding:4px 12px;"><b>Drawdown atual:</b></td><td>{_fmt_p(dados.get('dd_atual'))}</td></tr>
+<tr><td style="padding:4px 12px;"><b>Sharpe:</b></td><td>{f"{dados.get('sharpe'):.2f}" if dados.get('sharpe') is not None else '-'}</td></tr>
+</table>
+
 <p style="margin-top:20px;padding:12px;background:#eef;border-radius:6px;">
-<b>Relatório completo com gráficos:</b><br>
-<a href="file:///{link_html}" style="color:#1a3a6c;font-weight:bold;">Abrir {Path(link_html).name}</a><br>
-<span style="font-size:11px;color:#666;">Ou copie o caminho: <code>{link_html}</code></span>
+<b>Relatorio completo com graficos:</b><br>
+<a href="file:///{link_html}" style="color:#1a3a6c;font-weight:bold;">
+  Abrir {Path(link_html).name}
+</a><br>
+<span style="font-size:11px;color:#666;">
+Ou copie o caminho: <code>{link_html}</code>
+</span>
 </p>
 
 <p style="margin-top:32px;color:#888;font-size:11px;border-top:1px solid #ddd;padding-top:12px;">

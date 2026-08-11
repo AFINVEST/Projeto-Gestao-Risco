@@ -449,7 +449,7 @@ def _indices_historicos(snapshots_all, ref_date: date):
 def montar_html(snapshots_mes, snapshots_all, atrib_items, rent_hist, ind_hist,
                  label_mes, data_fim: date, pct_capital=0.01):
     if not snapshots_mes:
-        return f"Book Juros - Consolidado {label_mes} - sem dados", "<p>Sem snapshots no periodo.</p>", {}
+        return f"Dash Risco - {label_mes} - sem dados", "<p>Sem snapshots no periodo.</p>", {}
 
     n = len(snapshots_mes)
     primeiro = snapshots_mes[0]; ultimo = snapshots_mes[-1]
@@ -539,7 +539,7 @@ def montar_html(snapshots_mes, snapshots_all, atrib_items, rent_hist, ind_hist,
 
     # Waterfall atribuicao
     chart_waterfall = _svg_waterfall(atrib_items, largura=800, altura=340,
-                                       titulo=f"Atribuição de Performance {label_mes}")
+                                       titulo=f"Atribuicao de Performance {label_mes}")
 
     # Historico
     datas_h = [s["Data"] for s in snapshots_all]
@@ -560,7 +560,7 @@ def montar_html(snapshots_mes, snapshots_all, atrib_items, rent_hist, ind_hist,
         acc *= (1 + r); cdi_h_ret.append(acc - 1)
     chart_cota_hist = _svg_line_chart(datas_h,
         {"Cota": cota_h_ret, "CDI": cdi_h_ret},
-        largura=800, altura=200, titulo="Cota vs CDI - Histórico total (retorno acumulado)",
+        largura=800, altura=200, titulo="Cota vs CDI - Historico total (retorno acumulado)",
         cores=["#1565c0", "#7f7f7f"], y_fmt="pct")
 
     vol_20d_h = [s.get("vol_20d") for s in snapshots_all]
@@ -570,41 +570,8 @@ def montar_html(snapshots_mes, snapshots_all, atrib_items, rent_hist, ind_hist,
 
     dd_h = [s.get("dd_atual") for s in snapshots_all]
     chart_dd = _svg_line_chart(datas_h, {"Drawdown": dd_h},
-        largura=800, altura=180, titulo="Drawdown histórico",
+        largura=800, altura=180, titulo="Drawdown historico",
         cores=["#dc3545"], y_fmt="pct", y_zero_center=True)
-
-    consumo_hist_h = [s.get("consumo_hist_pct") for s in snapshots_all]
-    consumo_ewma_h = [s.get("consumo_ewma_pct") for s in snapshots_all]
-    chart_var_hist = _svg_line_chart(datas_h,
-        {"HIST 3y": consumo_hist_h, "EWMA": consumo_ewma_h},
-        largura=800, altura=180, titulo="Utilização do risco (VaR / limite)",
-        cores=["#1565c0", "#fd7e14"], y_fmt="pct")
-
-    all_ret_hist = [float(s.get("retorno_dtd") or 0) for s in snapshots_all]
-    n_hist = len(all_ret_hist)
-    if n_hist >= 2:
-        m_h = sum(all_ret_hist) / n_hist
-        v_h = sum((r - m_h) ** 2 for r in all_ret_hist) / (n_hist - 1)
-        vol_total_hist = math.sqrt(v_h) * math.sqrt(252)
-    else:
-        vol_total_hist = None
-    all_cdi_hist = [float(s.get("cdi_dtd") or 0) for s in snapshots_all]
-    excesso = [r - c for r, c in zip(all_ret_hist, all_cdi_hist)]
-    if excesso and vol_total_hist and vol_total_hist > 0:
-        mu_ex = sum(excesso) / len(excesso)
-        sig_ex_val = _std(excesso)
-        sharpe_hist = (mu_ex / sig_ex_val * math.sqrt(252)) if sig_ex_val > 0 else None
-    else:
-        sharpe_hist = None
-    var_95_bps_h = -sorted(all_ret_hist)[int(len(all_ret_hist) * 0.05)] * 10_000 if all_ret_hist else 0
-    cotas_h_valid = [c for c in cotas_h_raw if c is not None]
-    dd_max_hist = 0.0
-    if len(cotas_h_valid) >= 2:
-        peak_h = cotas_h_valid[0]
-        for c in cotas_h_valid:
-            if c > peak_h: peak_h = c
-            dd = c / peak_h - 1
-            if dd < dd_max_hist: dd_max_hist = dd
 
     # ─── HTML ────────────────────────────
     html = f"""<!DOCTYPE html>
@@ -627,7 +594,7 @@ tr:nth-child(even) td {{ background: #f8f9fa; }}
 .pct-cdi {{ display: block; font-size: 10px; color: #888; font-style: italic; margin-top: 2px; }}
 </style></head><body>
 
-<h1>Book Juros - Consolidado {label_mes}</h1>
+<h1>Dash Risco - Consolidado {label_mes}</h1>
 
 <!-- ============ SECAO 1: RESUMO DO MÊS ============ -->
 <h2>1. Resumo do mês</h2>
@@ -814,38 +781,13 @@ tr:nth-child(even) td {{ background: #f8f9fa; }}
   {chart_dd}
 </div>
 
-<div class="chart-container">
-  {chart_var_hist}
-</div>
-
-<h3>Métricas históricas da cota</h3>
-<div class="metric-grid">
-  <div class="metric" style="width:25%;">
-    <div class="metric-label">Sharpe</div>
-    <div class="metric-value" style="color:{_cor_ret(sharpe_hist) if sharpe_hist else '#888'}">{f'{sharpe_hist:.2f}' if sharpe_hist is not None else '-'}</div>
-    <div class="metric-value-secondary" style="font-size:11px;color:#666;font-weight:normal;">(ret-CDI) / vol</div>
-  </div>
-  <div class="metric" style="width:25%;">
-    <div class="metric-label">Vol realizada</div>
-    <div class="metric-value">{(vol_total_hist*100 if vol_total_hist else 0):.2f}%</div>
-  </div>
-  <div class="metric" style="width:25%;">
-    <div class="metric-label">VaR (95%)</div>
-    <div class="metric-value">{var_95_bps_h:.2f} bps</div>
-  </div>
-  <div class="metric" style="width:25%;">
-    <div class="metric-label">Máximo Drawdown</div>
-    <div class="metric-value" style="color:#dc3545">{dd_max_hist*100:.2f}%</div>
-  </div>
-</div>
-
 <p style="margin-top:32px;color:#888;font-size:11px;border-top:1px solid #ddd;padding-top:12px;">
 Consolidado gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')}.
 PL médio do mês: {_fmt_reais(pl_medio)}.
 </p>
 </body></html>"""
 
-    assunto = f"Book Juros - Consolidado {label_mes}"
+    assunto = f"Dash Risco - Consolidado {label_mes} - Retorno {ret_mes*100:+.2f}% ({(pct_cdi_mes*100 if pct_cdi_mes else 0):.0f}% CDI)"
     dados = {
         "label": label_mes, "ret_mes": ret_mes, "cdi_mes": cdi_mes,
         "alpha_mes": alpha_mes, "vol_20d_media": vol_20d_media, "dd_max": dd_max_mes,
@@ -875,11 +817,9 @@ def _resumo_email_texto_mensal(dados: dict, link_html: str) -> str:
     def _fmt_p(v): return f"{v*100:+.2f}%" if v is not None else "-"
     def _fmt_c(v): return f"{v*100:.0f}%" if v is not None else "-"
 
-    return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
-<body style="font-family:Segoe UI,Arial,sans-serif;color:#222;font-size:14px;">
+    return f"""<html><body style="font-family:Segoe UI,Arial,sans-serif;color:#222;font-size:14px;">
 <h2 style="color:#1a3a6c;border-bottom:2px solid #1a3a6c;padding-bottom:6px;">
-Book Juros - Consolidado {dados['label']}
+Dash Risco — Consolidado {dados['label']}
 </h2>
 
 <h3 style="color:#1a3a6c;">Resumo do mês</h3>
@@ -897,7 +837,7 @@ Book Juros - Consolidado {dados['label']}
 </table>
 
 <p style="margin-top:20px;padding:12px;background:#eef;border-radius:6px;">
-<b>Relatório completo com atribuição, rentabilidade histórica e índices:</b><br>
+<b>Relatorio completo com atribuicao, rentabilidade historica e indices:</b><br>
 <a href="file:///{link_html}" style="color:#1a3a6c;font-weight:bold;">
   Abrir {Path(link_html).name}
 </a><br>

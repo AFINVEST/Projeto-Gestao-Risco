@@ -313,11 +313,11 @@ def _dv01_hoje(basefundos: dict, data_ref: pd.Timestamp,
 
             resultado = dv.calcular_dv01(ativo, taxa_pct, data_ref)
             dv_contrato = float(resultado.get("dv01", 0.0))
-            dv_abs = abs(dv_contrato * qty)
-            print(f"[dv01] {ativo}: PU={pu:.2f} du={du} taxa={taxa_pct:.4f}% dv_contrato={dv_contrato:.4f} qty={qty:.1f} dv_abs={dv_abs:.2f}")
+            dv_signed = dv_contrato * qty   # SIGNED: long soma, short subtrai (netting da carteira)
+            print(f"[dv01] {ativo}: PU={pu:.2f} du={du} taxa={taxa_pct:.4f}% dv_contrato={dv_contrato:.4f} qty={qty:.1f} dv_signed={dv_signed:.2f}")
             c = _classe(ativo)
             if c in buckets:
-                buckets[c] += dv_abs
+                buckets[c] += dv_signed
                 n_ok += 1
         except Exception as e:
             print(f"[dv01] falha em {ativo}: {e}")

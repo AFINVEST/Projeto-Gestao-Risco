@@ -2401,3 +2401,21 @@
 [2026-08-18 09:47:35] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (90, 408) | Dados/df_valor_ajuste_contrato.parquet (79, 406)
 [2026-08-18 09:47:35] [warn] envio Supabase falhou: name '_enviar_para_supabase' is not defined
 [2026-08-18 09:47:36] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json
+[2026-08-19 09:27:03] Atualizando de 2026-08-17 até 2026-08-18 (DU B3: 2)
+[2026-08-19 09:27:05] [HTTP] ConsolidatedTradesDerivatives 2026-08-17 -> status=200 content-length=122366 t=1.77s
+[2026-08-19 09:27:05] [HTTP] md5=be197f0c9b02af298ad5a0fe5daaf70f bytes=609023 (ConsolidatedTradesDerivatives 2026-08-17)
+[2026-08-19 09:27:06] 2026-08-17: base longa atualizada; total linhas = 21991.
+[2026-08-19 09:27:06] 2026-08-17: preços/valores atualizados.
+[2026-08-19 09:27:08] [HTTP] ConsolidatedTradesDerivatives 2026-08-18 -> status=200 content-length=123341 t=1.75s
+[2026-08-19 09:27:08] [HTTP] md5=9a564c272a280bff5d255c65c24bf84f bytes=610059 (ConsolidatedTradesDerivatives 2026-08-18)
+[2026-08-19 09:27:09] 2026-08-18: base longa atualizada; total linhas = 22106.
+[2026-08-19 09:27:09] 2026-08-18: preços/valores atualizados.
+[2026-08-19 09:27:09] [today-check] Coleta EXATA do dia 2026-08-18 (sem backfill).
+[2026-08-19 09:27:11] [HTTP] ConsolidatedTradesDerivatives 2026-08-18 -> status=200 content-length=123341 t=1.36s
+[2026-08-19 09:27:11] [HTTP] md5=9a564c272a280bff5d255c65c24bf84f bytes=610059 (ConsolidatedTradesDerivatives 2026-08-18)
+[2026-08-19 09:27:11] [today-ok] Dados encontrados para 2026-08-18: 115 linhas.
+[2026-08-19 09:27:11] 2026-08-18: base longa atualizada (hoje); total linhas = 22106.
+[2026-08-19 09:27:11] 2026-08-18: preços/valores de HOJE adicionados.
+[2026-08-19 09:27:15] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (90, 409) | Dados/df_valor_ajuste_contrato.parquet (79, 407)
+[2026-08-19 09:27:15] [warn] envio Supabase falhou: name '_enviar_para_supabase' is not defined
+[2026-08-19 09:27:15] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json

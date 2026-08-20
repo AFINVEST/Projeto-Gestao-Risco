@@ -149,7 +149,7 @@ print(f'df_divone.parquet salvo com naming novo ({df_divone.shape[1]} cols)')
 # ─────────────────────────────────────────────────────────────────────────────
 # 6) NTNB (comportamento original)
 # ─────────────────────────────────────────────────────────────────────────────
-df_ntnb = pd.read_excel('Dados/FechamentoNTNBs.xlsx')
+df_ntnb = pd.read_excel('Dados/FechamentoNTNBs.xlsx', sheet_name='Planilha1')  # PUs (Planilha2 tem yields)
 df_ntnb.columns = df_ntnb.iloc[0]
 df_ntnb = df_ntnb.drop(df_ntnb.index[0])
 df_ntnb = df_ntnb.drop(df_ntnb.index[0])

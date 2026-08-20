@@ -7559,7 +7559,7 @@ def simulate_nav_cota() -> None:
 
     
 
-    aba_cart,tab_orcamento = st.tabs(["Histortico Carteira", "Portfolio Atual"])
+    aba_cart,tab_orcamento = st.tabs(["Histórico Carteira", "Portfólio Atual"])
     
     with aba_cart:
 
@@ -8379,13 +8379,95 @@ def simulate_nav_cota() -> None:
     import plotly.graph_objects as go
 
     with tab_orcamento:
-        col11,col22 = st.columns(2)
-        COL1, COLmeio, COL2 = st.columns([4.8, 0.2, 4.8])
+        col11,col22 = st.columns([100, 0.001])  # col22 invisivel (sem conteudo relevante apos Fase 2)
+        COL1, COLmeio, COL2 = st.columns([100, 0.001, 0.001])  # COL2/meio invisiveis (conteudo hidden Fase 2)
         with col11:
-            st.subheader("Resumo de Orçamento")
-            c1, c2  = st.columns(2)
-            c1.metric("VaR (R$ / bps)",  var_display)
-            c2.metric("CVaR (R$ / bps)", cvar_display)
+            st.subheader("Consumo do orçamento (VaR)")
+            _snap_ult = supabase.table("snapshot_diario").select(
+                "Data,pl_total,var_carteira_hist_reais,consumo_hist_pct,var_carteira_ewma_reais,consumo_ewma_pct,var_limite_efet_bps"
+            ).order("Data", desc=True).limit(1).execute().data
+            if _snap_ult:
+                _s = _snap_ult[0]
+                _pl = _s.get("pl_total") or 0
+                _lim_bps = _s.get("var_limite_efet_bps") or 1.0
+                _limite_R = (_lim_bps / 10_000) * _pl if _pl else 0
+                _var_hist = _s.get("var_carteira_hist_reais") or 0
+                _var_ewma = _s.get("var_carteira_ewma_reais") or 0
+                _cons_hist = _s.get("consumo_hist_pct") or 0
+                _cons_ewma = _s.get("consumo_ewma_pct") or 0
+
+                import plotly.graph_objects as _pgo
+                def _donut(pct, titulo):
+                    if pct >= 1.0: cor = "#dc3545"
+                    elif pct >= 0.8: cor = "#fd7e14"
+                    elif pct >= 0.5: cor = "#ffc107"
+                    else: cor = "#28a745"
+                    _fig = _pgo.Figure(_pgo.Pie(
+                        values=[min(pct, 1)*100, max(1-pct, 0)*100], hole=0.65,
+                        marker=dict(colors=[cor, "#e5e7eb"]),
+                        textinfo="none", sort=False, direction="clockwise",
+                        rotation=0, showlegend=False
+                    ))
+                    _fig.update_layout(
+                        title=dict(text=titulo, x=0.5, xanchor="center", font=dict(size=14, color="#1a3a6c")),
+                        annotations=[
+                            dict(text=f"<b>{pct*100:.0f}%</b>", x=0.5, y=0.55, showarrow=False, font=dict(size=28, color=cor)),
+                            dict(text="do limite", x=0.5, y=0.4, showarrow=False, font=dict(size=10, color="#666")),
+                        ],
+                        margin=dict(l=10, r=10, t=50, b=10), height=280
+                    )
+                    return _fig
+
+                _tit_hist = "VaR HIST 3 anos<br><span style=' + chr(39) + 'font-size:12px;color:#333' + chr(39) + '>R$ {:,.0f}</span>".format(_var_hist)
+                _tit_ewma = "VaR EWMA (λ=0.99)<br><span style=' + chr(39) + 'font-size:12px;color:#333' + chr(39) + '>R$ {:,.0f}</span>".format(_var_ewma)
+
+                # Puxa tambem DV01 pro mesmo snapshot
+                _snap_dv = supabase.table("snapshot_diario").select(
+                    "dv01_juros_nom,dv01_juros_real,dv01_ntnb,dv01_total"
+                ).eq("Data", _s.get("Data")).execute().data
+                _sd = _snap_dv[0] if _snap_dv else {}
+                _pl_risco = _pl * 0.01
+                _dv_nom = float(_sd.get("dv01_juros_nom") or 0)
+                _dv_real = float(_sd.get("dv01_juros_real") or 0) + float(_sd.get("dv01_ntnb") or 0)
+                _dv_total = _dv_nom + _dv_real
+                _str_nom = _dv_nom * 100
+                _str_real = _dv_real * 50
+                _str_tot = _str_nom + _str_real
+                def _bps_r(v): return (v/_pl_risco*10_000) if _pl_risco else 0
+
+                _c1, _c2, _c3 = st.columns([1, 1, 1.3])
+                with _c1:
+                    st.plotly_chart(_donut(_cons_hist, _tit_hist), use_container_width=True)
+                with _c2:
+                    st.plotly_chart(_donut(_cons_ewma, _tit_ewma), use_container_width=True)
+                with _c3:
+                    _dv_html = """<div style='background:#f8f9fa;border:1px solid #ddd;border-radius:6px;padding:14px;font-size:13px;line-height:1.7;margin-top:30px;'>
+<div style='font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:600;'>DV01 e Stress do dia</div>
+<b>Juros Nominais<sup>*</sup>:</b><br>
+&nbsp;&nbsp;DV01 = R$ {n_dv:,.0f} ({n_bps:.2f} bps)<br>
+&nbsp;&nbsp;Stress = R$ {n_st:,.0f} ({n_sb:.1f} bps)<br><br>
+<b>Juros Reais<sup>**</sup>:</b><br>
+&nbsp;&nbsp;DV01 = R$ {r_dv:,.0f} ({r_bps:.2f} bps)<br>
+&nbsp;&nbsp;Stress = R$ {r_st:,.0f} ({r_sb:.1f} bps)<br><br>
+<b style='color:#1a3a6c;'>TOTAL:</b><br>
+&nbsp;&nbsp;DV01 = R$ {t_dv:,.0f} ({t_bps:.2f} bps)<br>
+&nbsp;&nbsp;Stress = R$ {t_st:,.0f} ({t_sb:.1f} bps)
+<div style='font-size:10px;color:#666;margin-top:10px;border-top:1px solid #ddd;padding-top:6px;'>
+<sup>*</sup>Juros nominais (DI): choque de 100 bps<br>
+<sup>**</sup>Juros reais (DAP + NTNB): choque de 50 bps<br>
+bps calculados sobre PL Risco (1% do PL total).
+</div>
+</div>""".format(
+                        n_dv=_dv_nom, n_bps=_bps_r(_dv_nom), n_st=_str_nom, n_sb=_bps_r(_str_nom),
+                        r_dv=_dv_real, r_bps=_bps_r(_dv_real), r_st=_str_real, r_sb=_bps_r(_str_real),
+                        t_dv=_dv_total, t_bps=_bps_r(_dv_total), t_st=_str_tot, t_sb=_bps_r(_str_tot),
+                    )
+                    st.markdown(_dv_html, unsafe_allow_html=True)
+
+                st.caption("Limite: R$ {:,.0f} ({:.2f} bps do PL) — snapshot {}".format(_limite_R, _lim_bps, _s.get("Data")))
+            else:
+                st.info("Sem snapshot_diario disponivel.")
+
             # ---- orçamento de risco (1/2/3 bps) ----
             coll1,coll2 = st.columns(2)
             with coll1:
@@ -8436,8 +8518,9 @@ def simulate_nav_cota() -> None:
                 #)
 
         with COLmeio:
-            # Adicionar linha vertical
-            st.html(
+            # HIDDEN Fase 2: divider vertical removido
+            if False:
+                st.html(
                 '''
                         <div class="divider-vertical-lines"></div>
                         <style>
@@ -8561,27 +8644,24 @@ def simulate_nav_cota() -> None:
                 carry_portfolio_ts = carry_assets_ts.sum(axis=1).rename("Carry_DI_portfolio_R$")
 
                 # --- visualizações ---
-                st.markdown("### Carry do portfólio DI ao longo do tempo (R$)")
-
-                # métrica do carry atual
-                if len(carry_portfolio_ts) >= 2:
-                    curr = float(carry_portfolio_ts.iloc[-1])
-                    prev = float(carry_portfolio_ts.iloc[-2])
-                    st.metric(label="Carry DI do portfólio (1d) — atual", value=f"R$ {curr:,.2f}", delta=f"{(curr-prev):,.2f}")
-                elif len(carry_portfolio_ts) == 1:
-                    curr = float(carry_portfolio_ts.iloc[-1])
-                    st.metric(label="Carry DI do portfólio (1d) — atual", value=f"R$ {curr:,.2f}", delta=None)
-                
-                st.line_chart(carry_portfolio_ts)
+                # HIDDEN Fase 2: Carry chart oculto ate refazer o calculo corretamente
+                if False:
+                    st.markdown("### Carry do portfólio DI ao longo do tempo (R$)")
+                    if len(carry_portfolio_ts) >= 2:
+                        curr = float(carry_portfolio_ts.iloc[-1])
+                        prev = float(carry_portfolio_ts.iloc[-2])
+                        st.metric(label="Carry DI do portfólio (1d) — atual", value=f"R$ {curr:,.2f}", delta=f"{(curr-prev):,.2f}")
+                    elif len(carry_portfolio_ts) == 1:
+                        curr = float(carry_portfolio_ts.iloc[-1])
+                        st.metric(label="Carry DI do portfólio (1d) — atual", value=f"R$ {curr:,.2f}", delta=None)
+                    st.line_chart(carry_portfolio_ts)
                 
                 # (opcional) contribuições por ativo na última data — dentro de "Exibir mais"
-                if "carry_assets_ts" in locals() and not carry_assets_ts.empty:
-                    last_contrib = carry_assets_ts.iloc[-1].sort_values(ascending=False)
-                    with st.expander("Exibir mais — Contribuição por DI (última data)", expanded=False):
-                        st.dataframe(
-                            last_contrib.to_frame("Carry_R$"),
-                            use_container_width=True
-                        )
+                if False:  # HIDDEN Fase 2
+                    if "carry_assets_ts" in locals() and not carry_assets_ts.empty:
+                        last_contrib = carry_assets_ts.iloc[-1].sort_values(ascending=False)
+                        with st.expander("Exibir mais — Contribuição por DI (última data)", expanded=False):
+                            st.dataframe(last_contrib.to_frame("Carry_R$"), use_container_width=True)
                         # ================================================================================================
         
     import re as _re
@@ -8711,13 +8791,10 @@ def simulate_nav_cota() -> None:
     is_peak = (cota == rolling_max)
     ultima_data_pico = is_peak[is_peak].index[-1] if is_peak.any() else cota.index[0]
     dias_em_dd = (cota.index[-1] - ultima_data_pico).days if dd_atual < 0 else 0
+    # REMOVED Fase 2c cleanup: DV01 duplicado (agora so aparece ao lado dos donuts em col11)
     with tab_orcamento:
         with COL1:
-            st.subheader("Resumo de DV01")
-            c4, c5= st.columns(2)
-            c4.metric("DV01 Port (R$/bp / bps)", dv01_port_display)
-            c5.metric("DV01 Stress (R$ / bps)",  dv01_strss_display)
-            #c6.metric("CoVaR Total (R$ / bps)",  covar_tot_display)
+            pass  # bloco anterior removido
 
     # ======================= VOL CURTA (1M, 6M, 1Y) ==============================
     def vol_annualized(ser: pd.Series) -> float:
@@ -8744,69 +8821,130 @@ def simulate_nav_cota() -> None:
 
     with aba_cart:
    
-        st.subheader("Resumo de Volatilidade")
-        #c7, c8, c9, c10 = st.columns(4)
-        #c7.metric("Vol (últ. 1M)", f"{vols_finais['1M']:,.2%}" if np.isfinite(vols_finais['1M']) else "—")
-        #c8.metric("Vol (últ. 6M)", f"{vols_finais['6M']:,.2%}" if np.isfinite(vols_finais['6M']) else "—")
-        #c9.metric("Vol (últ. 1Y)", f"{vols_finais['1Y']:,.2%}" if np.isfinite(vols_finais['1Y']) else "—",
-        #        help="Se não houver 252 dias, usa tudo que existir e anualiza.")
-        #c10.metric("Drawdown corrente", f"{dd_atual:,.2%}", help=f"Dias no DD: {dias_em_dd}d")
-        c7, c8 = st.columns(2)
-        c7.metric("Drawdown corrente", f"{dd_atual:,.2%}", help=f"Dias no DD: {dias_em_dd}d")
-        c8.metric("Vol (ultimos 21 dias)", f"{vols_finais['1M']:,.2%}" if np.isfinite(vols_finais['1M']) else "—")
+        # Carrega serie de snapshot_diario diretamente do Supabase
+        _snap_rows = []
+        _offset = 0
+        while True:
+            _r = supabase.table("snapshot_diario").select(
+                "Data,retorno_dtd,cdi_dtd,vol_20d,dd_atual,consumo_hist_pct,consumo_ewma_pct"
+            ).order("Data").range(_offset, _offset+999).execute()
+            if not _r.data: break
+            _snap_rows.extend(_r.data)
+            if len(_r.data) < 1000: break
+            _offset += 1000
 
-        # ======================= GRÁFICOS LADO A LADO (AZUIS) ========================
-        g1, g2 = st.columns(2)
+        if not _snap_rows:
+            st.info("Sem dados de snapshot_diario para plotar.")
+        else:
+            _df_snap = pd.DataFrame(_snap_rows)
+            _df_snap["Data"] = pd.to_datetime(_df_snap["Data"])
+            _df_snap = _df_snap.sort_values("Data").set_index("Data")
 
-        # --- Gráfico: Drawdown histórico (linha azul, zero tracejado) ---
-        with g1:
-            fig_dd = go.Figure()
+            import plotly.graph_objects as _go
 
-            # Adicionar a linha do Drawdown
-            fig_dd.add_trace(go.Scatter(
-                x=dd_series.index, y=dd_series.values,
-                mode="lines", name="Drawdown", line=dict(color="#1f77b4", width=2),
-                fill='tozeroy',  # Preencher a área abaixo da linha com a cor desejada
-                fillcolor='rgba(173, 216, 230, 0.3)'  # Cor azul clarinho com transparência
+            # === Estatisticas mensais (horizontal, ANTES dos charts) ===
+            from collections import defaultdict as _dd
+            _g = _dd(lambda: {"rets": [], "cdis": []})
+            for _, _row in _df_snap.iterrows():
+                _y, _m = _row.name.year, _row.name.month
+                _g[(_y, _m)]["rets"].append(float(_row.get("retorno_dtd") or 0))
+                _g[(_y, _m)]["cdis"].append(float(_row.get("cdi_dtd") or 0))
+            def _acum(rs):
+                acc = 1.0
+                for r in rs: acc *= (1+r)
+                return acc - 1
+            _meses = [{"ret": _acum(v["rets"]), "cdi": _acum(v["cdis"])} for v in _g.values()]
+            if _meses:
+                _n = len(_meses)
+                _npos = sum(1 for m in _meses if m["ret"]>0)
+                _nneg = sum(1 for m in _meses if m["ret"]<0)
+                _maxr = max(m["ret"] for m in _meses)
+                _minr = min(m["ret"] for m in _meses)
+                _nac  = sum(1 for m in _meses if m["ret"]>m["cdi"])
+                _nab  = sum(1 for m in _meses if m["ret"]<m["cdi"])
+                _cor_min = "#28a745" if _minr >= 0 else "#dc3545"
+                st.markdown("### Estatísticas mensais")
+                _html = f"""
+<table style="width:100%;border-collapse:collapse;text-align:center;font-size:14px;">
+<thead>
+<tr style="background:#1a3a6c;color:white;">
+<th style="padding:8px 10px;border:1px solid #ddd;">Meses positivos</th>
+<th style="padding:8px 10px;border:1px solid #ddd;">Meses negativos</th>
+<th style="padding:8px 10px;border:1px solid #ddd;">Maior retorno mensal</th>
+<th style="padding:8px 10px;border:1px solid #ddd;">Menor retorno mensal</th>
+<th style="padding:8px 10px;border:1px solid #ddd;">Meses acima do CDI</th>
+<th style="padding:8px 10px;border:1px solid #ddd;">Meses abaixo do CDI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="padding:10px;border:1px solid #ddd;color:#28a745;font-weight:bold;">{_npos}/{_n} ({_npos/_n*100:.0f}%)</td>
+<td style="padding:10px;border:1px solid #ddd;color:#dc3545;font-weight:bold;">{_nneg}/{_n} ({_nneg/_n*100:.0f}%)</td>
+<td style="padding:10px;border:1px solid #ddd;color:#28a745;font-weight:bold;">{_maxr*100:+.2f}%</td>
+<td style="padding:10px;border:1px solid #ddd;color:{_cor_min};font-weight:bold;">{_minr*100:+.2f}%</td>
+<td style="padding:10px;border:1px solid #ddd;color:#28a745;font-weight:bold;">{_nac}/{_n} ({_nac/_n*100:.0f}%)</td>
+<td style="padding:10px;border:1px solid #ddd;color:#dc3545;font-weight:bold;">{_nab}/{_n} ({_nab/_n*100:.0f}%)</td>
+</tr>
+</tbody>
+</table>
+"""
+                st.markdown(_html, unsafe_allow_html=True)
+                st.markdown("")   # espaco
+
+            # === Vol 20d anualizada ===
+            _fig_vol = _go.Figure()
+            _fig_vol.add_trace(_go.Scatter(
+                x=_df_snap.index, y=_df_snap["vol_20d"]*100,
+                mode="lines", name="Vol 20d anualizada",
+                line=dict(color="#c62828", width=2)
             ))
-
-            fig_dd.update_layout(
-                title="Drawdown",
-                xaxis_title="",
-                yaxis_title="",
+            _fig_vol.update_layout(
+                title="Volatilidade 20d anualizada",
                 hovermode="x unified",
-                margin=dict(l=20, r=20, t=30, b=10),
-                shapes=[dict(
-                    type="line", xref="paper", x0=0, x1=1, yref="y", y0=0, y1=0,
-                    line=dict(width=1, dash="dot", color="#888")
-                )]
+                margin=dict(l=20, r=20, t=40, b=20),
+                yaxis=dict(ticksuffix="%")
             )
+            st.plotly_chart(_fig_vol, use_container_width=True)
 
-            fig_dd.update_yaxes(tickformat=".2%")
-            st.plotly_chart(fig_dd, use_container_width=True)
-
-            # --- Gráfico: Volatilidade histórica (uma linha) ---
-            # Para ficar parecido ao print, use a vol rolling de 21 dias (1M).
-        vol_anualizada = ret_total.expanding(min_periods=2).std() * np.sqrt(252)
-
-        with g2:
-            fig_vol = go.Figure()
-            fig_vol.add_trace(go.Scatter(
-                x=vol_anualizada.index,
-                y=vol_anualizada.values,
-                mode="lines",
-                name="Vol anualizada (expanding)",
-                line=dict(width=2)
+            # === Drawdown historico ===
+            _fig_dd = _go.Figure()
+            _fig_dd.add_trace(_go.Scatter(
+                x=_df_snap.index, y=_df_snap["dd_atual"]*100,
+                mode="lines", name="Drawdown",
+                line=dict(color="#dc3545", width=2),
+                fill="tozeroy", fillcolor="rgba(220,53,69,0.15)"
             ))
-            fig_vol.update_layout(
-                title="Volatilidade",
-                xaxis_title="",
-                yaxis_title="",
+            _fig_dd.update_layout(
+                title="Drawdown histórico",
                 hovermode="x unified",
-                margin=dict(l=20, r=20, t=30, b=10)
+                margin=dict(l=20, r=20, t=40, b=20),
+                yaxis=dict(ticksuffix="%"),
+                shapes=[dict(type="line", xref="paper", x0=0, x1=1, yref="y", y0=0, y1=0,
+                             line=dict(width=1, dash="dot", color="#888"))]
             )
-            fig_vol.update_yaxes(tickformat=".2%")
-            st.plotly_chart(fig_vol, use_container_width=True)
+            st.plotly_chart(_fig_dd, use_container_width=True)
+
+            # === Utilizacao do risco (VaR / limite) ===
+            _fig_var = _go.Figure()
+            _fig_var.add_trace(_go.Scatter(
+                x=_df_snap.index, y=_df_snap["consumo_hist_pct"]*100,
+                mode="lines", name="HIST 3y",
+                line=dict(color="#1565c0", width=2)
+            ))
+            _fig_var.add_trace(_go.Scatter(
+                x=_df_snap.index, y=_df_snap["consumo_ewma_pct"]*100,
+                mode="lines", name="EWMA (lambda=0.99)",
+                line=dict(color="#fd7e14", width=2)
+            ))
+            _fig_var.update_layout(
+                title="Utilização do risco (VaR / limite)",
+                hovermode="x unified",
+                margin=dict(l=20, r=20, t=40, b=20),
+                yaxis=dict(ticksuffix="%")
+            )
+            st.plotly_chart(_fig_var, use_container_width=True)
+
+
 
 
 
@@ -8961,16 +9099,12 @@ def simulate_nav_cota() -> None:
             except Exception:
                 # fallback
                 st.progress(pct_clamped/100.0)
-        with col11:
-            st.subheader("Consumo do orçamento (VaR)")
-            #colA, colB = st.columns(2)
-            #with colA:
-            st.caption(f"VaR — {fmt_pct(pct_consumo_var(var_bps/100))} do orçamento")
-            donut_chart("VaR", pct_consumo_var(var_bps/100))
-
-            #with colB:
-            #    st.caption(f"CVaR — {fmt_pct(pct_consumo_cvar(cvar_bps/100))} do orçamento")
-            #    donut_chart("CVaR", pct_consumo_cvar(cvar_bps/100))
+        # REMOVED Fase 2b: substituido pelos donuts HIST+EWMA acima
+        if False:
+            with col11:
+                st.subheader("Consumo do orçamento (VaR)")
+                st.caption(f"VaR — {fmt_pct(pct_consumo_var(var_bps/100))} do orçamento")
+                donut_chart("VaR", pct_consumo_var(var_bps/100))
 
 
         from typing import Optional, Dict, Tuple, Sequence
@@ -8979,14 +9113,54 @@ def simulate_nav_cota() -> None:
         import plotly.express as px
         import plotly.graph_objects as go
 
-        with COL1:
+        # ===================== DV01 por ATIVO (BAR CHART, bps, full width, colorido por classe) =====================
+        st.subheader("Composição do DV01 por ativo (bps)")
 
-        # ===================== DV01 por CLASSE com CATEGORIAS empilhadas =====================
-            st.subheader("DV01 por classe")
+        dv01_asset_bps_dict = risco.get("DV01 por ativo (bps)", {}) or {}
+        if not dv01_asset_bps_dict:
+            st.info("DV01 por ativo indisponível para este portfólio.")
+        else:
+            import plotly.graph_objects as _pgo
+            import pandas as _pd
+            def _mc(a):
+                au = str(a).upper()
+                if au.startswith("DI"): return "Juros Nominais BR"
+                if au.startswith(("DAP","NTNB")): return "Juros Reais BR"
+                if "TREASURY" in au: return "Juros US"
+                if au.startswith("WDO"): return "Moeda"
+                return "Outros"
+            _cores_cls = {"Juros Nominais BR":"#1565c0","Juros Reais BR":"#dc3545","Juros US":"#0d47a1","Moeda":"#e57373","Outros":"#7f7f7f"}
+            _df_bar = _pd.DataFrame([
+                {"Ativo": a, "Classe": _mc(a), "DV01_bps": float(v)}
+                for a, v in dv01_asset_bps_dict.items() if abs(float(v)) > 1e-9
+            ]).sort_values("DV01_bps", ascending=True)
+            if _df_bar.empty:
+                st.info("Todos os DV01 zerados.")
+            else:
+                _fig_bar = _pgo.Figure()
+                for _cl in _df_bar["Classe"].unique():
+                    _sub = _df_bar[_df_bar["Classe"] == _cl]
+                    _fig_bar.add_trace(_pgo.Bar(
+                        x=_sub["DV01_bps"], y=_sub["Ativo"], orientation="h",
+                        name=_cl, marker_color=_cores_cls.get(_cl, "#7f7f7f"),
+                        text=[f"{v:+.2f} bps" for v in _sub["DV01_bps"]],
+                        textposition="outside",
+                        hovertemplate="<b>%{y}</b><br>DV01: %{x:.2f} bps<br>Classe: " + _cl + "<extra></extra>",
+                    ))
+                _fig_bar.update_layout(
+                    xaxis=dict(title="DV01 (bps sobre PL Risco)", zeroline=True, zerolinecolor="#666", zerolinewidth=1.5),
+                    yaxis=dict(title=""),
+                    barmode="relative", height=max(220, 40*len(_df_bar) + 100),
+                    margin=dict(l=80, r=30, t=30, b=40),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    showlegend=True,
+                )
+                st.plotly_chart(_fig_bar, use_container_width=True)
 
-            dv01_asset_rs_dict  = risco.get("DV01 por ativo (bps)", {}) or {}
-            if not dv01_asset_rs_dict:
-                st.info("DV01 por ativo indisponível para este portfólio.")
+            # Bloco antigo de DV01 por classe (bar + donut) desativado
+            if True:
+                _dv_dict_old = {}
+                PIE_HEIGHT = 340  # restaurada pra evitar UnboundLocalError
             else:
                 import re, numpy as np, pandas as pd
                 import plotly.graph_objects as go
@@ -9111,11 +9285,135 @@ def simulate_nav_cota() -> None:
         # ========================== CoVaR por ativo (AJUSTES + PIZZA) ==========================
         # ===================== CoVaR por CLASSE (ativos empilhados) + donut =====================
         #with COL2:
-        colll1, colllmeio, colll2 = st.columns([4.8, 0.2, 4.8])
+        colll1, colllmeio, colll2 = st.columns([100, 0.001, 0.001])  # CoVaR historico oculto
         with colll1:
 
+            # ============ NOVO CoVaR: usa risco_carteira_core (HIST 3y em PU) ============
             st.subheader("CoVaR por classe")
-            covar_bps_dict = risco.get("CoVaR por ativo (bps)", {}) or {}
+            try:
+                from risco_carteira_core import calcular_covar_completo
+                from cota_portfolio_core import load_basefundos as _load_bf
+                import pandas as _pd_c
+                _covar_res = calcular_covar_completo(
+                    data_ref=_pd_c.Timestamp.today().normalize(),
+                    basefundos=_load_bf(),
+                    janela_dias=756,
+                )
+                if "erro" in _covar_res:
+                    st.info(f"CoVaR novo indisponivel: {_covar_res.get('erro')}")
+                else:
+                    import plotly.graph_objects as _pgo_c
+                    _cls_R = _covar_res["covar_por_classe_R"]
+                    _cls_pct = _covar_res["covar_por_classe_pct"]
+                    _cores_cls = {
+                        "Juros Nominais BR":"#1565c0","Juros Reais BR":"#dc3545",
+                        "Juros US":"#0d47a1","Moeda":"#e57373","Outros":"#7f7f7f"
+                    }
+                    _labels = list(_cls_R.keys())
+                    _vals   = list(_cls_R.values())
+                    _cores  = [_cores_cls.get(l, "#999") for l in _labels]
+
+                    _c_pie, _c_bar = st.columns([1, 1.5])
+                    with _c_pie:
+                        _fig_pie = _pgo_c.Figure(_pgo_c.Pie(
+                            labels=_labels, values=_vals, hole=0.55,
+                            marker=dict(colors=_cores),
+                            textinfo="label+percent", sort=False,
+                        ))
+                        _fig_pie.update_layout(
+                            title=dict(text="Composição do CoVaR por classe", x=0.5, xanchor="center", font=dict(size=14, color="#1a3a6c")),
+                            margin=dict(l=10, r=10, t=40, b=10), height=320, showlegend=False,
+                        )
+                        st.plotly_chart(_fig_pie, use_container_width=True)
+                    with _c_bar:
+                        # Bar chart por ativo dentro de cada classe
+                        _covar_ativo = _covar_res["covar_por_ativo_R"]
+                        def _mc2(a):
+                            au = str(a).upper()
+                            if au.startswith("DI"): return "Juros Nominais BR"
+                            if au.startswith(("DAP","NTNB")): return "Juros Reais BR"
+                            if "TREASURY" in au: return "Juros US"
+                            if au.startswith("WDO"): return "Moeda"
+                            return "Outros"
+                        _df_at = _pd_c.DataFrame([
+                            {"Ativo": a, "Classe": _mc2(a), "CoVaR_R": v}
+                            for a, v in _covar_ativo.items() if abs(v) > 1e-6
+                        ]).sort_values("CoVaR_R", ascending=True)
+                        _fig_bar = _pgo_c.Figure()
+                        for _cl in _df_at["Classe"].unique():
+                            _sub = _df_at[_df_at["Classe"] == _cl]
+                            _fig_bar.add_trace(_pgo_c.Bar(
+                                x=_sub["CoVaR_R"], y=_sub["Ativo"], orientation="h",
+                                name=_cl, marker_color=_cores_cls.get(_cl, "#999"),
+                                text=[f"R$ {v:,.0f}" for v in _sub["CoVaR_R"]],
+                                textposition="outside",
+                            ))
+                        _fig_bar.update_layout(
+                            title=dict(text="CoVaR por ativo (R$)", x=0.5, xanchor="center", font=dict(size=14, color="#1a3a6c")),
+                            xaxis=dict(title="R$"), yaxis=dict(title=""),
+                            barmode="relative", height=max(240, 30*len(_df_at)+120),
+                            margin=dict(l=80, r=50, t=40, b=40), showlegend=False,
+                        )
+                        st.plotly_chart(_fig_bar, use_container_width=True)
+
+                    st.caption(f"VaR estimado (soma): R$ {_covar_res['var_estimado_R']:,.0f} — cauda: {_covar_res['n_scenarios_tail']} scenarios (HIST 3y, alpha 5%)")
+
+                    # ============ CoVaR HISTORICO por classe (area empilhada) ============
+                    st.markdown("### CoVaR histórico por estratégia")
+                    _rows_h = []
+                    _offset_h = 0
+                    while True:
+                        _rh = supabase.table("snapshot_diario").select(
+                            "Data,covar_juros_nom_pct,covar_juros_real_pct,covar_moeda_pct,covar_juros_us_pct,covar_outros_pct,covar_total_r"
+                        ).order("Data").range(_offset_h, _offset_h+999).execute()
+                        if not _rh.data: break
+                        _rows_h.extend(_rh.data)
+                        if len(_rh.data) < 1000: break
+                        _offset_h += 1000
+
+                    if _rows_h:
+                        import plotly.graph_objects as _pgo_h
+                        import pandas as _pd_h
+                        _df_h = _pd_h.DataFrame(_rows_h)
+                        _df_h["Data"] = _pd_h.to_datetime(_df_h["Data"])
+                        _df_h = _df_h.sort_values("Data").set_index("Data")
+
+                        _mapa_cor = {
+                            "covar_juros_nom_pct":  ("Juros Nominais BR", "#1565c0"),
+                            "covar_juros_real_pct": ("Juros Reais BR", "#dc3545"),
+                            "covar_moeda_pct":      ("Moeda", "#e57373"),
+                            "covar_juros_us_pct":   ("Juros US", "#0d47a1"),
+                            "covar_outros_pct":     ("Outros", "#7f7f7f"),
+                        }
+                        _fig_h = _pgo_h.Figure()
+                        for _col, (_nome, _cor) in _mapa_cor.items():
+                            if _col in _df_h.columns:
+                                _serie = _df_h[_col].fillna(0) * 100
+                                if _serie.abs().sum() > 0:
+                                    _fig_h.add_trace(_pgo_h.Scatter(
+                                        x=_df_h.index, y=_serie,
+                                        mode="lines", stackgroup="one",
+                                        name=_nome, line=dict(width=0.5),
+                                        fillcolor=_cor, hovertemplate="<b>%{fullData.name}</b><br>%{x|%Y-%m-%d}: %{y:.1f}%<extra></extra>",
+                                    ))
+                        _fig_h.update_layout(
+                            title=dict(text="CoVaR por estratégia (composição %)", x=0.5, xanchor="center", font=dict(size=14, color="#1a3a6c")),
+                            hovermode="x unified",
+                            margin=dict(l=20, r=20, t=40, b=20),
+                            yaxis=dict(ticksuffix="%", title="Proporção do CoVaR"),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                            height=380,
+                        )
+                        st.plotly_chart(_fig_h, use_container_width=True)
+                    else:
+                        st.info("Sem histórico de CoVaR disponível no snapshot_diario.")
+            except Exception as _ec:
+                st.error(f"Erro CoVaR: {_ec}")
+
+            # ============ BACKUP: CoVaR antigo (BBG 5y planilha) — DESATIVADO ============
+            if False:
+                st.subheader("CoVaR por classe (legado BBG 5y)")
+                covar_bps_dict = risco.get("CoVaR por ativo (bps)", {}) or {}
             pl_ref = float(risco.get("PL_ref (R$)", 0.0))
             covar_tot_rs = capital0 * 0.01   # o mesmo que você usou no histórico
 
@@ -9278,7 +9576,8 @@ def simulate_nav_cota() -> None:
         #with colll1:
         # ========================== Histórico empilhado (NOVO) ==========================
         with COL2:
-            st.subheader("Histórico de DV01 & CoVaR")
+            if False:  # HIDDEN Fase 2: DV01 historico oculto ate remocao definitiva
+                st.subheader("Histórico de DV01 & CoVaR")
 
         opt_freq = "Diária"
         weekly = (opt_freq == "Semanal")
@@ -9340,6 +9639,7 @@ def simulate_nav_cota() -> None:
             st.info("Sem histórico suficiente para DV01.")
         else:
             with COL2:
+              if False:  # HIDDEN Fase 2: DV01 historico area chart ocultado
                 st.caption("DV01 por estratégia (área empilhada)")
                 #st.write(df_hist_dv)
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
@@ -9369,6 +9669,7 @@ def simulate_nav_cota() -> None:
             st.info("Sem histórico suficiente para CoVaR.")
         else:
             with colll2:
+              if False:  # HIDDEN Fase 3: substituido pelo novo chart historico CoVaR
                 #st.caption("CoVaR por estratégia — área empilhada")
                 # 1. Agrupar os dados por estratégia (reutilizando a lógica)
                 #st.write(df_hist_cv)
@@ -9465,8 +9766,9 @@ def simulate_nav_cota() -> None:
                     "Áreas positivas ancoram o risco; áreas negativas representam estratégias redutoras."
                 )
 
-        st.subheader("Volatilidade histórica por ativo")
-        st.plotly_chart(fig_vol_assets, use_container_width=True)
+        # REMOVED Fase 2: Volatilidade historica por ativo removida do dashboard
+        # st.subheader("Volatilidade histórica por ativo")
+        # st.plotly_chart(fig_vol_assets, use_container_width=True)
         #Dado que preciso pegar os dados de cotações -> Traga o valor a presente
         #st.write(df_hist_cv_estrategia,df_hist_cv,df_hist_dv)
         #Printar o histórico de posições do bundle

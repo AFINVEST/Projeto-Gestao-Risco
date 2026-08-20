@@ -432,7 +432,6 @@ def _indices_historicos(snapshots_all, ref_date: date):
         ret = _acumulado(rets); cdi = _acumulado(cdis)
         pct = (ret / cdi) if cdi else None
         vol = _std(rets) * math.sqrt(252)
-        # Sharpe: mean(r-c)/std(r-c) * sqrt(252)
         excess = [r - c for r, c in zip(rets, cdis)]
         mu = sum(excess) / len(excess) if excess else 0
         sig = _std(excess)
@@ -795,6 +794,34 @@ tr:nth-child(even) td {{ background: #f8f9fa; }}
             cor = _cor_ret(d["sharpe"])
             html += f'<td style="color:{cor};font-weight:bold">{d["sharpe"]:.2f}</td>'
     html += "</tr></table>"
+
+    # ─── ESTATISTICAS MENSAIS (todo periodo) ────────────
+    from collections import defaultdict as _dd
+    _g = _dd(lambda: {"rets": [], "cdis": []})
+    for _s in snapshots_all:
+        _d = datetime.fromisoformat(_s["Data"])
+        _g[(_d.year, _d.month)]["rets"].append(float(_s.get("retorno_dtd") or 0))
+        _g[(_d.year, _d.month)]["cdis"].append(float(_s.get("cdi_dtd") or 0))
+    _meses = [{"ret": _acumulado(dat["rets"]), "cdi": _acumulado(dat["cdis"])} for _, dat in _g.items()]
+    if _meses:
+        _n = len(_meses)
+        _npos = sum(1 for m in _meses if m["ret"] > 0)
+        _nneg = sum(1 for m in _meses if m["ret"] < 0)
+        _maxr = max(m["ret"] for m in _meses)
+        _minr = min(m["ret"] for m in _meses)
+        _nac  = sum(1 for m in _meses if m["ret"] > m["cdi"])
+        _nab  = sum(1 for m in _meses if m["ret"] < m["cdi"])
+        html += '<h3>Estatísticas mensais (histórico completo, ' + str(_n) + ' meses)</h3>'
+        html += '<table>'
+        html += '<tr><th>Meses positivos</th><th>Meses negativos</th><th>Maior retorno mensal</th><th>Menor retorno mensal</th><th>Meses acima do CDI</th><th>Meses abaixo do CDI</th></tr>'
+        html += '<tr>'
+        html += f'<td style="color:#28a745;font-weight:bold">{_npos}/{_n} ({_npos/_n*100:.0f}%)</td>'
+        html += f'<td style="color:#dc3545;font-weight:bold">{_nneg}/{_n} ({_nneg/_n*100:.0f}%)</td>'
+        html += f'<td style="color:#28a745;font-weight:bold">{_maxr*100:+.2f}%</td>'
+        html += f'<td style="color:{_cor_ret(_minr)};font-weight:bold">{_minr*100:+.2f}%</td>'
+        html += f'<td style="color:#28a745;font-weight:bold">{_nac}/{_n} ({_nac/_n*100:.0f}%)</td>'
+        html += f'<td style="color:#dc3545;font-weight:bold">{_nab}/{_n} ({_nab/_n*100:.0f}%)</td>'
+        html += '</tr></table>'
 
     # ─── Contexto historico (charts) ────────────
     html += f"""

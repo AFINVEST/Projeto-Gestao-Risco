@@ -8864,32 +8864,32 @@ bps calculados sobre PL Risco (1% do PL total).
                 _nab  = sum(1 for m in _meses if m["ret"]<m["cdi"])
                 _cor_min = "#28a745" if _minr >= 0 else "#dc3545"
                 st.markdown("### Estatísticas mensais")
-                _html = f"""
-<table style="width:100%;border-collapse:collapse;text-align:center;font-size:14px;">
-<thead>
-<tr style="background:#1a3a6c;color:white;">
-<th style="padding:8px 10px;border:1px solid #ddd;">Meses positivos</th>
-<th style="padding:8px 10px;border:1px solid #ddd;">Meses negativos</th>
-<th style="padding:8px 10px;border:1px solid #ddd;">Maior retorno mensal</th>
-<th style="padding:8px 10px;border:1px solid #ddd;">Menor retorno mensal</th>
-<th style="padding:8px 10px;border:1px solid #ddd;">Meses acima do CDI</th>
-<th style="padding:8px 10px;border:1px solid #ddd;">Meses abaixo do CDI</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="padding:10px;border:1px solid #ddd;color:#28a745;font-weight:bold;">{_npos}/{_n} ({_npos/_n*100:.0f}%)</td>
-<td style="padding:10px;border:1px solid #ddd;color:#dc3545;font-weight:bold;">{_nneg}/{_n} ({_nneg/_n*100:.0f}%)</td>
-<td style="padding:10px;border:1px solid #ddd;color:#28a745;font-weight:bold;">{_maxr*100:+.2f}%</td>
-<td style="padding:10px;border:1px solid #ddd;color:{_cor_min};font-weight:bold;">{_minr*100:+.2f}%</td>
-<td style="padding:10px;border:1px solid #ddd;color:#28a745;font-weight:bold;">{_nac}/{_n} ({_nac/_n*100:.0f}%)</td>
-<td style="padding:10px;border:1px solid #ddd;color:#dc3545;font-weight:bold;">{_nab}/{_n} ({_nab/_n*100:.0f}%)</td>
-</tr>
-</tbody>
-</table>
-"""
-                st.markdown(_html, unsafe_allow_html=True)
-                st.markdown("")   # espaco
+
+                # go.Table no mesmo estilo de Indices Historicos
+                import plotly.graph_objects as _gotbl
+                _hdr_fill = "#0A2240"
+                _hdr_font = "#FFFFFF"
+                _cell_fill_gray = "#F7F8FA"
+                _cell_h = 30
+                _tbl_header = ["Meses positivos","Meses negativos","Maior retorno mensal","Menor retorno mensal","Meses acima do CDI","Meses abaixo do CDI"]
+                _tbl_row = [
+                    f"{_npos}/{_n} ({_npos/_n*100:.0f}%)",
+                    f"{_nneg}/{_n} ({_nneg/_n*100:.0f}%)",
+                    f"{_maxr*100:+.2f}%",
+                    f"{_minr*100:+.2f}%",
+                    f"{_nac}/{_n} ({_nac/_n*100:.0f}%)",
+                    f"{_nab}/{_n} ({_nab/_n*100:.0f}%)",
+                ]
+                _cell_font_colors = ["#28a745","#dc3545","#28a745",_cor_min,"#28a745","#dc3545"]
+                _fig_stats = _gotbl.Figure(data=[_gotbl.Table(
+                    header=dict(values=_tbl_header, fill_color=_hdr_fill, font=dict(color=_hdr_font, size=12), align="center", height=28),
+                    cells=dict(values=[[v] for v in _tbl_row], align="center", height=_cell_h,
+                               fill_color=[[_cell_fill_gray]]*6,
+                               font=dict(color=[[c] for c in _cell_font_colors], size=12))
+                )])
+                _fig_stats.update_layout(margin=dict(l=0,r=0,t=0,b=0), height=28+_cell_h+15, paper_bgcolor="rgba(0,0,0,0)")
+                st.plotly_chart(_fig_stats, use_container_width=True)
+
 
             # === Vol 20d anualizada ===
             _fig_vol = _go.Figure()
@@ -8943,6 +8943,55 @@ bps calculados sobre PL Risco (1% do PL total).
                 yaxis=dict(ticksuffix="%")
             )
             st.plotly_chart(_fig_var, use_container_width=True)
+
+            # ============ CoVaR HISTORICO por classe (area empilhada) ============
+            _rows_h = []
+            _offset_h = 0
+            while True:
+                _rh = supabase.table("snapshot_diario").select(
+                    "Data,covar_juros_nom_pct,covar_juros_real_pct,covar_moeda_pct,covar_juros_us_pct,covar_outros_pct,covar_total_r"
+                ).order("Data").range(_offset_h, _offset_h+999).execute()
+                if not _rh.data: break
+                _rows_h.extend(_rh.data)
+                if len(_rh.data) < 1000: break
+                _offset_h += 1000
+
+            if _rows_h:
+                import plotly.graph_objects as _pgo_h
+                import pandas as _pd_h
+                _df_h = _pd_h.DataFrame(_rows_h)
+                _df_h["Data"] = _pd_h.to_datetime(_df_h["Data"])
+                _df_h = _df_h.sort_values("Data").set_index("Data")
+
+                _mapa_cor = {
+                    "covar_juros_nom_pct":  ("Juros Nominais BR", "#1565c0"),
+                    "covar_juros_real_pct": ("Juros Reais BR", "#dc3545"),
+                    "covar_moeda_pct":      ("Moeda", "#e57373"),
+                    "covar_juros_us_pct":   ("Juros US", "#0d47a1"),
+                    "covar_outros_pct":     ("Outros", "#7f7f7f"),
+                }
+                _fig_h = _pgo_h.Figure()
+                for _col, (_nome, _cor) in _mapa_cor.items():
+                    if _col in _df_h.columns:
+                        _serie = _df_h[_col].fillna(0) * 100
+                        if _serie.abs().sum() > 0:
+                            _fig_h.add_trace(_pgo_h.Scatter(
+                                x=_df_h.index, y=_serie,
+                                mode="lines", stackgroup="one",
+                                name=_nome, line=dict(width=0.5),
+                                fillcolor=_cor, hovertemplate="<b>%{fullData.name}</b><br>%{x|%Y-%m-%d}: %{y:.1f}%<extra></extra>",
+                            ))
+                _fig_h.update_layout(
+                    title="CoVaR histórico por estratégia",
+                    hovermode="x unified",
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    yaxis=dict(ticksuffix="%", title="Proporção do CoVaR"),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    height=380,
+                )
+                st.plotly_chart(_fig_h, use_container_width=True)
+            else:
+                st.info("Sem histórico de CoVaR disponível no snapshot_diario.")
 
 
 
@@ -9335,8 +9384,11 @@ bps calculados sobre PL Risco (1% do PL total).
                             if "TREASURY" in au: return "Juros US"
                             if au.startswith("WDO"): return "Moeda"
                             return "Outros"
+                        _covar_bps_by_ativo = _covar_res.get("covar_por_ativo_bps", {})
+                        # ajusta signal: se CoVaR_R for negativo (hedge), bps tb negativo
                         _df_at = _pd_c.DataFrame([
-                            {"Ativo": a, "Classe": _mc2(a), "CoVaR_R": v}
+                            {"Ativo": a, "Classe": _mc2(a), "CoVaR_R": v,
+                             "CoVaR_bps": _covar_bps_by_ativo.get(a, 0) * (1 if v >= 0 else -1)}
                             for a, v in _covar_ativo.items() if abs(v) > 1e-6
                         ]).sort_values("CoVaR_R", ascending=True)
                         _fig_bar = _pgo_c.Figure()
@@ -9345,7 +9397,7 @@ bps calculados sobre PL Risco (1% do PL total).
                             _fig_bar.add_trace(_pgo_c.Bar(
                                 x=_sub["CoVaR_R"], y=_sub["Ativo"], orientation="h",
                                 name=_cl, marker_color=_cores_cls.get(_cl, "#999"),
-                                text=[f"R$ {v:,.0f}" for v in _sub["CoVaR_R"]],
+                                text=[f"R$ {r:,.0f} ({b:+.2f} bps)" for r, b in zip(_sub["CoVaR_R"], _sub["CoVaR_bps"])],
                                 textposition="outside",
                             ))
                         _fig_bar.update_layout(
@@ -9358,222 +9410,14 @@ bps calculados sobre PL Risco (1% do PL total).
 
                     st.caption(f"VaR estimado (soma): R$ {_covar_res['var_estimado_R']:,.0f} — cauda: {_covar_res['n_scenarios_tail']} scenarios (HIST 3y, alpha 5%)")
 
-                    # ============ CoVaR HISTORICO por classe (area empilhada) ============
-                    st.markdown("### CoVaR histórico por estratégia")
-                    _rows_h = []
-                    _offset_h = 0
-                    while True:
-                        _rh = supabase.table("snapshot_diario").select(
-                            "Data,covar_juros_nom_pct,covar_juros_real_pct,covar_moeda_pct,covar_juros_us_pct,covar_outros_pct,covar_total_r"
-                        ).order("Data").range(_offset_h, _offset_h+999).execute()
-                        if not _rh.data: break
-                        _rows_h.extend(_rh.data)
-                        if len(_rh.data) < 1000: break
-                        _offset_h += 1000
 
-                    if _rows_h:
-                        import plotly.graph_objects as _pgo_h
-                        import pandas as _pd_h
-                        _df_h = _pd_h.DataFrame(_rows_h)
-                        _df_h["Data"] = _pd_h.to_datetime(_df_h["Data"])
-                        _df_h = _df_h.sort_values("Data").set_index("Data")
-
-                        _mapa_cor = {
-                            "covar_juros_nom_pct":  ("Juros Nominais BR", "#1565c0"),
-                            "covar_juros_real_pct": ("Juros Reais BR", "#dc3545"),
-                            "covar_moeda_pct":      ("Moeda", "#e57373"),
-                            "covar_juros_us_pct":   ("Juros US", "#0d47a1"),
-                            "covar_outros_pct":     ("Outros", "#7f7f7f"),
-                        }
-                        _fig_h = _pgo_h.Figure()
-                        for _col, (_nome, _cor) in _mapa_cor.items():
-                            if _col in _df_h.columns:
-                                _serie = _df_h[_col].fillna(0) * 100
-                                if _serie.abs().sum() > 0:
-                                    _fig_h.add_trace(_pgo_h.Scatter(
-                                        x=_df_h.index, y=_serie,
-                                        mode="lines", stackgroup="one",
-                                        name=_nome, line=dict(width=0.5),
-                                        fillcolor=_cor, hovertemplate="<b>%{fullData.name}</b><br>%{x|%Y-%m-%d}: %{y:.1f}%<extra></extra>",
-                                    ))
-                        _fig_h.update_layout(
-                            title=dict(text="CoVaR por estratégia (composição %)", x=0.5, xanchor="center", font=dict(size=14, color="#1a3a6c")),
-                            hovermode="x unified",
-                            margin=dict(l=20, r=20, t=40, b=20),
-                            yaxis=dict(ticksuffix="%", title="Proporção do CoVaR"),
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                            height=380,
-                        )
-                        st.plotly_chart(_fig_h, use_container_width=True)
-                    else:
-                        st.info("Sem histórico de CoVaR disponível no snapshot_diario.")
             except Exception as _ec:
                 st.error(f"Erro CoVaR: {_ec}")
-
             # ============ BACKUP: CoVaR antigo (BBG 5y planilha) — DESATIVADO ============
             if False:
                 st.subheader("CoVaR por classe (legado BBG 5y)")
                 covar_bps_dict = risco.get("CoVaR por ativo (bps)", {}) or {}
-            pl_ref = float(risco.get("PL_ref (R$)", 0.0))
-            covar_tot_rs = capital0 * 0.01   # o mesmo que você usou no histórico
-
-            s_bps = pd.Series(covar_bps_dict, dtype=float).clip(lower=0)           # só positivos
-            s_rs  = s_bps * pl_ref / 1e4                                           # bps -> R$
-
-            # usa o mesmo normalizador da área (Top-N + "Outros" e divide pelo budget)
-            df_norm = _normalize_topN_from_dict(
-                s_rs.to_dict(), top_n=8, use_abs=False, only_positive=False, covar_tot_rs=covar_tot_rs
-            )
-            # df_norm agora são frações do orçamento; use isso para o donut
-            labels = df_norm.index.tolist()
-            values = df_norm.values.tolist()
-            if not covar_bps_dict:
-                st.info("CoVaR por ativo indisponível para este portfólio.")
-            else:
-                import plotly.graph_objects as go
-
-                # ── mesma regra de classe usada no DV01 ───────────────────────────
-                def map_classe(a: str) -> str:
-                    au = str(a).upper()
-                    if au.startswith("DI_") or au.startswith("DI"):
-                        return "JUROS NOMINAIS BRASIL"
-                    if au.startswith(("DAP","NTNB")):
-                        return "JUROS REAIS BRASIL"
-                    if "TREASURY" in au:
-                        return "JUROS US"
-                    if au.startswith("WDO"):
-                        return "MOEDA"
-                    return "OUTROS"
-
-                def _short(s, n=22):
-                    s = str(s);  return s if len(s) <= n else s[:n-1] + "…"
-
-                # ── base por ativo ────────────────────────────────────────────────
-                df_cv = pd.DataFrame({
-                    "Ativo": list(covar_bps_dict.keys()),
-                    "CoVaR_bps": [float(v) for v in covar_bps_dict.values()],
-                })
-
-                # Convertendo CoVaR de bps para percentual
-                df_cv["CoVaR_percent"] = df_cv["CoVaR_bps"]
-                df_cv = df_cv[df_cv["CoVaR_percent"] != 0.0].copy()
-
-                if df_cv.empty:
-                    st.info("Todos os CoVaR por ativo estão zerados.")
-                else:
-                    df_cv["Classe"] = df_cv["Ativo"].map(map_classe)
-
-                    # wide: linhas = Classe, colunas = Ativo, valores = CoVaR (percentual)
-                    wide = (
-                        df_cv.pivot_table(index="Classe", columns="Ativo", values="CoVaR_percent", aggfunc="sum")
-                            .fillna(0.0)
-                    )
-
-                    # ordem amigável de classes
-                    classes_order = ["JUROS NOMINAIS BRASIL", "JUROS REAIS BRASIL", "JUROS US", "MOEDA", "OUTROS"]
-                    present = [c for c in classes_order if c in wide.index] + [c for c in wide.index if c not in classes_order]
-                    wide = wide.loc[present]
-
-                    # remove ativos totalmente zerados (não aparecem na legenda)
-                    wide = wide.loc[:, (wide != 0).any(axis=0)]
-                    if wide.shape[1] == 0:
-                        st.info("Sem ativos com CoVaR diferente de zero para plotar.")
-                    else:
-                        col_left, col_right = st.columns([7, 3])
-
-                        # ---------------- barras empilhadas: Classe × (ativos) ----------------
-                        with col_left:
-                            fig = go.Figure()
-
-                            # range do eixo X com base na soma dos positivos/negativos por classe
-                            pos_max = float(wide.clip(lower=0).sum(axis=1).max())
-                            neg_min = float(wide.clip(upper=0).sum(axis=1).min())
-
-                            # cada trace = 1 ativo empilhado por classe
-                            # (barmode="relative" empilha positivos e negativos)
-                            threshold = np.nanpercentile(np.abs(wide.values), 75) if wide.size else 0.0
-                            for ativo in wide.columns:
-                                x = wide[ativo]
-                                if (x == 0).all():
-                                    continue
-                                fig.add_trace(go.Bar(
-                                    y=wide.index,
-                                    x=x,
-                                    orientation="h",
-                                    name=_short(ativo, 22),
-                                    customdata=np.array([ativo]*len(x)),
-                                    hovertemplate="<b>%{y}</b><br>Ativo: %{customdata}<br>CoVaR: %{x:,.2f}%<extra></extra>",
-                                    text=[f"{v:.2f}%" if abs(v) >= threshold else "" for v in x],
-                                    textposition="outside",
-                                    cliponaxis=False,
-                                ))
-
-                            fig.update_layout(
-                                barmode="relative",
-                                margin=dict(l=20, r=20, t=10, b=10),
-                                xaxis=dict(title="CoVaR (%)", tickformat=",.2f", showgrid=True, gridcolor="#F3F4F6"),
-                                yaxis=dict(title=""),
-                                legend=dict(orientation="h", y=-0.25, x=0.5, xanchor="center", title="Ativos"),
-                                plot_bgcolor="white",
-                                shapes=[dict(type="line", xref="x", x0=0, x1=0, yref="paper", y0=0, y1=1,
-                                            line=dict(width=1, dash="dot", color="#9CA3AF"))],
-                            )
-                            pad = 0.12 * max(1.0, abs(pos_max), abs(neg_min))
-                            fig.update_xaxes(range=[neg_min - pad, pos_max + pad])
-
-                            st.plotly_chart(fig, use_container_width=True)
-
-                        # ---------------- donut: distribuição (apenas positivos) ----------------
-                        # ── CoVaR (pizza) ───────────────────────────────────────────────
-                        with col_right:
-                            df_norm = normalize_topN(
-                                dict(zip(df_cv["Ativo"], df_cv["CoVaR_bps"])),
-                                top_n=8, use_abs=True, only_positive=False
-                            )
-                            if df_norm.empty:
-                                st.info("Sem CoVaR positivo para normalizar.")
-                            else:
-                                fig_p = go.Figure(go.Pie(
-                                    labels=df_norm["label_short"],
-                                    values=df_norm["pct"],
-                                    hole=0.55, sort=False, direction="clockwise",
-                                    textinfo="percent+label",
-                                    textposition="inside",
-                                    insidetextorientation="radial"
-                                ))
-                                fig_p.update_traces(textfont=dict(size=12))
-                                fig_p.update_layout(
-                                    margin=dict(l=10, r=10, t=10, b=10),
-                                    showlegend=False,
-                                    height=PIE_HEIGHT
-                                )
-                                st.plotly_chart(
-                                    fig_p,
-                                    use_container_width=True,
-                                    key="plot_nav_cota"
-                                )          
-                                st.caption("Distribuição do CoVaR")
-
-        with colllmeio:
-            # Adicionar linha vertical
-            st.html(
-                '''
-                        <div class="divider-vertical-lines"></div>
-                        <style>
-                            .divider-vertical-lines {
-                                border-left: 2px solid rgba(49, 51, 63, 0.2);
-                                height: 40vh;
-                                margin: auto;
-                            }
-                            @media (max-width: 768px) {
-                                .divider-vertical-lines {
-                                    display: none;
-                                }
-                            }
-                        </style>
-                        '''
-            )
-        #with colll1:
+            # DELETED Fase 3: bloco antigo CoVaR bar+donut removido (substituido por composicao nova acima)
         # ========================== Histórico empilhado (NOVO) ==========================
         with COL2:
             if False:  # HIDDEN Fase 2: DV01 historico oculto ate remocao definitiva

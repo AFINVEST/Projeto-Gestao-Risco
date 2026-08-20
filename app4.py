@@ -26,6 +26,9 @@ import functools, os, datetime as dt
 # Configuração do Supabase (substitua pelas suas credenciais)
 SUPABASE_URL = 'https://clyyhlibvmnavdpfsbtr.supabase.co'
 SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNseXlobGlidm1uYXZkcGZzYnRyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDIyOTk0NCwiZXhwIjoyMDg1ODA1OTQ0fQ.SxrA8VqFX_PUzJhDOJ3PdZ2SFgH4CnYZBzb6LEjUhfc'
+import os as _os_env
+_os_env.environ.setdefault("SUPABASE_URL", SUPABASE_URL)
+_os_env.environ.setdefault("SUPABASE_KEY", SUPABASE_KEY)
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 

@@ -189,6 +189,24 @@ def load_and_process_divone2(file_bbg, df_excel):
 
 
 def process_returns(df, assets):
+    """Retornos log dos ativos. Prioriza Supabase (novo, 3y B3 em PU); fallback: BBG 5y."""
+    try:
+        from risco_carteira_core import carregar_retornos_historicos
+        import pandas as _pd_pr
+        _wide = carregar_retornos_historicos(_pd_pr.Timestamp.today().normalize(),
+                                              ativos=list(assets), janela_dias=756)
+        if not _wide.empty:
+            _cols = [a for a in assets if a in _wide.columns]
+            if _cols:
+                _df_sup = _wide[_cols].copy()
+                for a in assets:
+                    if a not in _df_sup.columns:
+                        _df_sup[a] = 0.0
+                _df_sup = _df_sup[list(assets)].reset_index(drop=True)
+                return _df_sup
+    except Exception:
+        pass
+    # Fallback antigo BBG
     df_retorno = df.copy()
     df_retorno = df_retorno[assets]
     df_retorno.dropna(inplace=True)

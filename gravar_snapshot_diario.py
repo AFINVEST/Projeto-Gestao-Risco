@@ -316,6 +316,7 @@ def _dv01_hoje(basefundos: dict, data_ref: pd.Timestamp,
             dv_contrato = float(resultado.get("dv01", 0.0))
             dv_signed = dv_contrato * qty   # SIGNED: long soma, short subtrai (netting da carteira)
             print(f"[dv01] {ativo}: PU={pu:.2f} du={du} taxa={taxa_pct:.4f}% dv_contrato={dv_contrato:.4f} qty={qty:.1f} dv_signed={dv_signed:.2f}")
+            dv_por_ativo[ativo] = float(dv_signed)
             dv_por_ativo[ativo] = dv_signed
             c = _classe(ativo)
             if c in buckets:
@@ -329,11 +330,12 @@ def _dv01_hoje(basefundos: dict, data_ref: pd.Timestamp,
     print(f"[dv01] {n_ok} ativos calculados, {n_skip} ignorados/erros")
     total = buckets["juros_nom"] + buckets["juros_real"]
     return {
-        "dv01_juros_nom":  buckets["juros_nom"]  if buckets["juros_nom"]  > 0 else None,
-        "dv01_juros_real": buckets["juros_real"] if buckets["juros_real"] > 0 else None,
+        "dv01_juros_nom":  buckets["juros_nom"]  if abs(buckets["juros_nom"])  > 1e-6 else None,
+        "dv01_juros_real": buckets["juros_real"] if abs(buckets["juros_real"]) > 1e-6 else None,
         "dv01_treasury":   None,   # não suportado por dv01_dinamico
         "dv01_ntnb":       None,   # não suportado por dv01_dinamico
-        "dv01_total":      total if total > 0 else None,
+        "dv01_total":      total if abs(total) > 1e-6 else None,
+        "dv01_por_ativo":  dict(dv_por_ativo) if dv_por_ativo else None,
     }
 
 
@@ -393,6 +395,7 @@ def _compute_snapshot(
     cdi_ytd = _acumular_periodo(cdi_serie,       data, "ytd")
 
     dv01_dict = dv01_dict or {}
+    _dv_por_at = dv01_dict.get("dv01_por_ativo") or {}
     var_c = var_carteira_dict or {}
 
     # VaR de carteira em bps sobre PL total (nao PL_risco). Bate com o conceito de limite (1bp do PL).
@@ -426,6 +429,7 @@ def _compute_snapshot(
         "dv01_juros_real":  dv01_dict.get("dv01_juros_real"),
         "dv01_treasury":    dv01_dict.get("dv01_treasury"),
         "dv01_ntnb":        dv01_dict.get("dv01_ntnb"),
+        "dv01_por_ativo":   _dv_por_at if _dv_por_at else None,
         # Limites e governance
         "var_limite_base_bps": var_base,
         "var_limite_efet_bps": var_efet,

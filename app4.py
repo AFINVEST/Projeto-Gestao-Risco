@@ -1,6 +1,22 @@
 import psycopg2
 from psycopg2 import sql
 import streamlit as st
+
+
+# ─── CSS Fix multiselect (dropdown options visiveis) ───
+st.markdown('''<style>
+[data-baseweb="popover"] { background: white !important; }
+[data-baseweb="popover"] * { color: #111 !important; }
+[data-baseweb="popover"] [role="option"] { color: #111 !important; background: white !important; }
+[data-baseweb="popover"] [role="option"]:hover { background: #e5e7eb !important; }
+[data-baseweb="popover"] li { color: #111 !important; background: white !important; }
+[data-baseweb="popover"] ul { background: white !important; }
+div[role="listbox"] { background: white !important; }
+div[role="listbox"] * { color: #111 !important; }
+[role="option"] { color: #111 !important; background: white !important; }
+[data-baseweb="tag"] { background: #1a3a6c !important; }
+[data-baseweb="tag"] * { color: white !important; }
+</style>''', unsafe_allow_html=True)
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt

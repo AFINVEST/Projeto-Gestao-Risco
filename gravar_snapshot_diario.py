@@ -282,6 +282,7 @@ def _dv01_hoje(basefundos: dict, data_ref: pd.Timestamp,
 
     # 3) DV01 por ativo x qty
     buckets = {"juros_nom": 0.0, "juros_real": 0.0}
+    dv_por_ativo = {}   # ativo -> dv01_signed R$/bp
     n_ok, n_skip = 0, 0
     for ativo, qty in qty_por_ativo.items():
         a = str(ativo).upper()
@@ -315,6 +316,7 @@ def _dv01_hoje(basefundos: dict, data_ref: pd.Timestamp,
             dv_contrato = float(resultado.get("dv01", 0.0))
             dv_signed = dv_contrato * qty   # SIGNED: long soma, short subtrai (netting da carteira)
             print(f"[dv01] {ativo}: PU={pu:.2f} du={du} taxa={taxa_pct:.4f}% dv_contrato={dv_contrato:.4f} qty={qty:.1f} dv_signed={dv_signed:.2f}")
+            dv_por_ativo[ativo] = dv_signed
             c = _classe(ativo)
             if c in buckets:
                 buckets[c] += dv_signed

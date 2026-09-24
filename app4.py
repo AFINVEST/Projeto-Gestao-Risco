@@ -1560,7 +1560,7 @@ def calcular_metricas_de_fundo2(assets, df_contratos, fundos, op1 = True, op2 = 
 
         # Verificar se todas as colunas são zero
         # `axis=1` verifica todas as colunas na linha
-        if (linha == 0).all(axis=1).values[0]:
+        if not linha.empty and (linha == 0).all(axis=1).values[0]:
             lista_remove.append(fundo2)
     for fundo in lista_remove:
         fundos.remove(fundo)
@@ -2137,7 +2137,7 @@ def calcular_metricas_de_fundo(assets, quantidades, df_contratos, fundos, op1, o
 
         # Verificar se todas as colunas são zero
         # `axis=1` verifica todas as colunas na linha
-        if (linha == 0).all(axis=1).values[0]:
+        if not linha.empty and (linha == 0).all(axis=1).values[0]:
             lista_remove.append(fundo2)
     for fundo in lista_remove:
         fundos.remove(fundo)
@@ -2717,7 +2717,7 @@ def calcular_metricas_de_fundo_analise(assets, quantidades, df_contratos, fundos
 
         # Verificar se todas as colunas são zero
         # `axis=1` verifica todas as colunas na linha
-        if (linha == 0).all(axis=1).values[0]:
+        if not linha.empty and (linha == 0).all(axis=1).values[0]:
             lista_remove.append(fundo2)
     for fundo in lista_remove:
         fundos.remove(fundo)

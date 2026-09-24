@@ -9815,7 +9815,12 @@ CONFIG_PATH = "Dados/config.json"
 # ==========================================================
 def main_page():
     st.title("Dashboard de Análise de Risco de Portfólio")
-    atualizar_base_fundos()
+    try:
+        atualizar_base_fundos()
+    except Exception as _eb:
+        # No hospedado (Streamlit Cloud) BaseFundos nao existe ou eh read-only
+        import streamlit as _st_ab
+        _st_ab.warning(f"atualizar_base_fundos pulado: {_eb}")
     att_parquet_supabase()
 
     file_pl = "Dados/pl_fundos.parquet"

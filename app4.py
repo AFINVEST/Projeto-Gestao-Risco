@@ -5688,6 +5688,14 @@ def load_lft_series() -> pd.Series:
 
 from collections import defaultdict
 
+
+def _is_finite_num(x):
+    """isfinite seguro: retorna True se x eh um float/int finito, False pra string/None/NaN."""
+    try:
+        return np.isfinite(float(x))
+    except (TypeError, ValueError):
+        return False
+
 def analisar_dados_fundos2(
         soma_pl_sem_pesos: float,
         df_b3_fechamento : pd.DataFrame | None = None,
@@ -5807,13 +5815,13 @@ def analisar_dados_fundos2(
                         continue
 
                     p_fech = preco_lookup.get(data_fech, pd.Series()).get(ativo, np.nan)
-                    if not np.isfinite(p_fech):
+                    if not _is_finite_num(p_fech):
                         # sem preço mesmo após ffill → pula esta data (não faz break)
                         continue
 
                     # ─── regra de P&L e financeiro NTNB ─────────────────────────
                     if ativo == "TREASURY":
-                        rend = (p_fech - (p_ant if np.isfinite(p_ant) else p_fech)) * qtd * dolar / 10_000
+                        rend = (p_fech - (p_ant if _is_finite_num(p_ant) else p_fech)) * qtd * dolar / 10_000
                     elif "DAP" in ativo:
                         if data_fech == data_op:
                             rend = 0.0
@@ -5822,17 +5830,17 @@ def analisar_dados_fundos2(
                             rend   = ajuste * qtd
                     elif "DI" in ativo:
                         if data_fech == data_op:
-                            rend = (p_fech - (p_ant if np.isfinite(p_ant) else p_fech)) * qtd
+                            rend = (p_fech - (p_ant if _is_finite_num(p_ant) else p_fech)) * qtd
                         else:
                             ajuste = df_ajuste.get(data_fech.strftime("%Y-%m-%d"), pd.Series()).get(ativo, 0.0)
                             rend   = ajuste * qtd
                     elif "NTNB" in ativo:
                         # P&L (se quiser manter NTNB no df_pnl)
-                        rend = (p_fech - (p_ant if np.isfinite(p_ant) else p_fech)) * qtd
+                        rend = (p_fech - (p_ant if _is_finite_num(p_ant) else p_fech)) * qtd
                         # ► financeiro do dia (acumula por data)
                         financeiro_ntnb_daily[data_fech] += float(p_fech) * float(qtd)
                     else:
-                        rend = (p_fech - (p_ant if np.isfinite(p_ant) else p_fech)) * qtd
+                        rend = (p_fech - (p_ant if _is_finite_num(p_ant) else p_fech)) * qtd
 
                     chave = f"{ativo} - {fundo} - P&L"
                     pnl_cash.setdefault(chave, pd.Series()).at[data_fech] = \

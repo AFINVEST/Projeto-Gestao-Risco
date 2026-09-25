@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+body { font-family: Segoe UI, Arial, sans-serif; color: #222; font-size: 14px; max-width: 900px; margin: 0 auto; padding: 10px; }
+h1 { color: #1a3a6c; border-bottom: 3px solid #1a3a6c; padding-bottom: 8px; margin-bottom: 6px; }
+h2 { color: #1a3a6c; margin-top: 32px; font-size: 18px; border-bottom: 2px solid #1a3a6c; padding-bottom: 4px; }
+h3 { color: #1a3a6c; margin-top: 20px; font-size: 15px; }
+.metric-grid { display: table; width: 100%; border-collapse: collapse; margin: 12px 0; }
+.metric { display: table-cell; padding: 12px 14px; border: 1px solid #ddd; background: #f8f9fa; vertical-align: top; }
+.metric-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.metric-value { font-size: 20px; font-weight: bold; line-height: 1.2; }
+.metric-value-secondary { font-size: 15px; color: #444; font-weight: 600; margin-top: 2px; }
+.chart-container { margin: 16px 0; padding: 10px; background: #fff; border: 1px solid #ddd; border-radius: 4px; text-align: center; }
+table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+th, td { padding: 6px 10px; border: 1px solid #ddd; text-align: left; font-size: 13px; }
+th { background: #1a3a6c; color: white; }
+tr:nth-child(even) td { background: #f8f9fa; }
+.section-intro { background:#eef; padding:10px; border-radius:6px; font-size:12px; color:#333; margin:6px 0 16px 0; }
+</style></head><body>
+
+<h1>Book Juros - 24/09/2026</h1>
+
+
+<!-- ==================== SECAO 1: RESUMO DO DIA ==================== -->
+<h2>1. Resumo do dia</h2>
+
+<!-- Cota + Retornos periodo -->
+<div class="metric-grid">
+  <div class="metric" style="width:22%;">
+    <div class="metric-label">Cota</div>
+    <div class="metric-value">1.2204</div>
+  </div>
+  <div class="metric" style="width:26%;">
+    <div class="metric-label">Retorno DIA</div>
+    <div class="metric-value" style="color:#dc3545">-5.60 bps</div>
+    <div class="metric-value-secondary">-110% do CDI</div>
+  </div>
+  <div class="metric" style="width:26%;">
+    <div class="metric-label">Retorno MES</div>
+    <div class="metric-value" style="color:#28a745">+1.22%</div>
+    <div class="metric-value-secondary">139% do CDI</div>
+  </div>
+  <div class="metric" style="width:26%;">
+    <div class="metric-label">Retorno ANO</div>
+    <div class="metric-value" style="color:#28a745">+8.75%</div>
+    <div class="metric-value-secondary">85% do CDI</div>
+  </div>
+</div>
+
+<!-- Chart cota vs CDI mes -->
+<div class="chart-container">
+  <svg width="560" height="180" viewBox="0 0 560 180" xmlns="http://www.w3.org/2000/svg" style="background:#fff;font-family:Segoe UI,Arial,sans-serif;"><text x="280" y="14" font-size="13" font-weight="bold" fill="#1a3a6c" text-anchor="middle">Cota vs CDI - Sep/2026 (retorno acumulado)</text><line x1="55" y1="155.0" x2="545" y2="155.0" stroke="#e5e7eb" stroke-width="0.5"/><text x="51" y="158.0" font-size="9" fill="#666" text-anchor="end">-0.2%</text><line x1="55" y1="138.6" x2="545" y2="138.6" stroke="#e5e7eb" stroke-width="0.5"/><text x="51" y="141.6" font-size="9" fill="#666" text-anchor="end">0.0%</text><line x1="55" y1="122.1" x2="545" y2="122.1" stroke="#e5e7eb" stroke-width="0.5"/><text x="51" y="125.1" font-size="9" fill="#666" text-anchor="end">0.2%</text><line x1="55" y1="105.7" x2="545" y2="105.7" stroke="#e5e7eb" stroke-width="0.5"/><text x="51" y="108.7" font-size="9" fill="#666" text-anchor="end">0.5%</text><line x1="55" y1="89.3" x2="545" y2="89.3" stroke="#e5e7eb" stroke-width="0.5"/><text x="51" y="92.3" font-size="9" fill="#666" text-anchor="end">0.8%</text><line x1="55" y1="72.9" x2="545" y2="72.9" stroke="#e5e7eb" stroke-width="0.5"/><text x="51" y="75.9" font-size="9" fill="#666" text-anchor="end">1.0%</text><line x1="55" y1="56.4" x2="545" y2="56.4" stroke="#e5e7eb" stroke-width="0.5"/><text x="51" y="59.4" font-size="9" fill="#666" text-anchor="end">1.2%</text><line x1="55" y1="40.0" x2="545" y2="40.0" stroke="#e5e7eb" stroke-width="0.5"/><text x="51" y="43.0" font-size="9" fill="#666" text-anchor="end">1.5%</text><text x="55.0" y="172" font-size="9" fill="#666" text-anchor="middle">01/Sep</text><text x="177.5" y="172" font-size="9" fill="#666" text-anchor="middle">08/Sep</text><text x="300.0" y="172" font-size="9" fill="#666" text-anchor="middle">14/Sep</text><text x="422.5" y="172" font-size="9" fill="#666" text-anchor="middle">18/Sep</text><text x="545.0" y="172" font-size="9" fill="#666" text-anchor="middle">24/Sep</text><path d="M 55.0,129.9 L 85.6,117.0 L 116.2,105.5 L 146.9,100.8 L 177.5,87.9 L 208.1,97.0 L 238.8,92.7 L 269.4,89.8 L 300.0,85.1 L 330.6,83.5 L 361.2,83.7 L 391.9,76.0 L 422.5,73.1 L 453.1,62.6 L 483.8,57.4 L 514.4,62.6 L 545.0,66.3" fill="none" stroke="#1565c0" stroke-width="1.5"/><path d="M 55.0,135.2 L 85.6,131.8 L 116.2,128.4 L 146.9,125.0 L 177.5,121.6 L 208.1,118.2 L 238.8,114.8 L 269.4,111.4 L 300.0,108.0 L 330.6,104.5 L 361.2,101.1 L 391.9,97.8 L 422.5,94.4 L 453.1,91.1 L 483.8,87.7 L 514.4,84.3 L 545.0,81.0" fill="none" stroke="#7f7f7f" stroke-width="1.5"/><rect x="65" y="22" width="10" height="3" fill="#1565c0"/><text x="79" y="28" font-size="10" fill="#333">Cota</text><rect x="155" y="22" width="10" height="3" fill="#7f7f7f"/><text x="169" y="28" font-size="10" fill="#333">CDI</text></svg>
+</div>
+
+<!-- PL + Vol/DD -->
+<div class="metric-grid">
+  <div class="metric" style="width:25%;">
+    <div class="metric-label">PL Total</div>
+    <div class="metric-value">R$ 656.376.302</div>
+  </div>
+  <div class="metric" style="width:25%;">
+    <div class="metric-label">PL Risco (1%)</div>
+    <div class="metric-value">R$ 6.563.763</div>
+  </div>
+  <div class="metric" style="width:25%;">
+    <div class="metric-label">Vol 20d anualizada</div>
+    <div class="metric-value">1.55%</div>
+  </div>
+  <div class="metric" style="width:25%;">
+    <div class="metric-label">Drawdown atual</div>
+    <div class="metric-value" style="color:#dc3545">-0.13%</div>
+  </div>
+</div>
+
+<!-- DV01 + VaR carteira com donut (layout limpo) -->
+<h3>Risco atual da carteira</h3>
+<table style="width:100%;border:1px solid #ddd;border-collapse:collapse;">
+  <tr>
+    <td style="width:26%;padding:12px;vertical-align:top;background:#f8f9fa;border:1px solid #ddd;">
+      <div class="metric-label">DV01 e Stress do dia</div>
+      <div style="font-size:13px;color:#333;margin-top:8px;line-height:1.8;">
+        <b>Juros Nominais<sup>*</sup>:</b><br>
+        &nbsp;&nbsp;DV01 = R$ 651 (0.99 bps)<br>
+        &nbsp;&nbsp;Stress = R$ 65.138 (99.2 bps)<br><br>
+        <b>Juros Reais<sup>**</sup>:</b><br>
+        &nbsp;&nbsp;DV01 = R$ 0 (0.00 bps)<br>
+        &nbsp;&nbsp;Stress = R$ 0 (0.0 bps)<br><br>
+        <b style="color:#1a3a6c;">TOTAL:</b><br>
+        &nbsp;&nbsp;DV01 = R$ 651 (0.99 bps)<br>
+        &nbsp;&nbsp;Stress = R$ 65.138 (99.2 bps)
+      </div>
+      <div style="font-size:10px;color:#666;margin-top:10px;border-top:1px solid #ddd;padding-top:6px;">
+        <sup>*</sup>Juros nominais (DI): choque de 100 bps<br>
+        <sup>**</sup>Juros reais (DAP + NTNB): choque de 50 bps<br>
+        bps calculados sobre PL Risco.
+      </div>
+    </td>
+    <td style="width:37%;padding:12px;text-align:center;background:#f8f9fa;border:1px solid #ddd;">
+      <div class="metric-label">VaR HIST 3 anos</div>
+      <div class="metric-value" style="color:#28a745">R$ 26.690 / 0.41 bps</div>
+      <div style="margin-top:8px;"><svg width="116" height="116" viewBox="0 0 116 116" xmlns="http://www.w3.org/2000/svg"><circle cx="58.0" cy="58.0" r="48" fill="none" stroke="#e5e7eb" stroke-width="12"/><circle cx="58.0" cy="58.0" r="48" fill="none" stroke="#28a745" stroke-width="12" stroke-dasharray="122.64 301.59" transform="rotate(-90 58.0 58.0)" stroke-linecap="butt"/><text x="58.0" y="56.0" font-size="18" font-weight="bold" fill="#28a745" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif">41%</text><text x="58.0" y="73.0" font-size="9" fill="#666" text-anchor="middle" font-family="Segoe UI">do limite</text></svg></div>
+    </td>
+    <td style="width:37%;padding:12px;text-align:center;background:#f8f9fa;border:1px solid #ddd;">
+      <div class="metric-label">VaR EWMA (lambda=0.99)</div>
+      <div class="metric-value" style="color:#28a745">R$ 16.696 / 0.25 bps</div>
+      <div style="margin-top:8px;"><svg width="116" height="116" viewBox="0 0 116 116" xmlns="http://www.w3.org/2000/svg"><circle cx="58.0" cy="58.0" r="48" fill="none" stroke="#e5e7eb" stroke-width="12"/><circle cx="58.0" cy="58.0" r="48" fill="none" stroke="#28a745" stroke-width="12" stroke-dasharray="76.71 301.59" transform="rotate(-90 58.0 58.0)" stroke-linecap="butt"/><text x="58.0" y="56.0" font-size="18" font-weight="bold" fill="#28a745" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif">25%</text><text x="58.0" y="73.0" font-size="9" fill="#666" text-anchor="middle" font-family="Segoe UI">do limite</text></svg></div>
+    </td>
+  </tr>
+</table>
+
+<div class="section-intro" style="margin-top:8px;">
+  <b>Limite:</b> R$ 65.638 (1.00 bps do PL total).
+</div>
+
+
+<h3>Últimos 5 dias</h3>
+<table><tr><th>Data</th><th>Cota</th><th>Retorno</th><th>Alpha</th><th>VaR Cart HIST</th><th>VaR Cart EWMA</th><th>Consumo EWMA</th><th>Vol 20d</th><th>DD</th></tr><tr><td>24/09/2026</td><td>1.2204</td><td>-5.60 bps</td><td>-10.68 bps</td><td>R$ 26.690</td><td>R$ 16.696</td><td>25.4%</td><td>1.55%</td><td>-0.13%</td></tr><tr><td>23/09/2026</td><td>1.2211</td><td>-7.76 bps</td><td>-12.84 bps</td><td>R$ 26.708</td><td>R$ 16.707</td><td>25.5%</td><td>1.50%</td><td>-0.08%</td></tr><tr><td>22/09/2026</td><td>1.2221</td><td>+7.80 bps</td><td>+2.72 bps</td><td>R$ 26.719</td><td>R$ 16.715</td><td>25.5%</td><td>1.41%</td><td>0.00%</td></tr><tr><td>21/09/2026</td><td>1.2211</td><td>+15.77 bps</td><td>+10.69 bps</td><td>R$ 26.718</td><td>R$ 16.714</td><td>25.5%</td><td>1.44%</td><td>0.00%</td></tr><tr><td>18/09/2026</td><td>1.2192</td><td>+4.34 bps</td><td>-0.74 bps</td><td>R$ 26.702</td><td>R$ 16.704</td><td>25.4%</td><td>1.44%</td><td>0.00%</td></tr></table><h3>Eventos recentes</h3><ul><li><span style="color:#17a2b8;font-weight:bold">[INFO]</span> 2026-07-30 - Projeção IPCA ANBIMA atualizada: 0.05%</li></ul>
+<p style="margin-top:32px;color:#888;font-size:11px;border-top:1px solid #ddd;padding-top:12px;">
+Gerado em 25/09/2026 13:38.
+Cota = retorno total (ativo + carry LFT). PL Risco = 1% do PL Total.
+Stop-loss aciona apenas por DD; VaR e alerta para reducao prospectiva de posicoes.
+</p>
+</body></html>

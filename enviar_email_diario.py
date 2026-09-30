@@ -944,6 +944,23 @@ def run(dry_run=False, override_to=None):
     destinatarios = [override_to] if override_to else emails_diario
 
     snapshots_all = _load_snapshot_serie_completa(client)
+
+    # ─── GUARD: aborta se snapshot estiver atrasado (previne re-envio de dia velho) ───
+    # GUARD SNAPSHOT ATRASADO
+    import datetime as _dt_g
+    _hoje = _dt_g.date.today()
+    _esp = _hoje - _dt_g.timedelta(days=1)
+    while _esp.weekday() >= 5:  # pula sab/dom
+        _esp -= _dt_g.timedelta(days=1)
+    if snapshots_all:
+        _ult = _dt_g.date.fromisoformat(snapshots_all[-1]["Data"])
+        if _ult < _esp:
+            _dias = (_esp - _ult).days
+            print(f"[email] ABORTADO: snapshot mais recente ({_ult}) < esperado ({_esp}). Atraso: {_dias}d.")
+            print(f"[email] Motivo: pipeline nao atualizou ate {_esp}. Verifique ScrapAF3/ScrapB3/snapshot.")
+            print(f"[email] Email NAO enviado pra evitar re-envio de dado velho.")
+            return
+    # ────────────────────────────────────────────────────────────────────────
     if not snapshots_all:
         print("[email] sem snapshots.")
         return

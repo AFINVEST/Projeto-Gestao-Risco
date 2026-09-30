@@ -10,6 +10,13 @@ import os
 from datetime import datetime, timedelta, date
 import re  # ⇢ para tratar “R$”
 
+_JS_DISMISS_POPUP = """
+var banners = document.querySelectorAll('.ihub-announcement-header, .ihub-announcement, [class*="announcement"]');
+banners.forEach(function(b){ b.style.display='none'; });
+var closeBtns = document.querySelectorAll('.close, [aria-label="Close"], .ihub-announcement-close');
+closeBtns.forEach(function(b){ try{ b.click(); }catch(e){} });
+"""
+
 ################### Cuidado -> Codigo pode quebrar com mudanças no site, como a adiação de novos fundos ###################
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -343,7 +350,15 @@ def main():
         driver.get("https://afinvest.com.br/interno/relatorios/patrimonios")
         time.sleep(3)
         WebDriverWait(driver, 10).until(EC.presence_of_element_located(
-            (By.CSS_SELECTOR, "button.btn.btn-outline-primary[data-type='custom']"))).click()
+            (By.CSS_SELECTOR, "button.btn.btn-outline-primary[data-type='custom']")))
+        # Fecha popup/announcement antes de clicar (evita element click intercepted)
+        try:
+            driver.execute_script(_JS_DISMISS_POPUP)
+        except Exception:
+            pass
+        # JS click bypassa qualquer overlay residual
+        _btn_custom = driver.find_element(By.CSS_SELECTOR, "button.btn.btn-outline-primary[data-type='custom']")
+        driver.execute_script("arguments[0].click();", _btn_custom)
         time.sleep(3)
         date_input = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located(

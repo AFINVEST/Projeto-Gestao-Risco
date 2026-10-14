@@ -948,10 +948,16 @@ def run(dry_run=False, override_to=None):
     # ─── GUARD: aborta se snapshot estiver atrasado (previne re-envio de dia velho) ───
     # GUARD SNAPSHOT ATRASADO
     import datetime as _dt_g
-    _hoje = _dt_g.date.today()
-    _esp = _hoje - _dt_g.timedelta(days=1)
-    while _esp.weekday() >= 5:  # pula sab/dom
-        _esp -= _dt_g.timedelta(days=1)
+    # Esperado = ultimo pregao publicado pela B3 (respeita feriados)
+    try:
+        import pandas as _pd_g
+        _dfp = _pd_g.read_parquet("Dados/df_preco_de_ajuste_atual_completo.parquet")
+        _datas_b3 = sorted(c for c in _dfp.columns if c != "Assets")
+        _esp = _dt_g.date.fromisoformat(_datas_b3[-1])
+    except Exception:
+        _esp = _dt_g.date.today() - _dt_g.timedelta(days=1)
+        while _esp.weekday() >= 5:
+            _esp -= _dt_g.timedelta(days=1)
     if snapshots_all:
         _ult = _dt_g.date.fromisoformat(snapshots_all[-1]["Data"])
         if _ult < _esp:

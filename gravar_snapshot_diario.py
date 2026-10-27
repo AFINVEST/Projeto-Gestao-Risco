@@ -510,6 +510,9 @@ def run(bootstrap: bool = False, data_override: str | None = None,
         datas_a_processar = [pd.Timestamp(data_override).normalize()]
     else:
         datas_a_processar = [d for d in cotas.index if d.date().isoformat() not in datas_existentes]
+        # self-heal: reprocessa os ultimos 3 dias ja gravados (trade/preco que chegou atrasado)
+        _ja_gravados = [d for d in cotas.index if d.date().isoformat() in datas_existentes][-3:]
+        datas_a_processar = sorted(set(datas_a_processar) | set(_ja_gravados))
 
     data_ultima = res["data_fim"]
 
@@ -558,12 +561,23 @@ def run(bootstrap: bool = False, data_override: str | None = None,
                 dv01_dict=dv01_para_dia,
                 var_carteira_dict=var_carteira,
             )
+            if snap["Data"] in datas_existentes:
+                # nao sobrescreve o que o governance gravou (stop/limite efetivo)
+                for _k in ("var_limite_base_bps", "var_limite_efet_bps", "stop_loss_ativo", "fator_governance"):
+                    snap.pop(_k, None)
+                # DV01 so e calculado para a ultima data; nao apaga o dos dias anteriores
+                if data != data_ultima:
+                    for _k in ("dv01_total", "dv01_juros_nom", "dv01_juros_real", "dv01_treasury", "dv01_ntnb", "dv01_por_ativo"):
+                        snap.pop(_k, None)
             registros.append(snap)
         except Exception as e:
             print(f"[snapshot] erro em {data.date()}: {e}")
 
     print(f"[snapshot] enviando {len(registros)} snapshots...")
-    n = _upsert_snapshots(client, registros)
+    _grupos = {}
+    for _r in registros:
+        _grupos.setdefault(tuple(sorted(_r.keys())), []).append(_r)
+    n = sum(_upsert_snapshots(client, _g) for _g in _grupos.values())
     print(f"[snapshot] OK - {n} linhas em snapshot_diario")
 
 

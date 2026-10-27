@@ -87,6 +87,10 @@ if errorlevel 1 (
 )
 
 echo.
+echo [C2b] recalc_consumo_var.py (consumo vs limite efetivo)...
+python recalc_consumo_var.py
+
+echo.
 echo [C3] enviar_email_diario.py (via Outlook)...
 python enviar_email_diario.py
 if errorlevel 1 (

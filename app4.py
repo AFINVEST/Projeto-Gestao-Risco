@@ -99,6 +99,86 @@ def process_portfolio_especifico(df_pl, Weights, fundo):
     return df_pl, df_pl['PL_atualizado'].sum(), soma_sem_pesos
 
 
+# [wdo-venc] ---------------------------------------------------------------
+# Risco usa a serie generica WDO1; operacao/P&L usam o contrato exato WDO_<venc>.
+_WDO_MES = {"F": 1, "G": 2, "H": 3, "J": 4, "K": 5, "M": 6,
+            "N": 7, "Q": 8, "U": 9, "V": 10, "X": 11, "Z": 12}
+
+
+def ativo_risco(ativo) -> str:
+    """WDO_X26 / WDO_Z26 ... -> WDO1 (serie usada no risco). Demais ativos inalterados."""
+    a = str(ativo).strip()
+    return "WDO1" if a.upper().startswith("WDO") else a
+
+
+def wdo_vencimento(ativo):
+    """WDO_X26 -> date(2026, 11, 1). None se nao for contrato especifico."""
+    import re as _re
+    m = _re.match(r"^WDO_([FGHJKMNQUVXZ])(\d{2})$", str(ativo).strip().upper())
+    if not m:
+        return None
+    return datetime.date(2000 + int(m.group(2)), _WDO_MES[m.group(1)], 1)
+
+
+def wdo_ultimo_pregao(ativo):
+    """Ultimo dia de negociacao: ultimo dia util do mes anterior ao vencimento (sem feriados)."""
+    v = wdo_vencimento(ativo)
+    if v is None:
+        return None
+    d = v - datetime.timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= datetime.timedelta(days=1)
+    return d
+
+
+def wdo_contratos_disponiveis(data_ref) -> list:
+    """Contratos WDO_* com ajuste B3 na data e ainda negociaveis nela (ordenados por vencimento)."""
+    try:
+        df = pd.read_parquet("Dados/df_preco_de_ajuste_atual_completo.parquet")
+    except Exception:
+        return []
+    d = str(data_ref)[:10]
+    if d not in df.columns:
+        return []
+    d_dt = pd.to_datetime(d).date()
+    out = []
+    for _, r in df[df["Assets"].astype(str).str.startswith("WDO_")].iterrows():
+        v = r[d]
+        if v is None or str(v).strip() in ("", "nan", "None", "<NA>"):
+            continue
+        lp = wdo_ultimo_pregao(r["Assets"])
+        if lp is not None and lp >= d_dt:
+            out.append(str(r["Assets"]))
+    return sorted(set(out), key=wdo_vencimento)
+
+
+def _agrupar_wdo_pivot(p):
+    """Pivot Fundo x Ativo: soma as colunas WDO_* dentro de WDO1."""
+    if p is None or getattr(p, "empty", True):
+        return p
+    cols = [c for c in p.columns if str(c).upper().startswith("WDO")]
+    if not cols or cols == ["WDO1"]:
+        return p
+    p = p.copy()
+    tot = p[cols].apply(pd.to_numeric, errors="coerce").fillna(0).sum(axis=1)
+    p = p.drop(columns=cols)
+    p["WDO1"] = tot
+    return p
+
+
+def _agrupar_wdo_contratos(df):
+    """Colunas 'Contratos WDO_*' somadas em 'Contratos WDO1'."""
+    cols = [c for c in df.columns if str(c).startswith("Contratos WDO")]
+    if not cols or cols == ["Contratos WDO1"]:
+        return df
+    df = df.copy()
+    tot = df[cols].apply(pd.to_numeric, errors="coerce").fillna(0).sum(axis=1)
+    df = df.drop(columns=cols)
+    df["Contratos WDO1"] = tot
+    return df
+# [wdo-venc] fim helpers ---------------------------------------------------
+
+
 def load_and_process_excel(df_excel, assets_sel):
     df = df_excel.copy()
     df_precos = df.tail(1)
@@ -343,7 +423,7 @@ def processar_b3_portifolio():
     if mask_t.any():
         df.loc[mask_t, val_cols] = df.loc[mask_t, val_cols] * 1000
 
-    mask_wdo = df["Assets"] == "WDO1"
+    mask_wdo = df["Assets"].astype(str).str.startswith("WDO")  # [wdo-venc]
     if mask_wdo.any():
         df.loc[mask_wdo, val_cols] = df.loc[mask_wdo, val_cols] * 10
 
@@ -360,6 +440,7 @@ def processar_dados_port():
     df_assets.rename(columns={'Unnamed: 0': 'Ativo'}, inplace=True)
     df_portifolio_default = df_assets.copy()
     # Agrupar por ativo e somar as quantidades
+    df_assets['Ativo'] = df_assets['Ativo'].map(ativo_risco)  # [wdo-venc] risco agrega WDO_* em WDO1
     df_assets = df_assets.groupby('Ativo').sum().reset_index()
     # Criar uma lista com os ativos, convertendo para string e ignorando valores nulos
     assets_iniciais = df_assets['Ativo'].tolist()
@@ -619,8 +700,8 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
         st.table(df_view)
 
         # Agrupar para ver quantidades consolidadas do portfólio atual
-        df_atual = df_portifolio_salvo.groupby('Ativo', as_index=False)[
-            'Quantidade'].sum()
+        df_atual = (df_portifolio_salvo.assign(Ativo=df_portifolio_salvo['Ativo'].map(ativo_risco))
+                    .groupby('Ativo', as_index=False)['Quantidade'].sum())  # [wdo-venc]
         assets_atual = df_atual['Ativo'].tolist()
         quantidades_atual = df_atual['Quantidade'].tolist()
 
@@ -813,6 +894,7 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
     df_contratos = df_contratos.apply(pd.to_numeric, errors='coerce')
     df_contratos_2 = df_contratos_2.apply(pd.to_numeric, errors='coerce')
     df_contratos = df_contratos.add(df_contratos_2, fill_value=0)
+    df_contratos = _agrupar_wdo_contratos(df_contratos)  # [wdo-venc]
 
     df_contratos.drop(['Adm', 'PL', 'PL_atualizado', 'Weights'],
                       axis=1, inplace=True, errors='ignore')
@@ -832,8 +914,8 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
             # Para simplificar, usaremos os Ativos e Quantidades totais de df_compilado
             # (agrupado, mas sem re-somar por dia).
             st.write(df_compilado)
-            df_final_group = df_compilado.groupby('Ativo', as_index=False)[
-                'Quantidade'].sum()
+            df_final_group = (df_compilado.assign(Ativo=df_compilado['Ativo'].map(ativo_risco))
+                              .groupby('Ativo', as_index=False)['Quantidade'].sum())  # [wdo-venc]
             assets_teste = df_final_group['Ativo'].tolist()
             quantidades_teste = df_final_group['Quantidade'].tolist()
 
@@ -927,8 +1009,8 @@ def checkar_portifolio(assets, quantidades, compra_especifica, dia_compra, df_co
         if fundos1:
             st.write("## Novo Portfólio (após inserções)")
             # Aqui podemos usar os ativos/quantidades do df_compilado (ou agrupar novamente)
-            df_final_group = df_compilado.groupby('Ativo', as_index=False)[
-                'Quantidade'].sum()
+            df_final_group = (df_compilado.assign(Ativo=df_compilado['Ativo'].map(ativo_risco))
+                              .groupby('Ativo', as_index=False)['Quantidade'].sum())  # [wdo-venc]
             assets_teste = df_final_group['Ativo'].tolist()
             quantidades_teste = df_final_group['Quantidade'].tolist()
 
@@ -4067,16 +4149,20 @@ def delete_posicao_por_fundo(ativo, data, fundo=None) -> bool:
         return False
 
 
-def read_atual_contratos_supabase() -> pd.DataFrame:
+def read_atual_contratos_supabase(agregar_wdo: bool = True) -> pd.DataFrame:
     """Pivot Fundo (linhas) x Ativo (colunas) com soma de Quantidade.
     Inclui linha 'Total' agregada (compatível com BaseFundos legado).
     Fallback para leitura local se Supabase estiver vazio."""
     df = load_posicoes_por_fundo()
     if df is None or df.empty:
         try:
-            return read_atual_contratos()
+            _p = read_atual_contratos()
+            return _agrupar_wdo_pivot(_p) if agregar_wdo else _p  # [wdo-venc]
         except Exception:
             return pd.DataFrame()
+    if agregar_wdo:  # [wdo-venc] risco: WDO_* somado em WDO1
+        df = df.copy()
+        df["Ativo"] = df["Ativo"].map(ativo_risco)
     agrupado = (df.groupby(["Fundo", "Ativo"], as_index=False)["Quantidade"].sum())
     pivot = agrupado.pivot(index="Fundo", columns="Ativo", values="Quantidade").fillna(0)
     # Linha agregada 'Total' (o BaseFundos antigo tinha Total.parquet — código abaixo espera)
@@ -4254,8 +4340,8 @@ def atualizar_parquet_fundos(
     # Multiplicar a linha que tem o Ativo TREASURY por 1000 e WDO1 por 10
     df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'TREASURY',
                          df_fechamento_b3.columns != 'Assets'] *= 1000
-    df_fechamento_b3.loc[df_fechamento_b3['Assets'] == 'WDO1',
-                         df_fechamento_b3.columns != 'Assets'] *= 10
+    df_fechamento_b3.loc[df_fechamento_b3['Assets'].astype(str).str.startswith('WDO'),
+                         df_fechamento_b3.columns != 'Assets'] *= 10  # [wdo-venc]
 
     ultimo_fechamento = df_fechamento_b3.columns[-1]
     dolar = df_fechamento_b3.loc[
@@ -5447,7 +5533,7 @@ def load_b3_prices() -> pd.DataFrame:
     )
     df = pd.concat([df.iloc[:, :1], converted], axis=1)
     df.loc[df['Assets'] == 'TREASURY', df.columns != 'Assets'] *= 1000
-    df.loc[df['Assets'] == 'WDO1',     df.columns != 'Assets'] *= 10
+    df.loc[df['Assets'].astype(str).str.startswith('WDO'), df.columns != 'Assets'] *= 10  # [wdo-venc]
     return df
 
 # aproveita a função já existente, mas cacheia a saída
@@ -5804,7 +5890,7 @@ def analisar_dados_fundos2(
                         except Exception:
                             PU_atual = float(preco_lookup.at[ativo, preco_lookup.columns[-1]])
                         custo_op = (PU_FINAL - PU_atual) * 0.03 * abs(qtd) * 0.005
-                    elif raiz == "WDO1":
+                    elif raiz in ("WDO1", "WDO"):
                         try:
                             PU_atual = float(preco_lookup.at[ativo, data_op])
                         except Exception:
@@ -6274,7 +6360,7 @@ def calcular_metricas_por_pl(
     is_nominal = lambda a: a.startswith("DI_")
     is_real    = lambda a: a.startswith(("DAP", "NTNB"))
     is_us      = lambda a: "TREASURY" in a
-    is_fx      = lambda a: "WDO1" in a
+    is_fx      = lambda a: str(a).startswith("WDO")
 
     nominais = [a for a in intersec if is_nominal(a)]
     reais    = [a for a in intersec if is_real(a)]
@@ -9833,6 +9919,156 @@ CONFIG_PATH = "Dados/config.json"
 # ==========================================================
 #   FUNÇÃO DA PÁGINA 1 (Dashboard Principal)
 # ==========================================================
+# [wdo-venc] ---------------------------------------------------------------
+def alerta_vencimento_wdo(dias_alerta: int = 3):
+    """Avisa posicoes em WDO_* perto do ultimo pregao (ou ja vencidas)."""
+    try:
+        df = load_posicoes_por_fundo()
+        if df is None or df.empty:
+            return
+        df = df.copy()
+        df["Quantidade"] = pd.to_numeric(df["Quantidade"], errors="coerce").fillna(0)
+        pos = df[df["Ativo"].astype(str).str.startswith("WDO_")].groupby("Ativo")["Quantidade"].sum()
+        pos = pos[pos.abs() > 1e-9]
+        if pos.empty:
+            return
+        hoje = pd.to_datetime([c for c in load_b3_prices().columns if c != "Assets"][-1]).date()
+        for a, q in pos.items():
+            lp = wdo_ultimo_pregao(a)
+            if lp is None:
+                continue
+            if lp < hoje:
+                st.error(f"⚠️ {a}: {q:+.0f} contratos em aberto, mas o último pregão foi {lp:%d/%m/%Y}. "
+                         f"Lance a rolagem ('ROLAGEM WDO' em Adicionar Ativos) ou a liquidação.")
+            else:
+                du = int(np.busday_count(hoje, lp))
+                if du <= dias_alerta:
+                    st.warning(f"{a}: {q:+.0f} contratos em aberto. Último pregão em {lp:%d/%m/%Y} "
+                               f"({du} dia(s) útil(eis)). Programe a rolagem.")
+    except Exception as e:
+        print(f"[alerta_vencimento_wdo] {e}")
+
+
+def render_rolagem_wdo():
+    """Rolagem de WDO por fundo: -Q no contrato atual e +Q no novo, na mesma data."""
+    st.title("Rolagem de WDO")
+    alerta_vencimento_wdo()
+
+    df = load_posicoes_por_fundo()
+    if df is None or df.empty:
+        st.info("Sem posições cadastradas.")
+        return
+    df = df.copy()
+    df["Quantidade"] = pd.to_numeric(df["Quantidade"], errors="coerce").fillna(0)
+    wdo = df[df["Ativo"].astype(str).str.upper().str.startswith("WDO")]
+    pos = wdo.groupby(["Ativo", "Fundo"])["Quantidade"].sum()
+    pos = pos[pos.abs() > 1e-9]
+    tot = pos.groupby(level=0).sum()
+    tot = tot[tot.abs() > 1e-9]
+    if tot.empty:
+        st.info("Nenhuma posição aberta em WDO.")
+        return
+
+    b3 = load_b3_prices()
+    datas = [c for c in b3.columns if c != "Assets"]
+    ult = pd.to_datetime(datas[-1]).date()
+    px_tab = b3.set_index("Assets")
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        de = st.selectbox("Contrato atual (sai)", list(tot.index),
+                          format_func=lambda a: f"{a}  ({tot[a]:+.0f})", key="rol_de")
+    with c2:
+        data_op = st.date_input("Data da rolagem", value=ult, max_value=ult, key="rol_data")
+    d = str(data_op)
+    if d not in px_tab.columns:
+        st.error("Data sem pregão B3 (fim de semana/feriado) ou ainda sem preço. Rode o atualizar_precos.bat.")
+        return
+    candidatos = [c for c in wdo_contratos_disponiveis(d) if c != de]
+    if not candidatos:
+        st.error("Nenhum contrato de destino com ajuste B3 nessa data.")
+        return
+    with c3:
+        para = st.selectbox("Contrato novo (entra)", candidatos, key="rol_para")
+
+    def _pts(a):
+        try:
+            v = float(px_tab.at[a, d]) / 10.0
+            return 0.0 if np.isnan(v) else v
+        except Exception:
+            return 0.0
+
+    c4, c5, c6 = st.columns(3)
+    with c4:
+        p_de = st.number_input(f"Preço de saída {de} (pontos)", value=_pts(de), step=0.5,
+                               format="%.2f", key="rol_pde")
+    with c5:
+        p_para = st.number_input(f"Preço de entrada {para} (pontos)", value=_pts(para), step=0.5,
+                                 format="%.2f", key="rol_ppara")
+    with c6:
+        st.metric("Spread da rolagem (pontos)", f"{p_para - p_de:,.2f}")
+    st.caption("Preços na cotação B3 (R$ por US$ 1.000). O sistema grava × 10 (R$ por contrato), "
+               "mesmo padrão do ajuste usado no P&L. Default = ajuste B3 do dia.")
+
+    tab = pos.loc[de].rename("Posição atual").to_frame()
+    tab["Rolar"] = tab["Posição atual"].round().astype(int)
+    st.write("Quantidade a rolar por fundo (edite se for rolagem parcial):")
+    tab_ed = st.data_editor(
+        tab, key="rol_editor",
+        column_config={"Posição atual": st.column_config.NumberColumn(disabled=True, format="%.0f"),
+                       "Rolar": st.column_config.NumberColumn(step=1, format="%d")})
+    rolar = pd.to_numeric(tab_ed["Rolar"], errors="coerce").fillna(0).astype(int)
+    rolar = rolar[rolar != 0]
+    if rolar.empty:
+        st.info("Nada a rolar.")
+        return
+    atual = tab_ed.loc[rolar.index, "Posição atual"]
+    ruins = rolar[(rolar.abs() > atual.abs() + 1e-9) | (np.sign(rolar) != np.sign(atual))]
+    if not ruins.empty:
+        st.error("Quantidade a rolar maior que a posição ou com sinal trocado: " + ", ".join(map(str, ruins.index)))
+        return
+
+    Q = int(rolar.sum())
+    p_ult_de = float(px_tab.at[de, datas[-1]]) if de in px_tab.index else np.nan
+    p_ult_para = float(px_tab.at[para, datas[-1]]) if para in px_tab.index else np.nan
+    df_info = pd.DataFrame([
+        {"Ativo": de, "Quantidade": -Q, "Dia de Compra": d, "Preço de Compra": p_de * 10,
+         "Preço de Ajuste Atual": p_ult_de, "Rendimento": -Q * (p_ult_de - p_de * 10)},
+        {"Ativo": para, "Quantidade": Q, "Dia de Compra": d, "Preço de Compra": p_para * 10,
+         "Preço de Ajuste Atual": p_ult_para, "Rendimento": Q * (p_ult_para - p_para * 10)},
+    ])
+    st.write("Operações que serão lançadas (consolidado):")
+    st.table(df_info.set_index("Ativo")[["Quantidade", "Dia de Compra", "Preço de Compra"]])
+
+    if not st.button(f"Confirmar rolagem {de} → {para} ({Q:+d} contratos)", type="primary", key="rol_ok"):
+        return
+
+    # 1) BaseFundos + posicoes_por_fundo (mesmo caminho do Adicionar Ativos)
+    df_cur = pd.DataFrame({f"Contratos {de}": -rolar, f"Contratos {para}": rolar})
+    df_cur.loc["Total"] = df_cur.sum()
+    atualizar_parquet_fundos(df_cur, d, df_info, {de: -Q, para: Q})
+
+    # 2) portfolio_posicoes (mesmo padrão do 'Salvar novo portfólio')
+    _supa = load_data()
+    base = pd.DataFrame(_supa) if _supa else pd.DataFrame(columns=list(df_info.columns) + ["Id"])
+    if "Id" not in base.columns:
+        base["Id"] = np.nan
+    novo = pd.concat([base, df_info], ignore_index=True)
+    max_id = pd.to_numeric(novo["Id"], errors="coerce").max()
+    max_id = 0 if pd.isna(max_id) else int(max_id)
+    falt = novo["Id"].isna()
+    novo.loc[falt, "Id"] = list(range(max_id + 1, max_id + 1 + int(falt.sum())))
+    novo["Id"] = novo["Id"].astype(int)
+    novo["Dia de Compra"] = pd.to_datetime(novo["Dia de Compra"], errors="coerce").dt.strftime("%Y-%m-%d")
+    res = add_data(novo.replace({np.nan: None}).to_dict(orient="records"))
+    if res is None:
+        st.error("Erro ao salvar portfolio_posicoes no Supabase (BaseFundos já foi atualizado).")
+    else:
+        st.success(f"Rolagem lançada: {de} {-Q:+d} @ {p_de:,.2f} | {para} {Q:+d} @ {p_para:,.2f} em {d}.")
+    invalidar_caches_posicoes()
+# [wdo-venc] fim rolagem ---------------------------------------------------
+
+
 def main_page():
     st.title("Dashboard de Análise de Risco de Portfólio")
     try:
@@ -9909,6 +10145,10 @@ def main_page():
             if m: return f"DI_{m.group(1)}"
             m = re.match(r"^DAP[A-Z](\d{2})$", s)
             if m: return f"DAP{m.group(1)}"
+            m = re.match(r"^WDO([FGHJKMNQUVXZ]\d{2})$", s)  # [wdo-venc]
+            if m:
+                st.session_state["wdo_contrato_csv"] = f"WDO_{m.group(1)}"
+                return "WDO1"
             return s
 
         df["Ativo"] = df["Ativo"].apply(norm_ativo)
@@ -10027,6 +10267,7 @@ def main_page():
 
         # lista de colunas disponíveis para selecionar
         lista_todos_ativos = list(df.columns)
+        lista_todos_ativos.append("ROLAGEM WDO")  # [wdo-rolagem-adic]
 
         # se houver CSV, sugerir como default os ativos presentes no CSV que existam no universo
         csv_defaults = []
@@ -10046,6 +10287,12 @@ def main_page():
             faltantes = [a for a in exec_dict.keys() if a not in lista_todos_ativos]
             if faltantes:
                 st.sidebar.warning(f"Ativos no CSV fora do universo do app (ignorados): {', '.join(faltantes)}")
+
+        if "ROLAGEM WDO" in assets:  # [wdo-rolagem-adic]
+            if len(assets) > 1:
+                st.sidebar.info("A rolagem é lançada sozinha: os demais ativos selecionados foram ignorados.")
+            render_rolagem_wdo()
+            st.stop()
 
         if len(assets) > 0:
             df_precos, df_completo = load_and_process_excel(df, assets)
@@ -10736,6 +10983,27 @@ def main_page():
             drop_cols += [c for c in df_view.columns if str(c).startswith('Max')]
             df_view = df_view.drop(columns=drop_cols, errors='ignore')
 
+            # [wdo-venc] WDO1 (risco) -> contrato exato para gravar a operacao e o P&L
+            if "WDO1" in assets:
+                _contratos_wdo = wdo_contratos_disponiveis(data_compra_todos)
+                if not _contratos_wdo:
+                    st.sidebar.error(f"Nenhum contrato WDO com ajuste B3 em {data_compra_todos}. "
+                                     "Rode o atualizar_precos.bat.")
+                    st.stop()
+                _csv_wdo = st.session_state.get("wdo_contrato_csv")
+                _idx_wdo = _contratos_wdo.index(_csv_wdo) if _csv_wdo in _contratos_wdo else 0
+                st.sidebar.write("---")
+                _contrato_wdo = st.sidebar.selectbox("Contrato WDO operado:", _contratos_wdo,
+                                                     index=_idx_wdo, key="contrato_wdo")
+                st.sidebar.caption("Preço do WDO em R$ por contrato (pontos × 10). "
+                                   "O risco continua calculado pelo WDO1.")
+                _ren = {"WDO1": _contrato_wdo}
+                assets = [_ren.get(a, a) for a in assets]
+                quantidade_nomes = {_ren.get(k, k): v for k, v in quantidade_nomes.items()}
+                precos_user = {_ren.get(k, k): v for k, v in precos_user.items()}
+                data_compra = {_ren.get(k, k): v for k, v in data_compra.items()}
+                filtered_df = filtered_df.rename(columns={"Contratos WDO1": f"Contratos {_contrato_wdo}"})
+                columns = [f"Contratos {_contrato_wdo}" if c == "Contratos WDO1" else c for c in columns]
             df_port, key, soma_pl_sem_pesos = checkar_portifolio(
                 assets, quantidade_nomes, precos_user, data_compra, filtered_df, df_view)
 
@@ -10773,6 +11041,7 @@ def main_page():
             st.write("Nenhum Ativo selecionado.")
 
     elif opti == "Ver Portfólio":
+        alerta_vencimento_wdo()  # [wdo-venc]
         with st.spinner("Carregando dados do portfólio…"):
             # Agrupamento corrigido
             # ------------------------------------------------------------------
@@ -11240,7 +11509,7 @@ def main_page():
                     'DAP': 'Juros Reais Brasil',
                     'NTNB': 'Juros Reais Brasil',
                     'TREASURY': 'Juros US',
-                    'WDO1': 'Moedas'
+                    'WDO': 'Moedas'
                 }
                 lista_ativos = [
                     'DI_26', 'DI_27', 'DI_28', 'DI_29', 'DI_30',
@@ -11812,7 +12081,7 @@ def main_page():
                         'DAP': 'Juros Reais Brasil',
                         'NTNB': 'Juros Reais Brasil',
                         'TREASURY': 'Juros US',
-                        'WDO1': 'Moedas'
+                        'WDO': 'Moedas'
                     }
                     lista_ativos = df_final.index
                     lista_ativos = lista_ativos.tolist()
@@ -11861,7 +12130,7 @@ def main_page():
                                     'JUROS REAIS BRASIL')
                             elif 'TREASURY' in idx:
                                 lista_estrategias_atualizar.append('JUROS US')
-                            elif 'WDO1' in idx:
+                            elif 'WDO' in idx:
                                 lista_estrategias_atualizar.append('MOEDAS')
                         df_estrategias['Estrategia'] = lista_estrategias_atualizar
                         df_estrategias = df_estrategias.groupby('Estrategia').sum()
@@ -12202,7 +12471,7 @@ def main_page():
                                     'JUROS REAIS BRASIL')
                             elif 'TREASURY' in idx:
                                 lista_estrategias_atualizar.append('JUROS US')
-                            elif 'WDO1' in idx:
+                            elif 'WDO' in idx:
                                 lista_estrategias_atualizar.append('MOEDAS')
                         df_estrategias['Estrategia'] = lista_estrategias_atualizar
                         df_estrategias = df_estrategias.groupby('Estrategia').sum()

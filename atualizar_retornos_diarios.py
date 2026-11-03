@@ -120,6 +120,7 @@ def _ler_precos_wide_df_preco(parquet_path: str = "Dados/df_preco_de_ajuste_atua
     df_long = df.melt(id_vars="Assets", value_vars=cols_data,
                        var_name="Data", value_name="preco_raw")
     df_long = df_long.rename(columns={"Assets": "Ativo"})
+    df_long = df_long[~df_long["Ativo"].astype(str).str.startswith("WDO_")]  # [wdo-venc]
     df_long["preco"] = df_long["preco_raw"].map(_parse_ptbr)
     df_long["Data"] = pd.to_datetime(df_long["Data"], errors="coerce")
     df_long = df_long.dropna(subset=["Data", "preco"])

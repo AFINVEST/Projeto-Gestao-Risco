@@ -126,6 +126,13 @@ def _parse_ptbr(v):
     except Exception: return None
 
 
+# [wdo-venc]
+def ativo_risco(ativo) -> str:
+    """Contrato especifico de dolar (WDO_X26) -> serie generica WDO1 para risco."""
+    a = str(ativo).strip()
+    return "WDO1" if a.upper().startswith("WDO") else a
+
+
 def carregar_precos_atuais(data_ref: pd.Timestamp,
                             path: str = "Dados/df_preco_de_ajuste_atual_completo.parquet") -> dict:
     """Retorna {ativo: preco} na data_ref (ou mais recente <= data_ref)."""
@@ -146,7 +153,7 @@ def carregar_precos_atuais(data_ref: pd.Timestamp,
         ativo = str(row["Assets"])
         v = _parse_ptbr(row[col_alvo])
         if v is not None and v > 0:
-            out[ativo] = v
+            out[ativo] = v * 10 if ativo.upper().startswith("WDO") else v
     return out
 
 
@@ -178,7 +185,7 @@ def carregar_posicoes_atuais(data_ref: pd.Timestamp,
                 try:
                     v = df.at[ativo, col_q]
                     if pd.notna(v) and float(v) != 0:
-                        qty[ativo] = qty.get(ativo, 0.0) + float(v)
+                        qty[ativo_risco(ativo)] = qty.get(ativo_risco(ativo), 0.0) + float(v)
                 except Exception:
                     continue
     # remove posicoes liquidas zero

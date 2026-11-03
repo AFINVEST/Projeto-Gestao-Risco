@@ -256,7 +256,7 @@ def load_b3_prices() -> pd.DataFrame:
     )
     df = pd.concat([df.iloc[:, :1], converted], axis=1)
     df.loc[df["Assets"] == "TREASURY", df.columns != "Assets"] *= 1000
-    df.loc[df["Assets"] == "WDO1",     df.columns != "Assets"] *= 10
+    df.loc[df["Assets"].astype(str).str.startswith("WDO"), df.columns != "Assets"] *= 10  # [wdo-venc]
     return df
 
 
@@ -416,7 +416,7 @@ def analisar_dados_fundos2(
                         try: PU_atual = float(preco_lookup.at[ativo, data_op])
                         except Exception: PU_atual = float(preco_lookup.at[ativo, preco_lookup.columns[-1]])
                         custo_op = (PU_FINAL - PU_atual) * 0.03 * abs(qtd) * 0.005
-                    elif raiz == "WDO1":
+                    elif raiz in ("WDO1", "WDO"):
                         try: PU_atual = float(preco_lookup.at[ativo, data_op])
                         except Exception: PU_atual = float(preco_lookup.at[ativo, preco_lookup.columns[-1]])
                         custo_op = (PU_atual) * 0.02 * abs(qtd) * 0.005

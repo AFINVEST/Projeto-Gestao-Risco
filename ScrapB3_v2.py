@@ -520,7 +520,10 @@ def selecionar_vertices(df_day: pd.DataFrame, data_ref: dt.date) -> pd.DataFrame
         use = after if not after.empty else w_pref
 
         best = use.sort_values("MatDate2").head(1)
-        df = pd.concat([df[df["Asset"].ne("WDO1")], best], ignore_index=True)
+        # [wdo-venc] contratos especificos p/ operacao e P&L (WDO_X26, WDO_Z26, ...)
+        espec = use[use["Prefix"].eq("WDO")].sort_values("MatDate2").head(3).copy()
+        espec["Asset"] = "WDO_" + espec["Vencimento"].astype(str).str.upper()
+        df = pd.concat([df[df["Asset"].ne("WDO1")], best, espec], ignore_index=True)
 
     # Seleção do TREASURY (T10)
     t = df[df["Asset"].eq("TREASURY")].copy()

@@ -3359,3 +3359,1035 @@
 [2026-11-03 11:05:37] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (90, 460) | Dados/df_valor_ajuste_contrato.parquet (79, 458)
 [2026-11-03 11:05:37] [warn] envio Supabase falhou: name '_enviar_para_supabase' is not defined
 [2026-11-03 11:05:38] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json
+[2026-11-03 17:45:04] Atualizando de 2025-01-02 até 2026-10-30 (DU B3: 458)
+[2026-11-03 17:45:05] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.39s
+[2026-11-03 17:45:05] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:45:05] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.27s
+[2026-11-03 17:45:05] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:45:06] [HTTP] ConsolidatedTradesDerivatives 2024-12-30 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:45:06] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-30)
+[2026-11-03 17:45:06] ! ConsolidatedTradesDerivatives @ 2024-12-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:06] [HTTP] ConsolidatedTradesDerivatives 2024-12-27 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:06] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-27)
+[2026-11-03 17:45:06] ! ConsolidatedTradesDerivatives @ 2024-12-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:06] [HTTP] ConsolidatedTradesDerivatives 2024-12-26 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:06] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-26)
+[2026-11-03 17:45:06] ! ConsolidatedTradesDerivatives @ 2024-12-26: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:07] [HTTP] ConsolidatedTradesDerivatives 2024-12-23 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:07] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-23)
+[2026-11-03 17:45:07] ! ConsolidatedTradesDerivatives @ 2024-12-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:07] [HTTP] ConsolidatedTradesDerivatives 2024-12-20 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:45:07] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-20)
+[2026-11-03 17:45:07] ! ConsolidatedTradesDerivatives @ 2024-12-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:07] [HTTP] ConsolidatedTradesDerivatives 2024-12-19 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:45:07] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-19)
+[2026-11-03 17:45:07] ! ConsolidatedTradesDerivatives @ 2024-12-19: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:08] [HTTP] ConsolidatedTradesDerivatives 2024-12-18 -> status=200 content-length=251 t=0.34s
+[2026-11-03 17:45:08] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-18)
+[2026-11-03 17:45:08] ! ConsolidatedTradesDerivatives @ 2024-12-18: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:08] [HTTP] ConsolidatedTradesDerivatives 2024-12-17 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:08] ! ConsolidatedTradesDerivatives @ 2024-12-17: falhou parse ([WinError 183] Não é possível criar um arquivo já existente: 'debug_b3_csv')
+[2026-11-03 17:45:08] [HTTP] ConsolidatedTradesDerivatives 2024-12-16 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:08] ! ConsolidatedTradesDerivatives @ 2024-12-16: falhou parse ([WinError 183] Não é possível criar um arquivo já existente: 'debug_b3_csv')
+[2026-11-03 17:45:08] [HTTP] ConsolidatedTradesDerivatives 2024-12-13 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:08] ! ConsolidatedTradesDerivatives @ 2024-12-13: falhou parse ([WinError 183] Não é possível criar um arquivo já existente: 'debug_b3_csv')
+[2026-11-03 17:45:09] [HTTP] ConsolidatedTradesDerivatives 2024-12-12 -> status=200 content-length=251 t=0.80s
+[2026-11-03 17:45:09] ! ConsolidatedTradesDerivatives @ 2024-12-12: falhou parse ([WinError 183] Não é possível criar um arquivo já existente: 'debug_b3_csv')
+[2026-11-03 17:45:10] [HTTP] ConsolidatedTradesDerivatives 2024-12-11 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:10] ! ConsolidatedTradesDerivatives @ 2024-12-11: falhou parse ([WinError 183] Não é possível criar um arquivo já existente: 'debug_b3_csv')
+[2026-11-03 17:45:10] [HTTP] ConsolidatedTradesDerivatives 2024-12-10 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:10] ! ConsolidatedTradesDerivatives @ 2024-12-10: falhou parse ([WinError 183] Não é possível criar um arquivo já existente: 'debug_b3_csv')
+[2026-11-03 17:45:10] [HTTP] ConsolidatedTradesDerivatives 2024-12-09 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:45:10] ! ConsolidatedTradesDerivatives @ 2024-12-09: falhou parse ([WinError 183] Não é possível criar um arquivo já existente: 'debug_b3_csv')
+[2026-11-03 17:45:10] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-02
+[2026-11-03 17:45:10] 2025-01-02: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:45:11] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:11] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse ([WinError 183] Não é possível criar um arquivo já existente: 'debug_b3_csv')
+[2026-11-03 17:45:11] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:45:11] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse ([WinError 183] Não é possível criar um arquivo já existente: 'debug_b3_csv')
+[2026-11-03 17:45:12] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.25s
+[2026-11-03 17:45:12] ! ConsolidatedTradesDerivatives @ 2025-01-02: falhou parse ([WinError 183] Não é possível criar um arquivo já existente: 'debug_b3_csv')
+[2026-11-03 17:45:12] [HTTP] ConsolidatedTradesDerivatives 2024-12-30 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:45:12] ! ConsolidatedTradesDerivatives @ 2024-12-30: falhou parse ([WinError 183] Não é possível criar um arquivo já existente: 'debug_b3_csv')
+[2026-11-03 17:45:12] [HTTP] ConsolidatedTradesDerivatives 2024-12-27 -> status=200 content-length=251 t=0.36s
+[2026-11-03 17:45:12] ! ConsolidatedTradesDerivatives @ 2024-12-27: falhou parse ([WinError 183] Não é possível criar um arquivo já existente: 'debug_b3_csv')
+[2026-11-03 17:45:13] [HTTP] ConsolidatedTradesDerivatives 2024-12-26 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:13] ! ConsolidatedTradesDerivatives @ 2024-12-26: falhou parse ([WinError 183] Não é possível criar um arquivo já existente: 'debug_b3_csv')
+[2026-11-03 17:45:13] [HTTP] ConsolidatedTradesDerivatives 2024-12-23 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:13] ! ConsolidatedTradesDerivatives @ 2024-12-23: falhou parse ([WinError 183] Não é possível criar um arquivo já existente: 'debug_b3_csv')
+[2026-11-03 17:45:13] [HTTP] ConsolidatedTradesDerivatives 2024-12-20 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:13] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-20)
+[2026-11-03 17:45:13] ! ConsolidatedTradesDerivatives @ 2024-12-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:14] [HTTP] ConsolidatedTradesDerivatives 2024-12-19 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:45:14] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-19)
+[2026-11-03 17:45:14] ! ConsolidatedTradesDerivatives @ 2024-12-19: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:14] [HTTP] ConsolidatedTradesDerivatives 2024-12-18 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:45:14] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-18)
+[2026-11-03 17:45:14] ! ConsolidatedTradesDerivatives @ 2024-12-18: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:14] [HTTP] ConsolidatedTradesDerivatives 2024-12-17 -> status=200 content-length=251 t=0.24s
+[2026-11-03 17:45:14] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-17)
+[2026-11-03 17:45:14] ! ConsolidatedTradesDerivatives @ 2024-12-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:14] [HTTP] ConsolidatedTradesDerivatives 2024-12-16 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:14] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-16)
+[2026-11-03 17:45:14] ! ConsolidatedTradesDerivatives @ 2024-12-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:15] [HTTP] ConsolidatedTradesDerivatives 2024-12-13 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:45:15] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-13)
+[2026-11-03 17:45:15] ! ConsolidatedTradesDerivatives @ 2024-12-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:15] [HTTP] ConsolidatedTradesDerivatives 2024-12-12 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:45:15] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-12)
+[2026-11-03 17:45:15] ! ConsolidatedTradesDerivatives @ 2024-12-12: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:15] [HTTP] ConsolidatedTradesDerivatives 2024-12-11 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:45:15] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-11)
+[2026-11-03 17:45:15] ! ConsolidatedTradesDerivatives @ 2024-12-11: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:16] [HTTP] ConsolidatedTradesDerivatives 2024-12-10 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:16] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-10)
+[2026-11-03 17:45:16] ! ConsolidatedTradesDerivatives @ 2024-12-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:16] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-03
+[2026-11-03 17:45:16] 2025-01-03: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:45:16] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.28s
+[2026-11-03 17:45:16] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:45:17] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.19s
+[2026-11-03 17:45:17] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:45:17] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.33s
+[2026-11-03 17:45:17] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-03)
+[2026-11-03 17:45:17] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:17] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.34s
+[2026-11-03 17:45:17] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:45:19] [HTTP] ConsolidatedTradesDerivatives 2024-12-30 -> status=200 content-length=251 t=1.58s
+[2026-11-03 17:45:19] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-30)
+[2026-11-03 17:45:19] ! ConsolidatedTradesDerivatives @ 2024-12-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:19] [HTTP] ConsolidatedTradesDerivatives 2024-12-27 -> status=200 content-length=251 t=0.34s
+[2026-11-03 17:45:19] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-27)
+[2026-11-03 17:45:19] ! ConsolidatedTradesDerivatives @ 2024-12-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:20] [HTTP] ConsolidatedTradesDerivatives 2024-12-26 -> status=200 content-length=251 t=0.24s
+[2026-11-03 17:45:20] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-26)
+[2026-11-03 17:45:20] ! ConsolidatedTradesDerivatives @ 2024-12-26: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:20] [HTTP] ConsolidatedTradesDerivatives 2024-12-23 -> status=200 content-length=251 t=0.39s
+[2026-11-03 17:45:20] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-23)
+[2026-11-03 17:45:20] ! ConsolidatedTradesDerivatives @ 2024-12-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:20] [HTTP] ConsolidatedTradesDerivatives 2024-12-20 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:45:20] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-20)
+[2026-11-03 17:45:20] ! ConsolidatedTradesDerivatives @ 2024-12-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:21] [HTTP] ConsolidatedTradesDerivatives 2024-12-19 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:21] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-19)
+[2026-11-03 17:45:21] ! ConsolidatedTradesDerivatives @ 2024-12-19: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:21] [HTTP] ConsolidatedTradesDerivatives 2024-12-18 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:45:21] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-18)
+[2026-11-03 17:45:21] ! ConsolidatedTradesDerivatives @ 2024-12-18: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:21] [HTTP] ConsolidatedTradesDerivatives 2024-12-17 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:45:21] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-17)
+[2026-11-03 17:45:21] ! ConsolidatedTradesDerivatives @ 2024-12-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:21] [HTTP] ConsolidatedTradesDerivatives 2024-12-16 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:21] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-16)
+[2026-11-03 17:45:21] ! ConsolidatedTradesDerivatives @ 2024-12-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:22] [HTTP] ConsolidatedTradesDerivatives 2024-12-13 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:22] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-13)
+[2026-11-03 17:45:22] ! ConsolidatedTradesDerivatives @ 2024-12-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:26] [HTTP] ConsolidatedTradesDerivatives 2024-12-12 -> status=200 content-length=251 t=4.30s
+[2026-11-03 17:45:26] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-12)
+[2026-11-03 17:45:26] ! ConsolidatedTradesDerivatives @ 2024-12-12: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:26] [HTTP] ConsolidatedTradesDerivatives 2024-12-11 -> status=200 content-length=251 t=0.31s
+[2026-11-03 17:45:26] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-11)
+[2026-11-03 17:45:26] ! ConsolidatedTradesDerivatives @ 2024-12-11: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:26] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-06
+[2026-11-03 17:45:26] 2025-01-06: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:45:27] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.34s
+[2026-11-03 17:45:27] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:45:27] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.30s
+[2026-11-03 17:45:27] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:45:28] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.20s
+[2026-11-03 17:45:28] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:45:28] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:28] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-03)
+[2026-11-03 17:45:28] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:28] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.28s
+[2026-11-03 17:45:28] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:45:29] [HTTP] ConsolidatedTradesDerivatives 2024-12-30 -> status=200 content-length=251 t=0.34s
+[2026-11-03 17:45:29] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-30)
+[2026-11-03 17:45:29] ! ConsolidatedTradesDerivatives @ 2024-12-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:29] [HTTP] ConsolidatedTradesDerivatives 2024-12-27 -> status=200 content-length=251 t=0.36s
+[2026-11-03 17:45:29] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-27)
+[2026-11-03 17:45:29] ! ConsolidatedTradesDerivatives @ 2024-12-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:29] [HTTP] ConsolidatedTradesDerivatives 2024-12-26 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:45:29] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-26)
+[2026-11-03 17:45:29] ! ConsolidatedTradesDerivatives @ 2024-12-26: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:30] [HTTP] ConsolidatedTradesDerivatives 2024-12-23 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:30] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-23)
+[2026-11-03 17:45:30] ! ConsolidatedTradesDerivatives @ 2024-12-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:30] [HTTP] ConsolidatedTradesDerivatives 2024-12-20 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:45:30] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-20)
+[2026-11-03 17:45:30] ! ConsolidatedTradesDerivatives @ 2024-12-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:30] [HTTP] ConsolidatedTradesDerivatives 2024-12-19 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:45:30] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-19)
+[2026-11-03 17:45:30] ! ConsolidatedTradesDerivatives @ 2024-12-19: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:30] [HTTP] ConsolidatedTradesDerivatives 2024-12-18 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:45:30] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-18)
+[2026-11-03 17:45:30] ! ConsolidatedTradesDerivatives @ 2024-12-18: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:31] [HTTP] ConsolidatedTradesDerivatives 2024-12-17 -> status=200 content-length=251 t=0.31s
+[2026-11-03 17:45:31] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-17)
+[2026-11-03 17:45:31] ! ConsolidatedTradesDerivatives @ 2024-12-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:31] [HTTP] ConsolidatedTradesDerivatives 2024-12-16 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:45:31] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-16)
+[2026-11-03 17:45:31] ! ConsolidatedTradesDerivatives @ 2024-12-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:31] [HTTP] ConsolidatedTradesDerivatives 2024-12-13 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:31] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-13)
+[2026-11-03 17:45:31] ! ConsolidatedTradesDerivatives @ 2024-12-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:32] [HTTP] ConsolidatedTradesDerivatives 2024-12-12 -> status=200 content-length=251 t=0.31s
+[2026-11-03 17:45:32] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-12)
+[2026-11-03 17:45:32] ! ConsolidatedTradesDerivatives @ 2024-12-12: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:32] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-07
+[2026-11-03 17:45:32] 2025-01-07: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:45:33] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.23s
+[2026-11-03 17:45:33] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:45:33] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.20s
+[2026-11-03 17:45:33] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:45:33] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.28s
+[2026-11-03 17:45:33] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:45:33] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.23s
+[2026-11-03 17:45:33] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:45:34] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:45:34] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-03)
+[2026-11-03 17:45:34] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:34] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.19s
+[2026-11-03 17:45:34] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:45:34] [HTTP] ConsolidatedTradesDerivatives 2024-12-30 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:45:34] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-30)
+[2026-11-03 17:45:34] ! ConsolidatedTradesDerivatives @ 2024-12-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:34] [HTTP] ConsolidatedTradesDerivatives 2024-12-27 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:45:34] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-27)
+[2026-11-03 17:45:34] ! ConsolidatedTradesDerivatives @ 2024-12-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:35] [HTTP] ConsolidatedTradesDerivatives 2024-12-26 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:35] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-26)
+[2026-11-03 17:45:35] ! ConsolidatedTradesDerivatives @ 2024-12-26: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:35] [HTTP] ConsolidatedTradesDerivatives 2024-12-23 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:45:35] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-23)
+[2026-11-03 17:45:35] ! ConsolidatedTradesDerivatives @ 2024-12-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:35] [HTTP] ConsolidatedTradesDerivatives 2024-12-20 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:45:35] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-20)
+[2026-11-03 17:45:35] ! ConsolidatedTradesDerivatives @ 2024-12-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:36] [HTTP] ConsolidatedTradesDerivatives 2024-12-19 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:36] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-19)
+[2026-11-03 17:45:36] ! ConsolidatedTradesDerivatives @ 2024-12-19: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:36] [HTTP] ConsolidatedTradesDerivatives 2024-12-18 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:36] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-18)
+[2026-11-03 17:45:36] ! ConsolidatedTradesDerivatives @ 2024-12-18: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:36] [HTTP] ConsolidatedTradesDerivatives 2024-12-17 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:45:36] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-17)
+[2026-11-03 17:45:36] ! ConsolidatedTradesDerivatives @ 2024-12-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:36] [HTTP] ConsolidatedTradesDerivatives 2024-12-16 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:36] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-16)
+[2026-11-03 17:45:36] ! ConsolidatedTradesDerivatives @ 2024-12-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:37] [HTTP] ConsolidatedTradesDerivatives 2024-12-13 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:37] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-13)
+[2026-11-03 17:45:37] ! ConsolidatedTradesDerivatives @ 2024-12-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:37] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-08
+[2026-11-03 17:45:37] 2025-01-08: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:45:38] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=0.69s
+[2026-11-03 17:45:38] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:45:38] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=0.30s
+[2026-11-03 17:45:38] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:45:38] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.25s
+[2026-11-03 17:45:38] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:45:39] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.36s
+[2026-11-03 17:45:39] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:45:39] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.33s
+[2026-11-03 17:45:39] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:45:40] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:40] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-03)
+[2026-11-03 17:45:40] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:40] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.25s
+[2026-11-03 17:45:40] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:45:40] [HTTP] ConsolidatedTradesDerivatives 2024-12-30 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:45:40] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-30)
+[2026-11-03 17:45:40] ! ConsolidatedTradesDerivatives @ 2024-12-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:40] [HTTP] ConsolidatedTradesDerivatives 2024-12-27 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:40] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-27)
+[2026-11-03 17:45:40] ! ConsolidatedTradesDerivatives @ 2024-12-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:41] [HTTP] ConsolidatedTradesDerivatives 2024-12-26 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:41] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-26)
+[2026-11-03 17:45:41] ! ConsolidatedTradesDerivatives @ 2024-12-26: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:41] [HTTP] ConsolidatedTradesDerivatives 2024-12-23 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:45:41] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-23)
+[2026-11-03 17:45:41] ! ConsolidatedTradesDerivatives @ 2024-12-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:41] [HTTP] ConsolidatedTradesDerivatives 2024-12-20 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:45:41] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-20)
+[2026-11-03 17:45:41] ! ConsolidatedTradesDerivatives @ 2024-12-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:41] [HTTP] ConsolidatedTradesDerivatives 2024-12-19 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:42] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-19)
+[2026-11-03 17:45:42] ! ConsolidatedTradesDerivatives @ 2024-12-19: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:42] [HTTP] ConsolidatedTradesDerivatives 2024-12-18 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:42] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-18)
+[2026-11-03 17:45:42] ! ConsolidatedTradesDerivatives @ 2024-12-18: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:42] [HTTP] ConsolidatedTradesDerivatives 2024-12-17 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:42] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-17)
+[2026-11-03 17:45:42] ! ConsolidatedTradesDerivatives @ 2024-12-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:42] [HTTP] ConsolidatedTradesDerivatives 2024-12-16 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:45:42] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-16)
+[2026-11-03 17:45:42] ! ConsolidatedTradesDerivatives @ 2024-12-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:42] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-09
+[2026-11-03 17:45:42] 2025-01-09: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:45:43] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:43] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:45:43] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:43] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:45:43] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:45:43] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:43] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=0.30s
+[2026-11-03 17:45:43] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:45:44] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.23s
+[2026-11-03 17:45:44] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:45:44] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.30s
+[2026-11-03 17:45:44] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:45:44] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.24s
+[2026-11-03 17:45:44] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:45:45] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:45] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-03)
+[2026-11-03 17:45:45] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:45] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.28s
+[2026-11-03 17:45:45] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:45:45] [HTTP] ConsolidatedTradesDerivatives 2024-12-30 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:45:45] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-30)
+[2026-11-03 17:45:45] ! ConsolidatedTradesDerivatives @ 2024-12-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:45] [HTTP] ConsolidatedTradesDerivatives 2024-12-27 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:45:45] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-27)
+[2026-11-03 17:45:45] ! ConsolidatedTradesDerivatives @ 2024-12-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:46] [HTTP] ConsolidatedTradesDerivatives 2024-12-26 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:45:46] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-26)
+[2026-11-03 17:45:46] ! ConsolidatedTradesDerivatives @ 2024-12-26: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:46] [HTTP] ConsolidatedTradesDerivatives 2024-12-23 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:45:46] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-23)
+[2026-11-03 17:45:46] ! ConsolidatedTradesDerivatives @ 2024-12-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:47] [HTTP] ConsolidatedTradesDerivatives 2024-12-20 -> status=200 content-length=251 t=0.38s
+[2026-11-03 17:45:47] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-20)
+[2026-11-03 17:45:47] ! ConsolidatedTradesDerivatives @ 2024-12-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:47] [HTTP] ConsolidatedTradesDerivatives 2024-12-19 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:45:47] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-19)
+[2026-11-03 17:45:47] ! ConsolidatedTradesDerivatives @ 2024-12-19: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:47] [HTTP] ConsolidatedTradesDerivatives 2024-12-18 -> status=200 content-length=251 t=0.26s
+[2026-11-03 17:45:47] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-18)
+[2026-11-03 17:45:47] ! ConsolidatedTradesDerivatives @ 2024-12-18: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:47] [HTTP] ConsolidatedTradesDerivatives 2024-12-17 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:45:48] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-17)
+[2026-11-03 17:45:48] ! ConsolidatedTradesDerivatives @ 2024-12-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:48] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-10
+[2026-11-03 17:45:48] 2025-01-10: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:45:48] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:45:48] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:45:48] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:48] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:45:48] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:45:48] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:49] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:45:49] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:45:49] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:49] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=0.20s
+[2026-11-03 17:45:49] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:45:49] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.33s
+[2026-11-03 17:45:49] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:45:50] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.22s
+[2026-11-03 17:45:50] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:45:50] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.20s
+[2026-11-03 17:45:50] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:45:50] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:45:50] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-03)
+[2026-11-03 17:45:50] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:50] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.28s
+[2026-11-03 17:45:50] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:45:51] [HTTP] ConsolidatedTradesDerivatives 2024-12-30 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:45:51] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-30)
+[2026-11-03 17:45:51] ! ConsolidatedTradesDerivatives @ 2024-12-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:51] [HTTP] ConsolidatedTradesDerivatives 2024-12-27 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:45:51] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-27)
+[2026-11-03 17:45:51] ! ConsolidatedTradesDerivatives @ 2024-12-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:51] [HTTP] ConsolidatedTradesDerivatives 2024-12-26 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:45:51] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-26)
+[2026-11-03 17:45:51] ! ConsolidatedTradesDerivatives @ 2024-12-26: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:51] [HTTP] ConsolidatedTradesDerivatives 2024-12-23 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:45:51] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-23)
+[2026-11-03 17:45:51] ! ConsolidatedTradesDerivatives @ 2024-12-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:52] [HTTP] ConsolidatedTradesDerivatives 2024-12-20 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:45:52] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-20)
+[2026-11-03 17:45:52] ! ConsolidatedTradesDerivatives @ 2024-12-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:45:52] [HTTP] ConsolidatedTradesDerivatives 2024-12-19 -> status=200 content-length=251 t=0.24s
+[2026-11-03 17:45:52] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-19)
+[2026-11-03 17:45:52] ! ConsolidatedTradesDerivatives @ 2024-12-19: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:06] [HTTP] ConsolidatedTradesDerivatives 2024-12-18 -> status=200 content-length=251 t=14.12s
+[2026-11-03 17:46:06] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-18)
+[2026-11-03 17:46:06] ! ConsolidatedTradesDerivatives @ 2024-12-18: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:06] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-13
+[2026-11-03 17:46:06] 2025-01-13: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:46:07] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=0.47s
+[2026-11-03 17:46:07] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:46:07] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:07] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:46:07] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:46:07] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:07] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:46:07] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:46:07] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:08] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:46:08] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:46:08] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:08] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=0.28s
+[2026-11-03 17:46:08] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:46:09] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.51s
+[2026-11-03 17:46:09] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:46:09] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.44s
+[2026-11-03 17:46:09] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:46:10] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.58s
+[2026-11-03 17:46:10] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:46:10] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.33s
+[2026-11-03 17:46:10] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-03)
+[2026-11-03 17:46:10] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:10] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.38s
+[2026-11-03 17:46:10] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:46:11] [HTTP] ConsolidatedTradesDerivatives 2024-12-30 -> status=200 content-length=251 t=0.36s
+[2026-11-03 17:46:11] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-30)
+[2026-11-03 17:46:11] ! ConsolidatedTradesDerivatives @ 2024-12-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:11] [HTTP] ConsolidatedTradesDerivatives 2024-12-27 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:46:11] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-27)
+[2026-11-03 17:46:11] ! ConsolidatedTradesDerivatives @ 2024-12-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:11] [HTTP] ConsolidatedTradesDerivatives 2024-12-26 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:46:11] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-26)
+[2026-11-03 17:46:11] ! ConsolidatedTradesDerivatives @ 2024-12-26: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:12] [HTTP] ConsolidatedTradesDerivatives 2024-12-23 -> status=200 content-length=251 t=0.44s
+[2026-11-03 17:46:12] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-23)
+[2026-11-03 17:46:12] ! ConsolidatedTradesDerivatives @ 2024-12-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:12] [HTTP] ConsolidatedTradesDerivatives 2024-12-20 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:46:12] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-20)
+[2026-11-03 17:46:12] ! ConsolidatedTradesDerivatives @ 2024-12-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:12] [HTTP] ConsolidatedTradesDerivatives 2024-12-19 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:46:12] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-19)
+[2026-11-03 17:46:12] ! ConsolidatedTradesDerivatives @ 2024-12-19: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:12] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-14
+[2026-11-03 17:46:12] 2025-01-14: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:46:13] [HTTP] ConsolidatedTradesDerivatives 2025-01-15 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:46:13] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-15)
+[2026-11-03 17:46:13] ! ConsolidatedTradesDerivatives @ 2025-01-15: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:13] [HTTP] ConsolidatedTradesDerivatives 2025-01-15 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:46:13] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-15)
+[2026-11-03 17:46:13] ! ConsolidatedTradesDerivatives @ 2025-01-15: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:13] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:46:13] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:46:13] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:14] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:46:14] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:46:14] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:14] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:46:14] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:46:14] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:14] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=0.23s
+[2026-11-03 17:46:14] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:46:15] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.25s
+[2026-11-03 17:46:15] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:46:15] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.20s
+[2026-11-03 17:46:15] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:46:15] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.27s
+[2026-11-03 17:46:15] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:46:15] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:46:15] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-03)
+[2026-11-03 17:46:15] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:16] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.42s
+[2026-11-03 17:46:16] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:46:16] [HTTP] ConsolidatedTradesDerivatives 2024-12-30 -> status=200 content-length=251 t=0.33s
+[2026-11-03 17:46:16] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-30)
+[2026-11-03 17:46:16] ! ConsolidatedTradesDerivatives @ 2024-12-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:17] [HTTP] ConsolidatedTradesDerivatives 2024-12-27 -> status=200 content-length=251 t=0.34s
+[2026-11-03 17:46:17] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-27)
+[2026-11-03 17:46:17] ! ConsolidatedTradesDerivatives @ 2024-12-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:17] [HTTP] ConsolidatedTradesDerivatives 2024-12-26 -> status=200 content-length=251 t=0.39s
+[2026-11-03 17:46:17] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-26)
+[2026-11-03 17:46:17] ! ConsolidatedTradesDerivatives @ 2024-12-26: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:17] [HTTP] ConsolidatedTradesDerivatives 2024-12-23 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:46:17] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-23)
+[2026-11-03 17:46:17] ! ConsolidatedTradesDerivatives @ 2024-12-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:18] [HTTP] ConsolidatedTradesDerivatives 2024-12-20 -> status=200 content-length=251 t=1.08s
+[2026-11-03 17:46:18] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-20)
+[2026-11-03 17:46:18] ! ConsolidatedTradesDerivatives @ 2024-12-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:18] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-15
+[2026-11-03 17:46:18] 2025-01-15: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:46:19] [HTTP] ConsolidatedTradesDerivatives 2025-01-16 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:46:19] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-16)
+[2026-11-03 17:46:19] ! ConsolidatedTradesDerivatives @ 2025-01-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:19] [HTTP] ConsolidatedTradesDerivatives 2025-01-16 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:46:19] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-16)
+[2026-11-03 17:46:19] ! ConsolidatedTradesDerivatives @ 2025-01-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:19] [HTTP] ConsolidatedTradesDerivatives 2025-01-15 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:46:19] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-15)
+[2026-11-03 17:46:19] ! ConsolidatedTradesDerivatives @ 2025-01-15: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:20] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:46:20] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:46:20] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:20] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:46:20] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:46:20] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:21] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=1.03s
+[2026-11-03 17:46:21] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:46:21] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:21] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=0.33s
+[2026-11-03 17:46:21] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:46:21] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.23s
+[2026-11-03 17:46:21] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:46:22] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.27s
+[2026-11-03 17:46:22] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:46:22] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.28s
+[2026-11-03 17:46:22] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:46:22] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:46:22] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-03)
+[2026-11-03 17:46:22] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:22] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.25s
+[2026-11-03 17:46:22] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:46:23] [HTTP] ConsolidatedTradesDerivatives 2024-12-30 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:46:23] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-30)
+[2026-11-03 17:46:23] ! ConsolidatedTradesDerivatives @ 2024-12-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:23] [HTTP] ConsolidatedTradesDerivatives 2024-12-27 -> status=200 content-length=251 t=0.24s
+[2026-11-03 17:46:23] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-27)
+[2026-11-03 17:46:23] ! ConsolidatedTradesDerivatives @ 2024-12-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:23] [HTTP] ConsolidatedTradesDerivatives 2024-12-26 -> status=200 content-length=251 t=0.24s
+[2026-11-03 17:46:23] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-26)
+[2026-11-03 17:46:23] ! ConsolidatedTradesDerivatives @ 2024-12-26: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:24] [HTTP] ConsolidatedTradesDerivatives 2024-12-23 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:46:24] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-23)
+[2026-11-03 17:46:24] ! ConsolidatedTradesDerivatives @ 2024-12-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:24] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-16
+[2026-11-03 17:46:24] 2025-01-16: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:46:24] [HTTP] ConsolidatedTradesDerivatives 2025-01-17 -> status=200 content-length=251 t=0.53s
+[2026-11-03 17:46:24] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-17)
+[2026-11-03 17:46:24] ! ConsolidatedTradesDerivatives @ 2025-01-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:25] [HTTP] ConsolidatedTradesDerivatives 2025-01-17 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:46:25] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-17)
+[2026-11-03 17:46:25] ! ConsolidatedTradesDerivatives @ 2025-01-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:25] [HTTP] ConsolidatedTradesDerivatives 2025-01-16 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:46:25] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-16)
+[2026-11-03 17:46:25] ! ConsolidatedTradesDerivatives @ 2025-01-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:25] [HTTP] ConsolidatedTradesDerivatives 2025-01-15 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:46:25] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-15)
+[2026-11-03 17:46:25] ! ConsolidatedTradesDerivatives @ 2025-01-15: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:25] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:46:25] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:46:25] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:26] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:46:26] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:46:26] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:26] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:46:26] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:46:26] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:26] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=0.20s
+[2026-11-03 17:46:26] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:46:26] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.22s
+[2026-11-03 17:46:26] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:46:27] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.22s
+[2026-11-03 17:46:27] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:46:27] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.23s
+[2026-11-03 17:46:27] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:46:27] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:46:27] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-03)
+[2026-11-03 17:46:27] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:28] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.52s
+[2026-11-03 17:46:28] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:46:28] [HTTP] ConsolidatedTradesDerivatives 2024-12-30 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:46:28] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-30)
+[2026-11-03 17:46:28] ! ConsolidatedTradesDerivatives @ 2024-12-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:28] [HTTP] ConsolidatedTradesDerivatives 2024-12-27 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:46:28] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-27)
+[2026-11-03 17:46:28] ! ConsolidatedTradesDerivatives @ 2024-12-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:28] [HTTP] ConsolidatedTradesDerivatives 2024-12-26 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:46:28] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-26)
+[2026-11-03 17:46:28] ! ConsolidatedTradesDerivatives @ 2024-12-26: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:28] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-17
+[2026-11-03 17:46:28] 2025-01-17: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:46:29] [HTTP] ConsolidatedTradesDerivatives 2025-01-20 -> status=200 content-length=251 t=0.31s
+[2026-11-03 17:46:29] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-20)
+[2026-11-03 17:46:29] ! ConsolidatedTradesDerivatives @ 2025-01-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:29] [HTTP] ConsolidatedTradesDerivatives 2025-01-20 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:46:29] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-20)
+[2026-11-03 17:46:29] ! ConsolidatedTradesDerivatives @ 2025-01-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:29] [HTTP] ConsolidatedTradesDerivatives 2025-01-17 -> status=200 content-length=251 t=0.17s
+[2026-11-03 17:46:29] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-17)
+[2026-11-03 17:46:29] ! ConsolidatedTradesDerivatives @ 2025-01-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:30] [HTTP] ConsolidatedTradesDerivatives 2025-01-16 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:46:30] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-16)
+[2026-11-03 17:46:30] ! ConsolidatedTradesDerivatives @ 2025-01-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:30] [HTTP] ConsolidatedTradesDerivatives 2025-01-15 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:46:30] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-15)
+[2026-11-03 17:46:30] ! ConsolidatedTradesDerivatives @ 2025-01-15: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:30] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:46:30] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:46:30] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:30] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:46:30] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:46:30] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:31] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:46:31] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:46:31] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:31] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=0.22s
+[2026-11-03 17:46:31] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:46:31] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.36s
+[2026-11-03 17:46:31] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:46:32] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.25s
+[2026-11-03 17:46:32] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:46:32] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.19s
+[2026-11-03 17:46:32] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:46:34] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=1.76s
+[2026-11-03 17:46:34] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-03)
+[2026-11-03 17:46:34] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:34] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.20s
+[2026-11-03 17:46:34] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:46:34] [HTTP] ConsolidatedTradesDerivatives 2024-12-30 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:46:34] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-30)
+[2026-11-03 17:46:34] ! ConsolidatedTradesDerivatives @ 2024-12-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:34] [HTTP] ConsolidatedTradesDerivatives 2024-12-27 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:46:34] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-27)
+[2026-11-03 17:46:34] ! ConsolidatedTradesDerivatives @ 2024-12-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:34] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-20
+[2026-11-03 17:46:34] 2025-01-20: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:46:35] [HTTP] ConsolidatedTradesDerivatives 2025-01-21 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:46:35] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-21)
+[2026-11-03 17:46:35] ! ConsolidatedTradesDerivatives @ 2025-01-21: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:35] [HTTP] ConsolidatedTradesDerivatives 2025-01-21 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:46:35] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-21)
+[2026-11-03 17:46:35] ! ConsolidatedTradesDerivatives @ 2025-01-21: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:36] [HTTP] ConsolidatedTradesDerivatives 2025-01-20 -> status=200 content-length=251 t=0.61s
+[2026-11-03 17:46:36] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-20)
+[2026-11-03 17:46:36] ! ConsolidatedTradesDerivatives @ 2025-01-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:36] [HTTP] ConsolidatedTradesDerivatives 2025-01-17 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:46:36] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-17)
+[2026-11-03 17:46:36] ! ConsolidatedTradesDerivatives @ 2025-01-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:36] [HTTP] ConsolidatedTradesDerivatives 2025-01-16 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:46:36] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-16)
+[2026-11-03 17:46:36] ! ConsolidatedTradesDerivatives @ 2025-01-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:38] [HTTP] ConsolidatedTradesDerivatives 2025-01-15 -> status=200 content-length=251 t=1.97s
+[2026-11-03 17:46:38] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-15)
+[2026-11-03 17:46:38] ! ConsolidatedTradesDerivatives @ 2025-01-15: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:38] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:46:38] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:46:38] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:39] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:46:39] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:46:39] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:39] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:46:39] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:46:39] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:39] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=0.28s
+[2026-11-03 17:46:39] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:46:39] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.22s
+[2026-11-03 17:46:39] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:46:40] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.19s
+[2026-11-03 17:46:40] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:46:40] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.19s
+[2026-11-03 17:46:40] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:46:40] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:46:40] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-03)
+[2026-11-03 17:46:40] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:40] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.25s
+[2026-11-03 17:46:40] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:46:41] [HTTP] ConsolidatedTradesDerivatives 2024-12-30 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:46:41] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2024-12-30)
+[2026-11-03 17:46:41] ! ConsolidatedTradesDerivatives @ 2024-12-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:41] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-21
+[2026-11-03 17:46:41] 2025-01-21: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:46:41] [HTTP] ConsolidatedTradesDerivatives 2025-01-22 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:46:41] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-22)
+[2026-11-03 17:46:41] ! ConsolidatedTradesDerivatives @ 2025-01-22: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:41] [HTTP] ConsolidatedTradesDerivatives 2025-01-22 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:46:41] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-22)
+[2026-11-03 17:46:41] ! ConsolidatedTradesDerivatives @ 2025-01-22: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:42] [HTTP] ConsolidatedTradesDerivatives 2025-01-21 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:46:42] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-21)
+[2026-11-03 17:46:42] ! ConsolidatedTradesDerivatives @ 2025-01-21: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:42] [HTTP] ConsolidatedTradesDerivatives 2025-01-20 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:46:42] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-20)
+[2026-11-03 17:46:42] ! ConsolidatedTradesDerivatives @ 2025-01-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:42] [HTTP] ConsolidatedTradesDerivatives 2025-01-17 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:46:42] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-17)
+[2026-11-03 17:46:42] ! ConsolidatedTradesDerivatives @ 2025-01-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:42] [HTTP] ConsolidatedTradesDerivatives 2025-01-16 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:46:42] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-16)
+[2026-11-03 17:46:42] ! ConsolidatedTradesDerivatives @ 2025-01-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:43] [HTTP] ConsolidatedTradesDerivatives 2025-01-15 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:46:43] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-15)
+[2026-11-03 17:46:43] ! ConsolidatedTradesDerivatives @ 2025-01-15: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:43] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:46:43] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:46:43] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:43] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=0.31s
+[2026-11-03 17:46:43] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:46:43] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:43] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:46:43] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:46:43] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:45] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=1.44s
+[2026-11-03 17:46:45] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:46:45] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.20s
+[2026-11-03 17:46:45] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:46:45] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.17s
+[2026-11-03 17:46:45] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:46:45] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.20s
+[2026-11-03 17:46:45] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:46:46] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:46:46] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-03)
+[2026-11-03 17:46:46] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:46] [HTTP] ConsolidatedTradesDerivatives 2025-01-02 -> status=200 content-length=312 t=0.28s
+[2026-11-03 17:46:46] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-02)
+[2026-11-03 17:46:46] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-22
+[2026-11-03 17:46:46] 2025-01-22: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:46:46] [HTTP] ConsolidatedTradesDerivatives 2025-01-23 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:46:46] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-23)
+[2026-11-03 17:46:46] ! ConsolidatedTradesDerivatives @ 2025-01-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:46:47] [HTTP] ConsolidatedTradesDerivatives 2025-01-23 -> status=200 content-length=251 t=0.17s
+[2026-11-03 17:46:47] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-23)
+[2026-11-03 17:46:47] ! ConsolidatedTradesDerivatives @ 2025-01-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:05] [HTTP] ConsolidatedTradesDerivatives 2025-01-22 -> status=200 content-length=251 t=17.91s
+[2026-11-03 17:47:05] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-22)
+[2026-11-03 17:47:05] ! ConsolidatedTradesDerivatives @ 2025-01-22: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:05] [HTTP] ConsolidatedTradesDerivatives 2025-01-21 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:05] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-21)
+[2026-11-03 17:47:05] ! ConsolidatedTradesDerivatives @ 2025-01-21: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:07] [HTTP] ConsolidatedTradesDerivatives 2025-01-20 -> status=200 content-length=251 t=2.61s
+[2026-11-03 17:47:07] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-20)
+[2026-11-03 17:47:07] ! ConsolidatedTradesDerivatives @ 2025-01-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:08] [HTTP] ConsolidatedTradesDerivatives 2025-01-17 -> status=200 content-length=251 t=0.81s
+[2026-11-03 17:47:08] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-17)
+[2026-11-03 17:47:08] ! ConsolidatedTradesDerivatives @ 2025-01-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:10] [HTTP] ConsolidatedTradesDerivatives 2025-01-16 -> status=200 content-length=251 t=1.47s
+[2026-11-03 17:47:10] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-16)
+[2026-11-03 17:47:10] ! ConsolidatedTradesDerivatives @ 2025-01-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:10] [HTTP] ConsolidatedTradesDerivatives 2025-01-15 -> status=200 content-length=251 t=0.42s
+[2026-11-03 17:47:10] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-15)
+[2026-11-03 17:47:10] ! ConsolidatedTradesDerivatives @ 2025-01-15: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:10] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:10] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:47:10] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:12] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=1.81s
+[2026-11-03 17:47:12] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:47:12] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:13] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:47:13] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:47:13] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:13] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=0.20s
+[2026-11-03 17:47:13] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:47:13] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.17s
+[2026-11-03 17:47:13] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:47:13] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.45s
+[2026-11-03 17:47:13] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:47:14] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.27s
+[2026-11-03 17:47:14] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:47:14] [HTTP] ConsolidatedTradesDerivatives 2025-01-03 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:47:14] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-03)
+[2026-11-03 17:47:14] ! ConsolidatedTradesDerivatives @ 2025-01-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:14] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-23
+[2026-11-03 17:47:14] 2025-01-23: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:47:14] [HTTP] ConsolidatedTradesDerivatives 2025-01-24 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:14] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-24)
+[2026-11-03 17:47:14] ! ConsolidatedTradesDerivatives @ 2025-01-24: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:15] [HTTP] ConsolidatedTradesDerivatives 2025-01-24 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:15] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-24)
+[2026-11-03 17:47:15] ! ConsolidatedTradesDerivatives @ 2025-01-24: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:15] [HTTP] ConsolidatedTradesDerivatives 2025-01-23 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:47:15] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-23)
+[2026-11-03 17:47:15] ! ConsolidatedTradesDerivatives @ 2025-01-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:15] [HTTP] ConsolidatedTradesDerivatives 2025-01-22 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:47:15] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-22)
+[2026-11-03 17:47:15] ! ConsolidatedTradesDerivatives @ 2025-01-22: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:15] [HTTP] ConsolidatedTradesDerivatives 2025-01-21 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:47:15] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-21)
+[2026-11-03 17:47:15] ! ConsolidatedTradesDerivatives @ 2025-01-21: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:16] [HTTP] ConsolidatedTradesDerivatives 2025-01-20 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:47:16] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-20)
+[2026-11-03 17:47:16] ! ConsolidatedTradesDerivatives @ 2025-01-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:16] [HTTP] ConsolidatedTradesDerivatives 2025-01-17 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:47:16] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-17)
+[2026-11-03 17:47:16] ! ConsolidatedTradesDerivatives @ 2025-01-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:16] [HTTP] ConsolidatedTradesDerivatives 2025-01-16 -> status=200 content-length=251 t=0.33s
+[2026-11-03 17:47:16] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-16)
+[2026-11-03 17:47:16] ! ConsolidatedTradesDerivatives @ 2025-01-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:17] [HTTP] ConsolidatedTradesDerivatives 2025-01-15 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:17] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-15)
+[2026-11-03 17:47:17] ! ConsolidatedTradesDerivatives @ 2025-01-15: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:17] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:47:17] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:47:17] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:18] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=0.98s
+[2026-11-03 17:47:18] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:47:18] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:18] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.24s
+[2026-11-03 17:47:18] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:47:18] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:18] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=0.24s
+[2026-11-03 17:47:18] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:47:19] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.23s
+[2026-11-03 17:47:19] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:47:19] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.27s
+[2026-11-03 17:47:19] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:47:19] [HTTP] ConsolidatedTradesDerivatives 2025-01-06 -> status=200 content-length=312 t=0.20s
+[2026-11-03 17:47:19] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-06)
+[2026-11-03 17:47:19] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-24
+[2026-11-03 17:47:19] 2025-01-24: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:47:20] [HTTP] ConsolidatedTradesDerivatives 2025-01-27 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:47:20] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-27)
+[2026-11-03 17:47:20] ! ConsolidatedTradesDerivatives @ 2025-01-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:20] [HTTP] ConsolidatedTradesDerivatives 2025-01-27 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:20] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-27)
+[2026-11-03 17:47:20] ! ConsolidatedTradesDerivatives @ 2025-01-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:20] [HTTP] ConsolidatedTradesDerivatives 2025-01-24 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:47:20] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-24)
+[2026-11-03 17:47:20] ! ConsolidatedTradesDerivatives @ 2025-01-24: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:20] [HTTP] ConsolidatedTradesDerivatives 2025-01-23 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:20] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-23)
+[2026-11-03 17:47:20] ! ConsolidatedTradesDerivatives @ 2025-01-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:21] [HTTP] ConsolidatedTradesDerivatives 2025-01-22 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:47:21] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-22)
+[2026-11-03 17:47:21] ! ConsolidatedTradesDerivatives @ 2025-01-22: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:21] [HTTP] ConsolidatedTradesDerivatives 2025-01-21 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:21] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-21)
+[2026-11-03 17:47:21] ! ConsolidatedTradesDerivatives @ 2025-01-21: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:21] [HTTP] ConsolidatedTradesDerivatives 2025-01-20 -> status=200 content-length=251 t=0.50s
+[2026-11-03 17:47:21] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-20)
+[2026-11-03 17:47:21] ! ConsolidatedTradesDerivatives @ 2025-01-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:22] [HTTP] ConsolidatedTradesDerivatives 2025-01-17 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:22] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-17)
+[2026-11-03 17:47:22] ! ConsolidatedTradesDerivatives @ 2025-01-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:22] [HTTP] ConsolidatedTradesDerivatives 2025-01-16 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:22] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-16)
+[2026-11-03 17:47:22] ! ConsolidatedTradesDerivatives @ 2025-01-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:22] [HTTP] ConsolidatedTradesDerivatives 2025-01-15 -> status=200 content-length=251 t=0.36s
+[2026-11-03 17:47:22] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-15)
+[2026-11-03 17:47:22] ! ConsolidatedTradesDerivatives @ 2025-01-15: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:23] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:47:23] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:47:23] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:23] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:47:23] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:47:23] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:23] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:23] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:47:23] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:23] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=0.19s
+[2026-11-03 17:47:23] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:47:24] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.19s
+[2026-11-03 17:47:24] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:47:24] [HTTP] ConsolidatedTradesDerivatives 2025-01-07 -> status=200 content-length=312 t=0.19s
+[2026-11-03 17:47:24] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-07)
+[2026-11-03 17:47:24] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-27
+[2026-11-03 17:47:24] 2025-01-27: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:47:24] [HTTP] ConsolidatedTradesDerivatives 2025-01-28 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:24] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-28)
+[2026-11-03 17:47:24] ! ConsolidatedTradesDerivatives @ 2025-01-28: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:24] [HTTP] ConsolidatedTradesDerivatives 2025-01-28 -> status=200 content-length=251 t=0.17s
+[2026-11-03 17:47:24] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-28)
+[2026-11-03 17:47:24] ! ConsolidatedTradesDerivatives @ 2025-01-28: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:25] [HTTP] ConsolidatedTradesDerivatives 2025-01-27 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:47:25] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-27)
+[2026-11-03 17:47:25] ! ConsolidatedTradesDerivatives @ 2025-01-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:25] [HTTP] ConsolidatedTradesDerivatives 2025-01-24 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:47:25] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-24)
+[2026-11-03 17:47:25] ! ConsolidatedTradesDerivatives @ 2025-01-24: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:25] [HTTP] ConsolidatedTradesDerivatives 2025-01-23 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:47:25] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-23)
+[2026-11-03 17:47:25] ! ConsolidatedTradesDerivatives @ 2025-01-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:25] [HTTP] ConsolidatedTradesDerivatives 2025-01-22 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:47:25] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-22)
+[2026-11-03 17:47:25] ! ConsolidatedTradesDerivatives @ 2025-01-22: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:26] [HTTP] ConsolidatedTradesDerivatives 2025-01-21 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:26] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-21)
+[2026-11-03 17:47:26] ! ConsolidatedTradesDerivatives @ 2025-01-21: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:26] [HTTP] ConsolidatedTradesDerivatives 2025-01-20 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:47:26] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-20)
+[2026-11-03 17:47:26] ! ConsolidatedTradesDerivatives @ 2025-01-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:26] [HTTP] ConsolidatedTradesDerivatives 2025-01-17 -> status=200 content-length=251 t=0.17s
+[2026-11-03 17:47:26] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-17)
+[2026-11-03 17:47:26] ! ConsolidatedTradesDerivatives @ 2025-01-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:26] [HTTP] ConsolidatedTradesDerivatives 2025-01-16 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:26] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-16)
+[2026-11-03 17:47:26] ! ConsolidatedTradesDerivatives @ 2025-01-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:26] [HTTP] ConsolidatedTradesDerivatives 2025-01-15 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:26] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-15)
+[2026-11-03 17:47:26] ! ConsolidatedTradesDerivatives @ 2025-01-15: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:28] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=1.30s
+[2026-11-03 17:47:28] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:47:28] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:28] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=0.33s
+[2026-11-03 17:47:28] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:47:28] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:28] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:47:28] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:47:28] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:29] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=0.23s
+[2026-11-03 17:47:29] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:47:29] [HTTP] ConsolidatedTradesDerivatives 2025-01-08 -> status=200 content-length=312 t=0.22s
+[2026-11-03 17:47:29] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-08)
+[2026-11-03 17:47:29] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-28
+[2026-11-03 17:47:29] 2025-01-28: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:47:29] [HTTP] ConsolidatedTradesDerivatives 2025-01-29 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:47:29] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-29)
+[2026-11-03 17:47:29] ! ConsolidatedTradesDerivatives @ 2025-01-29: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:39] [HTTP] ConsolidatedTradesDerivatives 2025-01-29 -> status=200 content-length=251 t=9.81s
+[2026-11-03 17:47:39] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-29)
+[2026-11-03 17:47:39] ! ConsolidatedTradesDerivatives @ 2025-01-29: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:39] [HTTP] ConsolidatedTradesDerivatives 2025-01-28 -> status=200 content-length=251 t=0.28s
+[2026-11-03 17:47:40] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-28)
+[2026-11-03 17:47:40] ! ConsolidatedTradesDerivatives @ 2025-01-28: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:40] [HTTP] ConsolidatedTradesDerivatives 2025-01-27 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:47:40] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-27)
+[2026-11-03 17:47:40] ! ConsolidatedTradesDerivatives @ 2025-01-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:40] [HTTP] ConsolidatedTradesDerivatives 2025-01-24 -> status=200 content-length=251 t=0.33s
+[2026-11-03 17:47:40] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-24)
+[2026-11-03 17:47:40] ! ConsolidatedTradesDerivatives @ 2025-01-24: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:41] [HTTP] ConsolidatedTradesDerivatives 2025-01-23 -> status=200 content-length=251 t=0.70s
+[2026-11-03 17:47:41] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-23)
+[2026-11-03 17:47:41] ! ConsolidatedTradesDerivatives @ 2025-01-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:41] [HTTP] ConsolidatedTradesDerivatives 2025-01-22 -> status=200 content-length=251 t=0.36s
+[2026-11-03 17:47:41] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-22)
+[2026-11-03 17:47:41] ! ConsolidatedTradesDerivatives @ 2025-01-22: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:41] [HTTP] ConsolidatedTradesDerivatives 2025-01-21 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:41] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-21)
+[2026-11-03 17:47:41] ! ConsolidatedTradesDerivatives @ 2025-01-21: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:42] [HTTP] ConsolidatedTradesDerivatives 2025-01-20 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:42] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-20)
+[2026-11-03 17:47:42] ! ConsolidatedTradesDerivatives @ 2025-01-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:42] [HTTP] ConsolidatedTradesDerivatives 2025-01-17 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:47:42] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-17)
+[2026-11-03 17:47:42] ! ConsolidatedTradesDerivatives @ 2025-01-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:42] [HTTP] ConsolidatedTradesDerivatives 2025-01-16 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:42] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-16)
+[2026-11-03 17:47:42] ! ConsolidatedTradesDerivatives @ 2025-01-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:42] [HTTP] ConsolidatedTradesDerivatives 2025-01-15 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:42] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-15)
+[2026-11-03 17:47:42] ! ConsolidatedTradesDerivatives @ 2025-01-15: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:44] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=1.58s
+[2026-11-03 17:47:44] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:47:44] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:44] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:47:44] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:47:44] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:44] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:45] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:47:45] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:48] [HTTP] ConsolidatedTradesDerivatives 2025-01-09 -> status=200 content-length=312 t=3.05s
+[2026-11-03 17:47:48] [HTTP] md5=8740c2203a627837304856cef72466c8 bytes=493 (ConsolidatedTradesDerivatives 2025-01-09)
+[2026-11-03 17:47:48] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-29
+[2026-11-03 17:47:48] 2025-01-29: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:47:48] [HTTP] ConsolidatedTradesDerivatives 2025-01-30 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:48] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-30)
+[2026-11-03 17:47:48] ! ConsolidatedTradesDerivatives @ 2025-01-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:48] [HTTP] ConsolidatedTradesDerivatives 2025-01-30 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:48] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-30)
+[2026-11-03 17:47:48] ! ConsolidatedTradesDerivatives @ 2025-01-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:49] [HTTP] ConsolidatedTradesDerivatives 2025-01-29 -> status=200 content-length=251 t=0.31s
+[2026-11-03 17:47:49] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-29)
+[2026-11-03 17:47:49] ! ConsolidatedTradesDerivatives @ 2025-01-29: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:49] [HTTP] ConsolidatedTradesDerivatives 2025-01-28 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:49] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-28)
+[2026-11-03 17:47:49] ! ConsolidatedTradesDerivatives @ 2025-01-28: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:49] [HTTP] ConsolidatedTradesDerivatives 2025-01-27 -> status=200 content-length=251 t=0.17s
+[2026-11-03 17:47:49] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-27)
+[2026-11-03 17:47:49] ! ConsolidatedTradesDerivatives @ 2025-01-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:49] [HTTP] ConsolidatedTradesDerivatives 2025-01-24 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:49] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-24)
+[2026-11-03 17:47:49] ! ConsolidatedTradesDerivatives @ 2025-01-24: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:50] [HTTP] ConsolidatedTradesDerivatives 2025-01-23 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:50] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-23)
+[2026-11-03 17:47:50] ! ConsolidatedTradesDerivatives @ 2025-01-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:50] [HTTP] ConsolidatedTradesDerivatives 2025-01-22 -> status=200 content-length=251 t=0.25s
+[2026-11-03 17:47:50] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-22)
+[2026-11-03 17:47:50] ! ConsolidatedTradesDerivatives @ 2025-01-22: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:50] [HTTP] ConsolidatedTradesDerivatives 2025-01-21 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:47:50] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-21)
+[2026-11-03 17:47:50] ! ConsolidatedTradesDerivatives @ 2025-01-21: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:50] [HTTP] ConsolidatedTradesDerivatives 2025-01-20 -> status=200 content-length=251 t=0.17s
+[2026-11-03 17:47:50] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-20)
+[2026-11-03 17:47:50] ! ConsolidatedTradesDerivatives @ 2025-01-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:51] [HTTP] ConsolidatedTradesDerivatives 2025-01-17 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:51] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-17)
+[2026-11-03 17:47:51] ! ConsolidatedTradesDerivatives @ 2025-01-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:51] [HTTP] ConsolidatedTradesDerivatives 2025-01-16 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:51] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-16)
+[2026-11-03 17:47:51] ! ConsolidatedTradesDerivatives @ 2025-01-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:51] [HTTP] ConsolidatedTradesDerivatives 2025-01-15 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:51] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-15)
+[2026-11-03 17:47:51] ! ConsolidatedTradesDerivatives @ 2025-01-15: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:51] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:51] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:47:51] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:51] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=0.17s
+[2026-11-03 17:47:51] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:47:51] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:52] [HTTP] ConsolidatedTradesDerivatives 2025-01-10 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:47:52] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-10)
+[2026-11-03 17:47:52] ! ConsolidatedTradesDerivatives @ 2025-01-10: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:52] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-30
+[2026-11-03 17:47:52] 2025-01-30: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:47:52] [HTTP] ConsolidatedTradesDerivatives 2025-01-31 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:52] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-31)
+[2026-11-03 17:47:52] ! ConsolidatedTradesDerivatives @ 2025-01-31: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:52] [HTTP] ConsolidatedTradesDerivatives 2025-01-31 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:52] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-31)
+[2026-11-03 17:47:52] ! ConsolidatedTradesDerivatives @ 2025-01-31: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:53] [HTTP] ConsolidatedTradesDerivatives 2025-01-30 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:47:53] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-30)
+[2026-11-03 17:47:53] ! ConsolidatedTradesDerivatives @ 2025-01-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:53] [HTTP] ConsolidatedTradesDerivatives 2025-01-29 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:47:53] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-29)
+[2026-11-03 17:47:53] ! ConsolidatedTradesDerivatives @ 2025-01-29: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:53] [HTTP] ConsolidatedTradesDerivatives 2025-01-28 -> status=200 content-length=251 t=0.17s
+[2026-11-03 17:47:53] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-28)
+[2026-11-03 17:47:53] ! ConsolidatedTradesDerivatives @ 2025-01-28: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:53] [HTTP] ConsolidatedTradesDerivatives 2025-01-27 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:47:53] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-27)
+[2026-11-03 17:47:53] ! ConsolidatedTradesDerivatives @ 2025-01-27: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:53] [HTTP] ConsolidatedTradesDerivatives 2025-01-24 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:54] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-24)
+[2026-11-03 17:47:54] ! ConsolidatedTradesDerivatives @ 2025-01-24: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:54] [HTTP] ConsolidatedTradesDerivatives 2025-01-23 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:47:54] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-23)
+[2026-11-03 17:47:54] ! ConsolidatedTradesDerivatives @ 2025-01-23: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:54] [HTTP] ConsolidatedTradesDerivatives 2025-01-22 -> status=200 content-length=251 t=0.19s
+[2026-11-03 17:47:54] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-22)
+[2026-11-03 17:47:54] ! ConsolidatedTradesDerivatives @ 2025-01-22: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:54] [HTTP] ConsolidatedTradesDerivatives 2025-01-21 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:54] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-21)
+[2026-11-03 17:47:54] ! ConsolidatedTradesDerivatives @ 2025-01-21: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:54] [HTTP] ConsolidatedTradesDerivatives 2025-01-20 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:55] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-20)
+[2026-11-03 17:47:55] ! ConsolidatedTradesDerivatives @ 2025-01-20: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:55] [HTTP] ConsolidatedTradesDerivatives 2025-01-17 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:55] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-17)
+[2026-11-03 17:47:55] ! ConsolidatedTradesDerivatives @ 2025-01-17: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:55] [HTTP] ConsolidatedTradesDerivatives 2025-01-16 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:47:55] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-16)
+[2026-11-03 17:47:55] ! ConsolidatedTradesDerivatives @ 2025-01-16: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:55] [HTTP] ConsolidatedTradesDerivatives 2025-01-15 -> status=200 content-length=251 t=0.22s
+[2026-11-03 17:47:55] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-15)
+[2026-11-03 17:47:55] ! ConsolidatedTradesDerivatives @ 2025-01-15: falhou parse (No columns to parse from file)
+[2026-11-03 17:47:56] [HTTP] ConsolidatedTradesDerivatives 2025-01-14 -> status=200 content-length=251 t=0.20s
+[2026-11-03 17:47:56] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-14)
+[2026-11-03 17:47:56] ! ConsolidatedTradesDerivatives @ 2025-01-14: falhou parse (No columns to parse from file)
+[2026-11-03 17:48:06] [HTTP] ConsolidatedTradesDerivatives 2025-01-13 -> status=200 content-length=251 t=10.78s
+[2026-11-03 17:48:06] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-13)
+[2026-11-03 17:48:06] ! ConsolidatedTradesDerivatives @ 2025-01-13: falhou parse (No columns to parse from file)
+[2026-11-03 17:48:06] ! ConsolidatedTradesDerivatives: sem dados até 15 DUs atrás para 2025-01-31
+[2026-11-03 17:48:06] 2025-01-31: nenhum dado disponível — mantendo (sem atualização).
+[2026-11-03 17:48:07] [HTTP] ConsolidatedTradesDerivatives 2025-02-03 -> status=200 content-length=251 t=0.30s
+[2026-11-03 17:48:07] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-02-03)
+[2026-11-03 17:48:07] ! ConsolidatedTradesDerivatives @ 2025-02-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:48:07] [HTTP] ConsolidatedTradesDerivatives 2025-02-03 -> status=200 content-length=251 t=0.27s
+[2026-11-03 17:48:07] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-02-03)
+[2026-11-03 17:48:07] ! ConsolidatedTradesDerivatives @ 2025-02-03: falhou parse (No columns to parse from file)
+[2026-11-03 17:48:07] [HTTP] ConsolidatedTradesDerivatives 2025-01-31 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:48:07] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-31)
+[2026-11-03 17:48:07] ! ConsolidatedTradesDerivatives @ 2025-01-31: falhou parse (No columns to parse from file)
+[2026-11-03 17:48:08] [HTTP] ConsolidatedTradesDerivatives 2025-01-30 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:48:08] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-30)
+[2026-11-03 17:48:08] ! ConsolidatedTradesDerivatives @ 2025-01-30: falhou parse (No columns to parse from file)
+[2026-11-03 17:48:08] [HTTP] ConsolidatedTradesDerivatives 2025-01-29 -> status=200 content-length=251 t=0.23s
+[2026-11-03 17:48:08] [HTTP] md5=7e9e8d696c4598619abd5fdce4d4e919 bytes=394 (ConsolidatedTradesDerivatives 2025-01-29)
+[2026-11-03 17:48:08] ! ConsolidatedTradesDerivatives @ 2025-01-29: falhou parse (No columns to parse from file)
+[2026-11-03 17:49:36] Atualizando de 2026-10-30 até 2026-10-30 (DU B3: 1)
+[2026-11-03 17:49:37] [HTTP] ConsolidatedTradesDerivatives 2026-10-30 -> status=200 content-length=126596 t=1.19s
+[2026-11-03 17:49:37] [HTTP] md5=de3ea7c853c58b08101cfa8c886afa59 bytes=627362 (ConsolidatedTradesDerivatives 2026-10-30)
+[2026-11-03 17:49:38] 2026-10-30: base longa atualizada; total linhas = 27927.
+[2026-11-03 17:49:38] 2026-10-30: preços/valores atualizados.
+[2026-11-03 17:49:38] 2026-11-02: não é dia útil B3 — não tenta hoje.
+[2026-11-03 17:49:42] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (103, 460) | Dados/df_valor_ajuste_contrato.parquet (92, 458)
+[2026-11-03 17:49:42] [warn] envio Supabase falhou: name '_enviar_para_supabase' is not defined
+[2026-11-03 17:49:43] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json

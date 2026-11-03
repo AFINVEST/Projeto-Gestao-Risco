@@ -2,3 +2,5 @@
 .env.local
 *.bak
 *.bak_*
+
+__pycache__/

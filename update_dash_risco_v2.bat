@@ -80,6 +80,13 @@ if errorlevel 1 (
 )
 
 echo.
+echo [C1b] atualizar_covar_snapshot.py (CoVaR por estrategia)...
+python atualizar_covar_snapshot.py
+if errorlevel 1 (
+    echo [warn] CoVaR por estrategia falhou. Seguindo o pipeline...
+)
+
+echo.
 echo [C2] aplicar_governance.py...
 python aplicar_governance.py
 if errorlevel 1 (

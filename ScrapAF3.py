@@ -342,9 +342,14 @@ def main():
         driver.get("https://afinvest.com.br/login/interno")
         time.sleep(2)
         WebDriverWait(driver, 10).until(EC.presence_of_element_located(
-            (By.ID, "atributo"))).send_keys("marcos.freitas@afinvest.com.br")
-        driver.find_element(By.ID, "passwordLogin").send_keys("Marcos@2468")
+            (By.ID, "atributo"))).send_keys(os.environ["AF_USUARIO"])
+        driver.find_element(By.ID, "passwordLogin").send_keys(os.environ["AF_SENHA"])
         driver.find_element(By.ID, "loginInterno").click()
+        # [af3-login] espera sair da tela de login antes de navegar
+        try:
+            WebDriverWait(driver, 30).until(lambda drv: "/login" not in drv.current_url)
+        except Exception:
+            raise RuntimeError("Login no portal AF falhou (continua na tela de login) - verificar AF_USUARIO/AF_SENHA no .env")
 
         # 4) Vai para o relatório e seleciona data custom
         driver.get("https://afinvest.com.br/interno/relatorios/patrimonios")
@@ -431,7 +436,22 @@ def main():
         print("Dados atualizados com sucesso!")
 
     except Exception as e:
-        print(f"Erro durante a execução: {str(e)}")
+        # [af3-falha] diagnostico + sai com erro para o .bat parar
+        import traceback as _tb, sys as _sys
+        print(f"Erro durante a execução: {type(e).__name__}: {str(e).strip()[:300]}")
+        _fr = [x for x in _tb.extract_tb(e.__traceback__) if x.filename.endswith("ScrapAF3.py")]
+        if _fr:
+            print(f"[ScrapAF3] falhou na linha {_fr[-1].lineno}: {(_fr[-1].line or '').strip()}")
+        try:
+            print(f"[ScrapAF3] URL no momento do erro: {driver.current_url}")
+            driver.save_screenshot("debug_scrapaf3.png")
+            with open("debug_scrapaf3.html", "w", encoding="utf-8") as _fh:
+                _fh.write(driver.page_source)
+            print("[ScrapAF3] print salvo em debug_scrapaf3.png (HTML em debug_scrapaf3.html)")
+        except Exception as _e2:
+            print(f"[ScrapAF3] nao consegui salvar o print: {_e2}")
+        driver.quit()
+        _sys.exit(1)
 
     finally:
         driver.quit()

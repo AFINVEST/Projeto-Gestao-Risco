@@ -4611,3 +4611,16 @@
 [2026-11-13 09:15:06] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (104, 468) | Dados/df_valor_ajuste_contrato.parquet (93, 466)
 [2026-11-13 09:15:06] [warn] envio Supabase falhou: name '_enviar_para_supabase' is not defined
 [2026-11-13 09:15:07] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json
+[2026-11-16 10:25:54] Atualizando de 2026-11-12 até 2026-11-13 (DU B3: 2)
+[2026-11-16 10:26:00] [HTTP] ConsolidatedTradesDerivatives 2026-11-12 -> status=200 content-length=122682 t=5.12s
+[2026-11-16 10:26:00] [HTTP] md5=0bc00dfde610c96e4a142e1832dcd75d bytes=610894 (ConsolidatedTradesDerivatives 2026-11-12)
+[2026-11-16 10:26:00] 2026-11-12: base longa atualizada; total linhas = 28818.
+[2026-11-16 10:26:01] 2026-11-12: preços/valores atualizados.
+[2026-11-16 10:26:06] [HTTP] ConsolidatedTradesDerivatives 2026-11-13 -> status=200 content-length=123691 t=5.09s
+[2026-11-16 10:26:06] [HTTP] md5=ebfe3476ce509696953d8555e1ea0529 bytes=612797 (ConsolidatedTradesDerivatives 2026-11-13)
+[2026-11-16 10:26:07] 2026-11-13: base longa atualizada; total linhas = 28929.
+[2026-11-16 10:26:07] 2026-11-13: preços/valores atualizados.
+[2026-11-16 10:26:07] 2026-11-15: não é dia útil B3 — não tenta hoje.
+[2026-11-16 10:26:12] Salvos: Dados/df_preco_de_ajuste_atual_completo.parquet (104, 469) | Dados/df_valor_ajuste_contrato.parquet (93, 467)
+[2026-11-16 10:26:12] [warn] envio Supabase falhou: name '_enviar_para_supabase' is not defined
+[2026-11-16 10:26:13] Salvo JSON pt-BR de preços (texto): Dados/df_preco_de_ajuste_atual_completo.json

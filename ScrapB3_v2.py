@@ -119,7 +119,10 @@ def _append_log(msg: str):
 
 def _ensure_debug_dir():
     if DEBUG_DUMP_DIR:
-        Path(DEBUG_DUMP_DIR).mkdir(parents=True, exist_ok=True)
+        try:  # [b3-debugdir] drive de rede as vezes acusa WinError 183; o dump e opcional
+            Path(DEBUG_DUMP_DIR).mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
 
 
 def _dump_csv(data: dt.date, raw_bytes: bytes):
@@ -773,7 +776,7 @@ def buscar_dia_com_backoff(target_d: dt.date) -> pd.DataFrame:
     tentativas_max = max(BACKOFF_LIM, 15)
 
     tentativa = 0
-    for prev_d in [target_d] + validos_back:
+    for prev_d in [target_d]:  # [b3-sem-backfill] nunca gravar pregao de outro dia com esta data
         try:
             csv_text = baixar_csv_b3(prev_d)
             df_n = parse_consolidated_trades(csv_text, prev_d)
